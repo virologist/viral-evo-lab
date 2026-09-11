@@ -1,0 +1,36 @@
+# ─── OS ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Editor / IDE ─────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Python ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.mypy_cache/
+.venv/
+venv/
+
+# ─── Backups & temp ───────────────────────────────────
+*.bak
+*.bak.*
+*.orig
+*.tmp
+*.temp
+*.log
+
+# ─── Local session metadata ───────────────────────────
+.created-by-session
+
+# ─── Runtime artifacts ────────────────────────────────
+/tmp/
+/outputs/
+/runs/
+*.results.json
