@@ -1,0 +1,36 @@
+{
+  "name": "viral-evo-lab",
+  "version": "1.0.0",
+  "description": "Viral genetic evolution research team: frontier literature search, method transfer, falsifiable hypothesis generation, evolutionary prediction, and full-pipeline bioinformatics guidance driving high-i",
+  "author": {
+    "name": "TZUVet",
+    "email": "54756814+virologist@users.noreply.github.com",
+    "url": "https://github.com/virologist"
+  },
+  "homepage": "https://github.com/virologist/viral-evo-lab",
+  "repository": "https://github.com/virologist/viral-evo-lab",
+  "license": "Apache-2.0",
+  "keywords": [
+    "virology",
+    "evolution",
+    "bioinformatics",
+    "research-team",
+    "hypothesis-generation"
+  ],
+  "agents": [
+    "./agents/viral-evo-lab-team-lead.md",
+    "./agents/hypothesis-officer.md",
+    "./agents/phylo-analyst.md",
+    "./agents/popgen-modeler.md",
+    "./agents/predictive-virologist.md",
+    "./agents/structural-virologist.md",
+    "./agents/literature-scout.md",
+    "./agents/pipeline-engineer.md",
+    "./agents/research-diagnostician.md",
+    "./agents/medical-vet-bridge.md",
+    "./agents/archivist.md"
+  ],
+  "skills": [
+    "./skills/viral-evo-core"
+  ]
+}

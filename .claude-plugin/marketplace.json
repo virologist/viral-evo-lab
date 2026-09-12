@@ -1,0 +1,23 @@
+{
+  "name": "viral-evo-lab-marketplace",
+  "owner": {
+    "name": "TZUVet",
+    "email": "54756814+virologist@users.noreply.github.com",
+    "url": "https://github.com/virologist"
+  },
+  "metadata": {
+    "description": "Single-plugin marketplace for viral-evo-lab",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "viral-evo-lab",
+      "source": "./",
+      "version": "1.0.0",
+      "description": "Viral genetic evolution research team: frontier literature search, method transfer, falsifiable hypothesis generation, evolutionary prediction, and full-pipeline bioinformatics guidance driving high-i",
+      "license": "Apache-2.0",
+      "category": "research",
+      "strict": true
+    }
+  ]
+}
