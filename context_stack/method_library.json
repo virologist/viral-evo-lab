@@ -1,0 +1,57 @@
+{
+  "$schema_version": "1.0.0",
+  "$purpose": "项目级方法管线真源（Anthropic feature_list.json 模式）。权威定义见 skills/viral-evo-core/references/frontier-2025-2026.md；本文件是项目级快照+迁移记录。",
+  "$governance": {
+    "write_rule": "archivist 仅在有新增/变更条目时增量更新；纯检索轮零写放大",
+    "human_view": "本 JSON 是机器真源；method_library.md 是人类可读视图，由 archivist 从 JSON 渲染"
+  },
+  "last_updated": "2026-09-18T11:44:00+08:00",
+  "project_pipelines": {
+    "production": {
+      "id": "P-H5Nx-v5.1",
+      "description": "H5Nx v5.1 投稿稿配套生产管线",
+      "steps": [
+        {"step": 1, "tool": "NCBI/GISAID", "purpose": "序列检索"},
+        {"step": 2, "tool": "MAFFT", "params": "--auto ≤1000seq / --thread >1000", "qc": "缺失率 <5%"},
+        {"step": 3, "tool": "MUSCLE5", "purpose": "蛋白序列比对", "note": "用于蛋白级模块"},
+        {"step": 4, "tool": "IQ-TREE 3.x", "params": "MFP 自动模型选择", "qc": "UFBoot≥95, SH-aLRT≥80"},
+        {"step": 5, "tool": "HyPhy FUBAR", "purpose": "位点级选择压（贝叶斯）", "qc": "FDR p<0.05"},
+        {"step": 6, "tool": "PAML M7/M8", "purpose": "位点模型似然比", "qc": "FUBAR+PAML 双显著方报位点"},
+        {"step": 7, "tool": "AlphaFold3", "purpose": "结构验证（精度优先）"},
+        {"step": 8, "tool": "ESMFold", "purpose": "结构预测（批量速度优先）"}
+      ],
+      "timetree": {
+        "tools": ["BEAST2", "TreeTime"],
+        "selection": "BEAST2 精度优先；TreeTime 探索优先",
+        "qc": "ESS≥200 + Tracer 收敛诊断",
+        "first_check": "root-to-tip 回归评估时间信号，信号不足改推距离法（LSD/TreeDater）"
+      },
+      "visualization": {
+        "publication_grade": "ggtree + ggplot2",
+        "exploration": "FigTree"
+      },
+      "workflow_size_trigger": "样本 >20 自动建议 Snakemake 模块化",
+      "gene_segments": "8 genes (HA, NA, PB2, PB1, PA, NP, M, NS) 分别建树，目录 03_ML_tree/"
+    },
+    "exploration": {
+      "id": "P-H5Nx-方案B",
+      "description": "BEAST1 Province 离散地理 + G70/G140 联合 trait 重建（方案 B，下一阶段，非投稿主线）",
+      "status": "未完成",
+      "assets": [
+        "06_Beast/H5Nx_HA_cd995_jump-reward.xml",
+        "06_Beast/H5Nx_HA_cd995_com.tree (MCC)"
+      ],
+      "requirements": "Province 离散地理 + G70/G140 联合 trait 重建（需 BEAST1 Java）"
+    }
+  },
+  "method_transfers": [],
+  "frontier_anchors_2025_2026": {
+    "authoritative_source": "skills/viral-evo-core/references/frontier-2025-2026.md",
+    "candidates": [
+      {"method": "BEAST2 + CoalRe", "use": "分节段病毒重配网络分析（8 节段禽流感直接适用）", "source": "RdRp Summit 2026-02 社区共识", "status": "候选待验证"},
+      {"method": "DMS 适应度景观", "use": "突变效应依赖遗传背景（entrenchment），支撑预适应 enabling 叙事", "source": "Bloom 组 Nat Ecol Evol 2025, doi:10.1038/s41559-025-02895-1", "status": "候选待验证"},
+      {"method": "蛋白语言模型（BiLSTM/ProtBERT）", "use": "仅从 HA 序列预测抗原性 / in silico DMS 排序逃逸突变", "source": "Sci Rep 2025, PMID:40592976", "status": "候选待验证"},
+      {"method": "FoldTree/Foldseek 结构系统发育", "use": "高分化蛋白家族深节点校验", "source": "Mol Evol Sci 2025 方法综述", "status": "候选待验证"}
+    ]
+  }
+}

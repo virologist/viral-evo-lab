@@ -1,0 +1,19 @@
+# OS 元数据
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器临时
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OneDrive 同步冲突标记
+*.tmp
+*.tmp.driveupload
+*.tmp.drivedownload
+
+# 临时 scratch
+scratch/

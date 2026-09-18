@@ -1,0 +1,46 @@
+{
+  "$schema_version": "1.0.0",
+  "$purpose": "用户明确认可的假说真源（Anthropic feature_list.json 模式：JSON 而非 Markdown 防 model 改坏）。仅 user_transcript 含'确认/采纳/认可'关键词的假说才入此池。",
+  "$governance": {
+    "write_rule": "仅在 user_transcript 含'确认/采纳/认可'关键词时由 archivist 写入；未认可前留在 10_hypotheses/_候选.md",
+    "deprecate_rule": "新数据证伪后 status=deprecated，不删除（保留溯源）；archivist 负责迁移",
+    "human_view": "本 JSON 是机器真源；confirmed_hypotheses.md 是人类可读视图，由 archivist 从 JSON 渲染"
+  },
+  "last_updated": "2026-09-18T11:44:00+08:00",
+  "active_hypotheses": [
+    {
+      "id": "H-ANCHOR-1",
+      "claim": "H5Nx clade 2.3.4.4 中，G70（mature 54）与 G140（mature 124）构成 4h clade 平级协同标记对（D'=+0.94 共变），通过独立获得 + 遗传连锁共演化塑造 4h 谱系糖基化景观；G140 是 4h clade 的定义性糖基化标记（clade_delta=-0.916, freq_4h=91.7%）。",
+      "supporting_evidence": [
+        {"source": "M6 共演化 D'", "value": "+0.944 (NetNGlyc n=2,476) / +0.896 (全集 n=2,497)", "ci": "跨数据集一致 >0.85"},
+        {"source": "M9_a GLMM Gate-1", "spec": "控制 Clade+Subtype+Phase+Year+Province RE, n=2475", "result": "G140 crude taxon_delta=+0.376 → conditional Mammal ΔP=+0.073, 95% CI [-0.067, +0.214], p=0.308 (不显著)"},
+        {"source": "M14 collapse", "spec": "binomial GLM, n=77 tip", "result": "G140 crude +0.368 → conditional +0.002，崩塌 99.4%"},
+        {"source": "Clade 4h 效应", "value": "β=+0.806, p≈0 (G140 变异绝大部分由 4h clade 解释)"}
+      ],
+      "key_predictions": [
+        "若假说成立，未来 4h clade 内部 G140 频率维持 ≥90%",
+        "若 G140 真有独立 mammalian association 效应，在控制 clade confounding 的子样本中仍显著；当前 M9_a 不支持，故 G140 mammalian association 主要由 clade-founder confounding 驱动"
+      ],
+      "falsification_conditions": [
+        "若 D' 重测（独立数据集）<0.85 → 推翻协同标记对叙事",
+        "若 M9_a 类严格控制 clade 后 G140-Mammal 仍 p<0.05 → 推翻 clade confounding 主导",
+        "若 4h clade 不再定义 clade_delta 主导（freq_4h<80%）→ 推翻定义性糖基化标记"
+      ],
+      "confidence": "高",
+      "confidence_basis": "双源 GLMM + 双盲 PGLS 验证，Methods §2.5 已双源声明",
+      "status": "active",
+      "associated_narrative": "clade-host confounding 量化案例本身是核心方法学贡献（诚实讨论）",
+      "manuscript_status": "v5.1 重定位完成；manuscript v3.8c+5.1 已应用；投稿中（仅 P0=GISAID 致谢表）",
+      "vintage": "2026-07-30 Gate-1 验证后",
+      "vintage_recorded": "2026-09-11"
+    }
+  ],
+  "deprecated_hypotheses": [
+    {"id": "DEP-1", "text": "S140 是唯一显著宿主关联位点", "reason": "被 G70 取代（M4 'cat' bug 修正）"},
+    {"id": "DEP-2", "text": "sequon 三联体差异化选择", "reason": "alignment 验证证伪（v3.6.1）"},
+    {"id": "DEP-3", "text": "G70 是 4b 单次预适应", "reason": "Card #2 排除大分支固定，修正为多重 gain+漂变"},
+    {"id": "DEP-4", "text": "G140 双锁定 / 最强 mammalian marker", "reason": "v5.1 Gate-1 验证证伪"},
+    {"id": "DEP-5", "text": "糖基化获得是预适应事件，enabling 后续野生鸟溢出（叙事框架 A）", "reason": "v5.1 重定位，已被 clade-confounding 框架取代"},
+    {"id": "DEP-6", "text": "codon 140 = G140 直接等号", "reason": "2026-08-12 证伪（G140 mature 124 = m8_col 125）"}
+  ]
+}
