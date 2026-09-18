@@ -1,6 +1,7 @@
 # CLAUDE.md — 病毒演化研究院团队级运行指南
 > 与 README 区分：README = 团队介绍与安装；本文件 = 团队运行机制与上下文接力协议
 > 维护者：archivist（史治文）；更新触发：每轮结构变更后
+> **Changelog 规范（Anthropic claude-progress.txt 模式）**：每次结构变更追加一条，必含"变更/理由/影响/下一步"四字段；禁止改写历史
 
 ## 角色映射（11 角色）
 
@@ -31,9 +32,9 @@
 | WF7 | 跨域方法借鉴/医学流感经验 | 3 |
 
 ## 上下文接力协议（接棒规则）
-1. **接收方第一步**：读 `research-ops/CLAUDE.md`（项目快照/战线/方法栈/待办/接手建议）
-2. **接收方第二步**：按相关度读 `context_stack/` 六文件
-3. **接收方第三步**：执行用户原任务；落盘回 archivist 接力
+1. **接收方第一步**：读 `research-ops/CLAUDE.md`（项目快照/战线/方法栈/待办/接手建议/Changelog）
+2. **接收方第二步**：按相关度读 `context_stack/` **三 JSON 真源**（research_anchor / confirmed_hypotheses / method_library）+ 三 .md 渲染视图 + 三协议 .md（user_constraints / quality_gates / diagnostic_findings）
+3. **接收方第三步**：执行用户原任务；落盘走 archivist（JSON 编辑 → .md 渲染）
 4. **handoff 失败处理**：若发现链路有断层，立即回主理人由主理人调度修复
 
 ## 全局重试预算
@@ -44,5 +45,23 @@
 
 ## 权威源唯一性
 - 阈值/前沿/检索源 → `skills/viral-evo-core/references/` 权威
-- 项目级快照/锚点/确认假说 → `research-ops/context_stack/` 权威
+- 项目级快照/锚点/确认假说 → `research-ops/context_stack/` **三 .json 为真源**（.md 是渲染视图）
 - 工作流触发表/角色映射 → 本文件权威
+
+## Changelog
+<!-- 规范：每次结构变更追加一条，禁止删除/改写历史；四字段：变更/理由/影响/下一步 -->
+- **v1.2（2026-09-18，P0-3~P1-6 任务）**
+  - 变更：①11/11 agent MD 加 stable-prefix 速查卡（身份/触发/输出/回传/纪律五行）②主理人加 Evaluator 反馈路由（WF5/WF6 审查结论→按严重度回 WF4/WF2/WF7/WF3，计入 ≤5 预算）③主理人加动态资源分配表（7 WF 粒度 + 简单查询降级规则）④新增 `references/context-compaction.md` + 主理人/archivist 压缩职责
+  - 理由：借鉴 Anthropic prompt-cache stable prefix（省 token）+ LangGraph Evaluator-Optimizer 边（loop 闭环）+ Anthropic 按复杂度分配投入（防过度投入）+ Managed Agents compaction（防 context rot）
+  - 影响：所有 agent MD 头部新增统一速查卡（cache 锚点，修改需 bump 注释日期）；WF5/WF6 审查结果不再是终点而是路由起点；长会话需按压缩协议执行
+  - 下一步：实测验证（首次实战任务观察路由准确率 + token 消耗 + P0 闭环率）
+- **v1.1（2026-09-18，P0-1/P0-2 任务）**
+  - 变更：CONTEXT_STACK 三文件 JSON 化（confirmed_hypotheses/method_library/research_anchor，schema 1.0.0）；本文件加 Changelog 规范；上下文接力协议改指 JSON 真源
+  - 理由：借鉴 Anthropic feature_list.json 模式（JSON 严格 schema 防 model 改坏 + 跨 session 持久状态）；claude-progress.txt 模式（Changelog 四字段）
+  - 影响：所有成员读取 context_stack 必须走 JSON；.md 变为渲染视图，禁止单独编辑；主理人/archivist MD 已同步协议
+  - 下一步：P0-3 stable prefix 重排（11 agent MD 顶部前置角色+能力+输出规范，提升 prompt cache 命中）
+- **v1.0（2026-09-10，建档）**
+  - 变更：初始团队级运行指南（11 角色映射 + WF1-7 触发表 + 接力协议）
+  - 理由：与 README 职责分离（介绍 vs 运行机制）
+  - 影响：新会话 onboarding 按"项目级 CLAUDE.md → context_stack → 本文件"三步接力
+  - 下一步：首次实战任务验证协议

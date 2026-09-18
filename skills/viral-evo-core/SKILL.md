@@ -18,6 +18,7 @@ description: 病毒演化研究院共享方法库。当执行病毒遗传进化�
 | 需要 2025-2026 前沿锚点（DMS/LM/CoalRe/结构系统发育） | `references/frontier-2025-2026.md` |
 | 跨域方法迁移（医学/植物/昆虫病毒）| `references/medical-vet-bridge.md` |
 | 研究诊断审视（方法/数据/管线协同） | `references/diagnostic-protocol.md` |
+| 上下文接近阈值/长会话/需要压缩时 | `references/context-compaction.md` |
 
 ## 铁律速查
 1. 断言必附 PMID/DOI，无来源不输出
