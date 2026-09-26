@@ -16,7 +16,6 @@
     "./agents/literature-scout.md",
     "./agents/pipeline-engineer.md",
     "./agents/research-diagnostician.md",
-    "./agents/medical-vet-bridge.md",
     "./agents/archivist.md"
   ],
   "skills": ["./skills/viral-evo-core"],
@@ -34,7 +33,6 @@
       "literature-scout",
       "pipeline-engineer",
       "research-diagnostician",
-      "medical-vet-bridge",
       "archivist"
     ]
   },
@@ -130,13 +128,6 @@
       "displayName": { "en": "Pei Shensi", "zh": "裴慎思" },
       "profession": { "en": "Research Diagnostician", "zh": "研究诊断官" },
       "avatar": "avatars/research-diagnostician.jpg",
-      "role": "member"
-    },
-    {
-      "id": "medical-vet-bridge",
-      "displayName": { "en": "Liu Tongren", "zh": "柳通人" },
-      "profession": { "en": "Medical-Veterinary Method Bridge", "zh": "跨域方法桥（医学-兽医-广义）" },
-      "avatar": "avatars/medical-vet-bridge.jpg",
       "role": "member"
     },
     {
