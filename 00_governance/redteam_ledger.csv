@@ -1,8 +1,8 @@
-﻿trace_id,finding_id,severity,source_agent,finding_summary,route,fix_commit,status,closed_date
+trace_id,finding_id,severity,source_agent,finding_summary,route,fix_commit,status,closed_date
 RT20260926,H-01,fatal,redteam-hypothesis,把条件回归非显著(p=0.308)当证伪(absence of evidence),WF4-统计补救,,open,
 RT20260926,H-02,major,redteam-hypothesis,Human p=0.022显著与塌缩叙事自相矛盾+hypothesis-generating标签使其免疫反驳,WF4-统计补救,,open,
 RT20260926,H-03,fatal,redteam-hypothesis,G140(freq4h=91.7%)与Clade近乎共线-不一致格子未报告-ΔP近乎不可识别,WF4-统计补救,,open,
-RT20260926,H-04,fatal,redteam-hypothesis,clade判定与G140循环依赖(条件化是构造性必然),WF4-重跑,19124c4部分+M17模块c258973,partial,
+RT20260926,H-04,fatal,redteam-hypothesis,clade判定与G140循环依赖(条件化是构造性必然),WF4-重跑,"c258973+29895ee(M17-V1复现:严格口径Mammal更不显著-0.028,方向性增强)",partial,
 RT20260926,H-05,major,redteam-hypothesis,defining-marker无预指定判据(91.7%<100%),WF4-统计补救,,open,
 RT20260926,H-06,fatal,redteam-hypothesis,非driver-passenger断言无判别检验(结构性不可证伪),措辞修正,19124c4,closed,2026-09-26
 RT20260926,H-07,major,redteam-hypothesis,D'小样本偏倚(n_joint=108占4.4%)无讨论,WF4-统计补救,,open,
@@ -36,3 +36,4 @@ RT20260926,E-04,medium,redteam-extrap,0.6Å放Method段赋予验证权重但两A
 RT20260926,E-05,medium,redteam-extrap,审稿人COI无5年无合作声明+数据重叠,WF3-重检索,19124c4,closed,2026-09-26
 RT20260926,E-06,minor,redteam-extrap,单一案例→全RNA病毒报告标准降格,措辞修正,19124c4,closed,2026-09-26
 RT20260926,E-07,minor,redteam-extrap,navian2399+nmammal77=2476-vs-M9a-2475差1(分母口径),人工核验,,open,
+RT20260926,M-11,fatal,diagnostic-v2.0,"M9_a-MixedLM源码缺失(git全史无S140_bin实现,v5.1核心模型不可独立复现)",重建或接受M17反推实现,29895ee(M17-V1反推复现n=2476),open,
