@@ -1,0 +1,142 @@
+{
+ "generated": "2026-09-26T20:56:31",
+ "file_count": 34,
+ "files": {
+  "settings.json": {
+   "sha16": "bd99f4b3bc5f8fe8",
+   "bytes": 40
+  },
+  "CLAUDE.md": {
+   "sha16": "b72bd5d13dbda808",
+   "bytes": 6198
+  },
+  "README.md": {
+   "sha16": "aa6b90e9a7e83e20",
+   "bytes": 2642
+  },
+  "agents/archivist.md": {
+   "sha16": "abcc4e545b390430",
+   "bytes": 7292
+  },
+  "agents/hypothesis-officer.md": {
+   "sha16": "0eab71295ff2e5f7",
+   "bytes": 3935
+  },
+  "agents/literature-scout.md": {
+   "sha16": "4020063bd304fdd7",
+   "bytes": 5747
+  },
+  "agents/phylo-analyst.md": {
+   "sha16": "0eba5a016382811e",
+   "bytes": 3923
+  },
+  "agents/pipeline-engineer.md": {
+   "sha16": "510e74ece61da73d",
+   "bytes": 3821
+  },
+  "agents/popgen-modeler.md": {
+   "sha16": "83d21fc4f7027ec7",
+   "bytes": 3983
+  },
+  "agents/predictive-virologist.md": {
+   "sha16": "e83d205fd6afa776",
+   "bytes": 3964
+  },
+  "agents/research-diagnostician.md": {
+   "sha16": "dfa31cb1cfbd7687",
+   "bytes": 5876
+  },
+  "agents/structural-virologist.md": {
+   "sha16": "8966ecb86f121da3",
+   "bytes": 3631
+  },
+  "agents/viral-evo-lab-team-lead.md": {
+   "sha16": "e6a5444a361f992a",
+   "bytes": 22848
+  },
+  "skills/viral-evo-core/SKILL.md": {
+   "sha16": "96bfead9681edc8f",
+   "bytes": 1535
+  },
+  "skills/viral-evo-core/references/code-standards.md": {
+   "sha16": "95b91565fd4d380b",
+   "bytes": 1035
+  },
+  "skills/viral-evo-core/references/context-compaction.md": {
+   "sha16": "6181f9419c4441f7",
+   "bytes": 2771
+  },
+  "skills/viral-evo-core/references/diagnostic-protocol.md": {
+   "sha16": "dfc3d727bef5df5f",
+   "bytes": 2151
+  },
+  "skills/viral-evo-core/references/frontier-2025-2026.md": {
+   "sha16": "084c639d0b87b85c",
+   "bytes": 2095
+  },
+  "skills/viral-evo-core/references/medical-vet-bridge.md": {
+   "sha16": "877e285c5e6171f6",
+   "bytes": 1728
+  },
+  "skills/viral-evo-core/references/method-transfer-template.md": {
+   "sha16": "63312a8d19a5f0be",
+   "bytes": 1212
+  },
+  "skills/viral-evo-core/references/quality-gates.md": {
+   "sha16": "753842b60ae5f02d",
+   "bytes": 2128
+  },
+  "skills/viral-evo-core/references/search-sources.md": {
+   "sha16": "5eb3d73d88ebbede",
+   "bytes": 1349
+  },
+  "avatars/archivist.jpg": {
+   "sha16": "60b430199b51b28e",
+   "bytes": 78501
+  },
+  "avatars/hypothesis-officer.jpg": {
+   "sha16": "dd47b3b94a25f016",
+   "bytes": 78356
+  },
+  "avatars/literature-scout.jpg": {
+   "sha16": "6927fe211c862c9f",
+   "bytes": 111491
+  },
+  "avatars/medical-vet-bridge.jpg": {
+   "sha16": "5a89aeb9aec637b4",
+   "bytes": 98994
+  },
+  "avatars/phylo-analyst.jpg": {
+   "sha16": "8d6d1e517c8efc42",
+   "bytes": 73746
+  },
+  "avatars/pipeline-engineer.jpg": {
+   "sha16": "3cb3823162e2933a",
+   "bytes": 73448
+  },
+  "avatars/popgen-modeler.jpg": {
+   "sha16": "e1cb601fab659c8f",
+   "bytes": 77782
+  },
+  "avatars/predictive-virologist.jpg": {
+   "sha16": "c0aa1f16fbd92680",
+   "bytes": 91381
+  },
+  "avatars/research-diagnostician.jpg": {
+   "sha16": "e05bb1c5ba875f11",
+   "bytes": 74739
+  },
+  "avatars/structural-virologist.jpg": {
+   "sha16": "ca056cb52a8e4b5e",
+   "bytes": 69407
+  },
+  "avatars/team.jpg": {
+   "sha16": "efbcd870772fc31b",
+   "bytes": 118955
+  },
+  "avatars/viral-evo-lab-team-lead.jpg": {
+   "sha16": "7231cc367da9c28e",
+   "bytes": 70795
+  }
+ }
+}

@@ -10,6 +10,9 @@
 | 时间信号 | root-to-tip R² 与斜率合理性 | TempEst | 信号不足禁推 BEAST，改距离法 |
 | 引用 | 每条断言附 PMID/DOI | Crossref/PubMed 核验 | 无来源删除或降级标注 |
 | 结构置信 | pLDDT≥70 区域方可做结构解读 | AlphaFold 输出 | <70 区域降级标注 |
+| **复现校准**（R4 2026-09-26） | 复现类模块（M17+）关键统计量与论文锁定值差异 <预指定阈值（如 ΔP<0.005、freq<0.01），且 n 一致 | 对照原模块 notebook 数据准备段逐条校准 | **禁止进入下游计算**（与 ESS<200 同级暂停）——未校准建树/长跑 = 白烧算力 |
+| **红队台账**（R2 2026-09-26） | 每次慢通道后 finding 全量登记 redteam_ledger.csv；P0 级闭环率脚本统计 | `python3 redteam_tools.py stats` | 未登记不汇编；未闭环 P0 不投出 |
+| **完整性巡检**（R1 2026-09-26） | 慢通道启动前 manifest diff 无缺失 + validate 通过 | `python3 redteam_tools.py check` | 缺失文件先 git checkout 恢复再开跑 |
 | 高危操作 | 警告 + 二次确认 | — | 无确认不执行 |
 
 ## 原则
