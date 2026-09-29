@@ -36,4 +36,9 @@ RT20260926,E-04,medium,redteam-extrap,0.6Å放Method段赋予验证权重但两A
 RT20260926,E-05,medium,redteam-extrap,审稿人COI无5年无合作声明+数据重叠,WF3-重检索,19124c4,closed,2026-09-26
 RT20260926,E-06,minor,redteam-extrap,单一案例→全RNA病毒报告标准降格,措辞修正,19124c4,closed,2026-09-26
 RT20260926,E-07,minor,redteam-extrap,navian2399+nmammal77=2476-vs-M9a-2475差1(分母口径),人工核验,,open,
-RT20260926,M-11,fatal,diagnostic-v2.0,"M9_a-MixedLM源码缺失(git全史无S140_bin实现,v5.1核心模型不可独立复现)",重建或接受M17反推实现,29895ee(M17-V1反推复现n=2476),open,
+RT20260926,M-11,fatal,diagnostic-v2.0,"M9_a-MixedLM源码缺失(git全史无S140_bin实现,v5.1核心模型不可独立复现)",重建或接受M17反推实现,01cb45f(sequon核验二次git -S验证全史无先例)+M17反推实现(n=2476),partial,2026-09-30
+RT20260930,H-09,fatal,wf1-hypothesis,"Mammal复现值三源不一致(V1b严格-0.032 vs M9_a+0.073 vs 论文CSV列+0.065),提示主理人输入数据存在转述偏差,投稿稿口径必须强制声明",口径声明硬约束已写入H-S2 v1.1,未编号,open,
+RT20260930,M-12,major,wf1-scout,"D'在freq(G140)=0.9706近乎单态位点退化(空单元→D'=±1精确值);同一D'=0.944对应r² 0.012~0.513(PMID18572214),D'几乎不携带关联强度信息","主统计量改r²+CI,D'降次要",未编号,open,
+RT20260930,M-13,major,wf1-scout,"标准逻辑回归在系统发育相关下inflated Type I error(PMID20525617),clade固定效应只是粗粒度离散化,clade内相关仍在",列为Mammal ΔP塌缩第三候选解释(前founder混杂/功效不足),未编号,open,
+RT20260930,N-01,fatal,主会话-WF1自检,"编号映射:论文唯一H3↔H5锚点A160T=-4外推124→H3 128落点P128S,但H3-128野生型为P(非sequon的N),offset在该区段不恒定(H3含125b类插入码)","绕过编号映射,直接sequon基序核验(N-X-S/T)",01cb45f(sequon自洽: G140=N124-H125-T126 20.26% / G70=N54-C55-S56 4.81%),closed,2026-09-30
+RT20260930,N-02,minor,主会话-WF1自检,"直接用比对列索引(含gap)取残基编号,误判G140 sequon=0.92%(实为20.26%);坐标映射纪律第一条新增references/coordinate-mapping.md(实测事故原型)",72b9dfe已记录三条铁律(去gap/显式换算/落点验证),72b9dfe,closed,2026-09-30

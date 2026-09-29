@@ -1,3 +1,3 @@
-generated: 2026-09-26T22:17:07
-total=38 closed=19 rate=50%
-fatal_high_closed=8/14
+generated: 2026-09-30T07:25:24
+total=43 closed=21 rate=49%
+fatal_high_closed=9/16
