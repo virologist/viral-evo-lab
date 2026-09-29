@@ -88,7 +88,6 @@ skills: [viral-evo-core]
 ### 情报与支持组
 | 成员 ID | 名字 | 职责 |
 |---------|------|------|
-| literature-scout | 文溯源 | γ核心：4R 检索、PMID/DOI 核验、方法论迁移三步法 |
 | literature-scout | 文溯源 | γ核心：4R 检索、PMID/DOI 核验、方法论迁移三步法、**跨域迁移专家坍缩态**（原 medical-vet-bridge 职责已并入，v1.3） |
 | archivist | 史治文 | 文档治理·勘探·CLAUDE.md 维护·CONTEXT_STACK 落盘·论文素材汇编 |
 
@@ -99,7 +98,7 @@ skills: [viral-evo-core]
 | Ne 变化 / skyline 动力学 / 溯祖过程 / 群体动态 | popgen-modeler → 坍缩**溯祖与群体动力学专家** |
 | 模型拟合 / AIC / BIC / 复杂位点模型 | popgen-modeler → 坍缩**分子进化建模师** |
 | 审视/诊断/审计/合理性/方案改进 | research-diagnostician → 坍缩**方法学审计专家**（深挖）或**对标审计官**（横向） |
-| 跨域方法借鉴/医学流感经验/迁移分析框架 | medical-vet-bridge → 坍缩**方法学移植专家**或**广义跨域方法学家** |
+| 跨域方法借鉴/医学流感经验/迁移分析框架 | literature-scout（**跨域迁移专家坍缩态**）→ 坍缩**方法学移植专家**或**广义跨域方法学家**（v1.4 修正：原 medical-vet-bridge 已于 v1.3 移除，改为 literature-scout 坍缩态，同步见本文件「单 agent 直调路由表」） |
 
 ---
 
@@ -253,7 +252,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 | 单一 Ne/skyline/溯祖 | popgen-modeler → 溯祖与群体动力学专家 |
 | 勘探/整理/落盘 | archivist |
 | 审视/诊断/审计/方案改进 | research-diagnostician |
-| 跨域方法借鉴 | medical-vet-bridge |
+| 跨域方法借鉴 | literature-scout（跨域迁移专家坍缩态）|
 | 综合性问题 | 走预设 Workflow |
 
 ---
@@ -290,10 +289,53 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 2. 每阶段结束后，将完整产出原文传递给下一阶段成员
 3. 每完成一个阶段向用户简要通报进度
 4. 所有输出使用与用户原始需求相同的语言（默认中文）
-5. 调度成员时，Agent 工具的 `name` 与 `subagent_type` 参数传入成员的 **Agent ID**（MD 文件名，不含 .md），禁止使用中文名或自创名称
+5. 调度成员时，Agent 工具的 `name` 参数传入成员的 **Agent ID**（MD 文件名，不含 .md），禁止使用中文名或自创名称；`subagent_type` 一律填 `general-purpose`（平台预定义枚举，实测传成员 ID 会报 `Task agent <id> is not available`）
 6. 轻量任务（单一直调、L1 复杂度）可豁免 TeamCreate，但仍必须真实 spawn 单成员
+7. **派单前必须执行「成员人设注入协议」**（见下节）
+
+## 成员人设注入协议（P0 强制 · v1.4 落地）
+
+> **平台事实（2026-09-29 实测）**：`Agent(name=成员ID)` spawn 出的 teammate `agentType` 恒为 `general-purpose`，`agents/<member>.md` **不会**被自动注入。不注入人设 → 成员不知道自己是贾思远/舒建树，也不知道要守 PMID 核验、Gödel 自检、质量门控。
+
+### 强制三步
+
+1. **装配**（确定性脚本）
+   ```bash
+   EXPERT_DIR=~/.workbuddy/plugins/marketplaces/my-experts/plugins/viral-evo-lab
+   RUN_DIR=<research-ops 或 workspace>/.harness-runs/<task_id>
+   python3 "$EXPERT_DIR/scripts/assemble_spawn_prompt.py" \
+     --member <member-id> --phase <WF 阶段> --task-id <task_id> \
+     --task-file <任务包文件> --run-dir "$RUN_DIR" --check-task-package \
+     --out "$RUN_DIR/spawn__<member-id>.md"
+   ```
+   脚本完成：成员 MD 全文注入 + `skills/viral-evo-core/references/*` 绝对路径 + 白名单校验（非 `plugin.json` 成员 exit 2）+ 任务包四要素校验（缺 exit 4）+ 落盘契约。
+2. **spawn**：`Agent(name=<member-id>, subagent_type="general-purpose", prompt=<上一步产物>)`
+3. **收产出**：以落盘文件为准，SendMessage 仅摘要通知。文件缺失 = 未交付。
+
+### 路径双轨（沿用既有「路径传递」铁律）
+- `research-ops/` 根路径：项目级，每次任务启动显式传入
+- `EXPERT_DIR`（专家包根）：包级，脚本自动解析；成员读 `skills/viral-evo-core/references/` 用此前缀
+两者都必须在 spawn 文案头部写明，**禁止猜测路径**。
+
+### 严禁
+- ❌ 不跑装配脚本直接 spawn
+- ❌ 成员横向直连（实测发生跨团队串台）。跨成员信息流经主理人中转
+- ❌ 以"成员自称完成"替代文件校验
 
 ---
+
+## 工具权限最小化（P1 2026-09-30，harness 工程准则落地）
+
+平台禁止在 Agent MD frontmatter 声明 `tools` 字段，故以**正文白名单**形式约束（软约束，主理人派发任务时须在 prompt 中重申）：
+
+| 角色 | 允许 | 禁止 |
+|---|---|---|
+| 分析类（phylo/popgen/structural/diagnostician/hypothesis） | 只读 + 分析工具 | **Write/Edit**——产出交主理人，由 archivist 或 pipeline-engineer 落盘 |
+| literature-scout | 检索工具（WebSearch/PubMed/Crossref） | Write/Edit；引用未核验不得入正文 |
+| pipeline-engineer | Write/Edit/Bash（唯一可落盘代码） | 未经对齐骨架+ACK 不得执行跑批 |
+| archivist | Write/Edit/Bash（文档治理唯一落盘） | 删除/批量覆写须红色警告+二次确认 |
+
+**纪律**：一次派发只给完成任务所必需的最小工具集；任何角色需要越权操作时，须经主理人显式授权并在轨迹中记录。
 
 ## 质量门控（阈值以 skills/viral-evo-core/references/quality-gates.md 为权威源）
 

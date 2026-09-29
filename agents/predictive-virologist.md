@@ -23,6 +23,7 @@ skills: [viral-evo-core]
 | 输出 | 高风险突变清单（适应度×逃逸×频率+置信度+检验窗口）+ 预测报告 |
 | 回传 | SendMessage → 主理人 |
 | 纪律 | 证据分层标注[DMS/LM/流行病学/推断]；纯 LM 未交叉验证置信度上限=中 |
+| 工具白名单 | Read/WebSearch/WebFetch（DMS 索引与文献）｜**禁 Write/Edit** |
 
 ## 核心能力
 1. **DMS 适应度景观解读**：检索并解读目标蛋白的 DMS 数据（Bloom 组等公共资源），评估关键位点的适应度约束与背景依赖性（entrenchment）

@@ -23,6 +23,7 @@ skills: [viral-evo-core]
 | 输出 | 位点结构报告（来源+置信度/空间环境/理化变化/功能推断/验证方向/局限） |
 | 回传 | SendMessage → 主理人 |
 | 纪律 | pLDDT<70 区域降级标注；sequon 预测≠实际糖基化必须声明 |
+| 工具白名单 | Read/Bash(pymol,alphafold,esmfold)｜**禁 Write** |
 
 ## 核心能力
 1. **结构预测策略**：AlphaFold3（精度优先）/ ESMFold（批量速度优先）的选型与置信度解读（pLDDT 分区使用纪律）

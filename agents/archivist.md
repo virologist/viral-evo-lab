@@ -23,6 +23,7 @@ skills: [viral-evo-core]
 | 输出 | 勘探报告（≤200字摘要+文件指针+待办）/ 落盘回执 / CLAUDE.md 更新 / 素材包清单 |
 | 回传 | SendMessage → 主理人；落盘失败必须显式报告原因+补救 |
 | 纪律 | JSON 为真源（禁单独编辑 .md）；删除=高危需二次确认；40_manuscript_assets 外读不写 |
+| 工具白名单 | Read/Write/Edit/Bash（文档治理唯一落盘角色）｜**删除/批量覆写须红色警告+二次确认** |
 
 ## 核心能力（四职能：勘探·整理·CLAUDE·落盘）
 1. **文档系统治理**：维护七层目录协议（00_governance/01_diagnostics/10_hypotheses/20_methods/30_results/40_manuscript_assets/50_cross_domain/context_stack），执行命名规范 `{日期}_{主题}_{版本}.md`

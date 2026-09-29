@@ -1,5 +1,5 @@
 {
- "generated": "2026-09-26T20:56:31",
+ "generated": "2026-09-30T06:38:35",
  "file_count": 34,
  "files": {
   "settings.json": {
@@ -15,48 +15,48 @@
    "bytes": 2642
   },
   "agents/archivist.md": {
-   "sha16": "abcc4e545b390430",
-   "bytes": 7292
+   "sha16": "e68d820b74651185",
+   "bytes": 7425
   },
   "agents/hypothesis-officer.md": {
-   "sha16": "0eab71295ff2e5f7",
-   "bytes": 3935
+   "sha16": "78eb0e05b064a7c3",
+   "bytes": 4077
   },
   "agents/literature-scout.md": {
-   "sha16": "4020063bd304fdd7",
-   "bytes": 5747
+   "sha16": "4195365c1fb878a0",
+   "bytes": 5866
   },
   "agents/phylo-analyst.md": {
-   "sha16": "0eba5a016382811e",
-   "bytes": 3923
+   "sha16": "6aff2ab3fef26a78",
+   "bytes": 4053
   },
   "agents/pipeline-engineer.md": {
-   "sha16": "510e74ece61da73d",
-   "bytes": 3821
+   "sha16": "27118c47c7317dac",
+   "bytes": 3928
   },
   "agents/popgen-modeler.md": {
-   "sha16": "83d21fc4f7027ec7",
-   "bytes": 3983
+   "sha16": "f18eb2330a464957",
+   "bytes": 4064
   },
   "agents/predictive-virologist.md": {
-   "sha16": "e83d205fd6afa776",
-   "bytes": 3964
+   "sha16": "abe5fc490c01b37f",
+   "bytes": 4056
   },
   "agents/research-diagnostician.md": {
-   "sha16": "dfa31cb1cfbd7687",
-   "bytes": 5876
+   "sha16": "15c835f416c41051",
+   "bytes": 5987
   },
   "agents/structural-virologist.md": {
-   "sha16": "8966ecb86f121da3",
-   "bytes": 3631
+   "sha16": "46ab57fb5482a09d",
+   "bytes": 3704
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "e6a5444a361f992a",
-   "bytes": 22848
+   "sha16": "45d028a69e87798f",
+   "bytes": 25879
   },
   "skills/viral-evo-core/SKILL.md": {
-   "sha16": "96bfead9681edc8f",
-   "bytes": 1535
+   "sha16": "638850b7d04449e9",
+   "bytes": 1623
   },
   "skills/viral-evo-core/references/code-standards.md": {
    "sha16": "95b91565fd4d380b",
@@ -65,6 +65,10 @@
   "skills/viral-evo-core/references/context-compaction.md": {
    "sha16": "6181f9419c4441f7",
    "bytes": 2771
+  },
+  "skills/viral-evo-core/references/coordinate-mapping.md": {
+   "sha16": "c90d03af5cd2fad6",
+   "bytes": 3095
   },
   "skills/viral-evo-core/references/diagnostic-protocol.md": {
    "sha16": "dfc3d727bef5df5f",
@@ -101,10 +105,6 @@
   "avatars/literature-scout.jpg": {
    "sha16": "6927fe211c862c9f",
    "bytes": 111491
-  },
-  "avatars/medical-vet-bridge.jpg": {
-   "sha16": "5a89aeb9aec637b4",
-   "bytes": 98994
   },
   "avatars/phylo-analyst.jpg": {
    "sha16": "8d6d1e517c8efc42",

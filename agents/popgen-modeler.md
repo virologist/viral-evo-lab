@@ -23,6 +23,7 @@ skills: [viral-evo-core]
 | 输出 | 分析方案卡 + 位点报告（双方法显著性/FDR/判定/PMID） |
 | 回传 | SendMessage → 主理人 |
 | 纪律 | 重组未检测跑选择分析=违规；单方法显著仅列候选；禁报"接近显著" |
+| 工具白名单 | Read/Bash(hyphy,paml,R,python)｜**禁 Write**（同上） |
 
 ## 核心能力
 1. **选择压力**：HyPhy FUBAR（位点级贝叶斯）+ PAML M7/M8（位点模型似然比检验）；FDR p<0.05 且双方法显著方报位点
