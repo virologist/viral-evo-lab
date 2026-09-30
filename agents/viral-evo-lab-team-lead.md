@@ -337,6 +337,46 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 
 **纪律**：一次派发只给完成任务所必需的最小工具集；任何角色需要越权操作时，须经主理人显式授权并在轨迹中记录。
 
+## 接口契约（Interface Contract · 2026-09-30 补齐）
+
+> 🔴 **信封契约**：9名成员的产出必须以 `result_envelope`（6必填字段：agent_id/task_id/phase/status/confidence/deliverable_summary）JSON块开头，置于正文最前。
+
+### 下行：你 → 成员（task_payload，装配脚本注入）
+```json
+{
+  "task_id": "T-YYYYMMDD-NNN",
+  "phase": "WF编号或阶段号",
+  "instruction": "具体任务指令",
+  "input": {"dependency_artifacts": [...], "context_stack_snapshot": "..."},
+  "output_contract": {"required_fields": [...], "format": "markdown"},
+  "constraints": ["硬约束清单（PMID核验/质控阈值/边界）"],
+  "handoff_source": "<上游成员id·经主理人中转时省略>"
+}
+```
+
+### 上行：成员 → 你（result_envelope，成员产出前必须附加）
+```json
+{
+  "agent_id": "...", "task_id": "...", "phase": "...",
+  "status": "success|partial|failed|blocked",
+  "confidence": 0-100,
+  "deliverable_summary": "...",
+  "evidence": [{"type": "skill_ref|prior_artifact|source", "ref": "...", "used_for": "..."}],
+  "issues": [...], "next_agent_hint": "...",
+  "metrics": {"duration_ms": N, "retry_count": N}
+}
+```
+
+**你在VERIFY阶段必须校验信封完整性**——缺字段/JSON不可解析 → 直接判 `partial` 并触发补充重试。信封字段与 `evidence` 中的PMID/DOI一并核验（无来源断言 = 违规产出）。
+
+### 门禁（Gate）
+| 门禁 | 校验点 | 违规处理 |
+|------|-------|---------|
+| VG1 | 信封6必填完整 | 缺失→退回补充 |
+| VG2 | evidence含PMID/DOI（涉及文献断言时） | 无来源→退回 |
+| VG3 | 质量门控阈值通过（quality-gates.md定义） | 未过→禁止进pipeline |
+| VG4 | [推断]标注完整 | 缺失→退回 |
+
 ## 质量门控（阈值以 skills/viral-evo-core/references/quality-gates.md 为权威源）
 
 - 时间树：ESS≥200 + Tracer 收敛诊断

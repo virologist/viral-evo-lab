@@ -1,6 +1,6 @@
 {
   "name": "viral-evo-lab",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Viral genetic evolution research team: frontier search, method transfer, falsifiable hypothesis generation, evolutionary trajectory prediction, and publication-grade bioinformatics guidance.",
   "author": {
     "name": "TZUVet",
@@ -18,8 +18,9 @@
     "./agents/research-diagnostician.md",
     "./agents/archivist.md"
   ],
-  "skills": ["./skills/viral-evo-core"],
-
+  "skills": [
+    "./skills/viral-evo-core"
+  ],
   "expertType": "team",
   "agentName": "viral-evo-lab-team-lead",
   "teamInfo": {
@@ -36,7 +37,6 @@
       "archivist"
     ]
   },
-
   "displayName": {
     "en": "Viral Evolution Lab",
     "zh": "病毒演化研究院"
@@ -57,83 +57,161 @@
   },
   "plugin": "viral-evo-lab",
   "tags": [
-    { "en": "Viral Evolution", "zh": "病毒遗传进化" },
-    { "en": "Phylogenetics", "zh": "系统发育分析" },
-    { "en": "Hypothesis-Driven Research", "zh": "假说驱动科研" }
+    {
+      "en": "Viral Evolution",
+      "zh": "病毒遗传进化"
+    },
+    {
+      "en": "Phylogenetics",
+      "zh": "系统发育分析"
+    },
+    {
+      "en": "Hypothesis-Driven Research",
+      "zh": "假说驱动科研"
+    }
   ],
   "quickPrompts": [
-    { "en": "Generate falsifiable evolutionary hypotheses from the variation patterns in this set of viral sequences, with a validation roadmap", "zh": "基于这组病毒序列的变异模式，生成可证伪的演化假说并给出验证路径" },
-    { "en": "Search the international frontier of a target method and evaluate its transferability to my current avian influenza dataset", "zh": "检索目标方法的国际前沿并评估迁移到我当前禽流感数据集的可行性" },
-    { "en": "Review my phylogenetic analysis pipeline, identify methodological weaknesses, and propose fixes", "zh": "审查我的系统发育分析流程，指出方法缺陷并给出改进方案" }
+    {
+      "en": "Generate falsifiable evolutionary hypotheses from the variation patterns in this set of viral sequences, with a validation roadmap",
+      "zh": "基于这组病毒序列的变异模式，生成可证伪的演化假说并给出验证路径"
+    },
+    {
+      "en": "Search the international frontier of a target method and evaluate its transferability to my current avian influenza dataset",
+      "zh": "检索目标方法的国际前沿并评估迁移到我当前禽流感数据集的可行性"
+    },
+    {
+      "en": "Review my phylogenetic analysis pipeline, identify methodological weaknesses, and propose fixes",
+      "zh": "审查我的系统发育分析流程，指出方法缺陷并给出改进方案"
+    }
   ],
   "members": [
     {
       "id": "viral-evo-lab-team-lead",
-      "displayName": { "en": "Lu Wenqu", "zh": "路问渠" },
-      "profession": { "en": "Chief Evolutionary Science Officer", "zh": "首席演化科学官" },
+      "displayName": {
+        "en": "Lu Wenqu",
+        "zh": "路问渠"
+      },
+      "profession": {
+        "en": "Chief Evolutionary Science Officer",
+        "zh": "首席演化科学官"
+      },
       "avatar": "avatars/viral-evo-lab-team-lead.jpg",
       "role": "lead"
     },
     {
       "id": "hypothesis-officer",
-      "displayName": { "en": "Jia Siyuan", "zh": "贾思远" },
-      "profession": { "en": "Hypothesis Engine Officer", "zh": "假说引擎官" },
+      "displayName": {
+        "en": "Jia Siyuan",
+        "zh": "贾思远"
+      },
+      "profession": {
+        "en": "Hypothesis Engine Officer",
+        "zh": "假说引擎官"
+      },
       "avatar": "avatars/hypothesis-officer.jpg",
       "role": "member"
     },
     {
       "id": "phylo-analyst",
-      "displayName": { "en": "Shu Jianshu", "zh": "舒建树" },
-      "profession": { "en": "Phylogenetics Analyst", "zh": "系统发育分析师" },
+      "displayName": {
+        "en": "Shu Jianshu",
+        "zh": "舒建树"
+      },
+      "profession": {
+        "en": "Phylogenetics Analyst",
+        "zh": "系统发育分析师"
+      },
       "avatar": "avatars/phylo-analyst.jpg",
       "role": "member"
     },
     {
       "id": "popgen-modeler",
-      "displayName": { "en": "Quan Yansheng", "zh": "权衍生" },
-      "profession": { "en": "Population Genetics & Molecular Evolution Modeler", "zh": "群体遗传与分子进化建模师" },
+      "displayName": {
+        "en": "Quan Yansheng",
+        "zh": "权衍生"
+      },
+      "profession": {
+        "en": "Population Genetics & Molecular Evolution Modeler",
+        "zh": "群体遗传与分子进化建模师"
+      },
       "avatar": "avatars/popgen-modeler.jpg",
       "role": "member"
     },
     {
       "id": "predictive-virologist",
-      "displayName": { "en": "Yu Gaozhan", "zh": "喻高瞻" },
-      "profession": { "en": "Predictive Virologist", "zh": "预测性病毒学家" },
+      "displayName": {
+        "en": "Yu Gaozhan",
+        "zh": "喻高瞻"
+      },
+      "profession": {
+        "en": "Predictive Virologist",
+        "zh": "预测性病毒学家"
+      },
       "avatar": "avatars/predictive-virologist.jpg",
       "role": "member"
     },
     {
       "id": "structural-virologist",
-      "displayName": { "en": "Fu Erde", "zh": "付尔德" },
-      "profession": { "en": "Structural Virologist", "zh": "结构病毒学家" },
+      "displayName": {
+        "en": "Fu Erde",
+        "zh": "付尔德"
+      },
+      "profession": {
+        "en": "Structural Virologist",
+        "zh": "结构病毒学家"
+      },
       "avatar": "avatars/structural-virologist.jpg",
       "role": "member"
     },
     {
       "id": "literature-scout",
-      "displayName": { "en": "Wen Suyuan", "zh": "文溯源" },
-      "profession": { "en": "Frontier Literature Scout", "zh": "前沿文献侦察员" },
+      "displayName": {
+        "en": "Wen Suyuan",
+        "zh": "文溯源"
+      },
+      "profession": {
+        "en": "Frontier Literature Scout",
+        "zh": "前沿文献侦察员"
+      },
       "avatar": "avatars/literature-scout.jpg",
       "role": "member"
     },
     {
       "id": "pipeline-engineer",
-      "displayName": { "en": "Ke Lixing", "zh": "柯力行" },
-      "profession": { "en": "Bioinformatics Pipeline Engineer", "zh": "生信管线工程师" },
+      "displayName": {
+        "en": "Ke Lixing",
+        "zh": "柯力行"
+      },
+      "profession": {
+        "en": "Bioinformatics Pipeline Engineer",
+        "zh": "生信管线工程师"
+      },
       "avatar": "avatars/pipeline-engineer.jpg",
       "role": "member"
     },
     {
       "id": "research-diagnostician",
-      "displayName": { "en": "Pei Shensi", "zh": "裴慎思" },
-      "profession": { "en": "Research Diagnostician", "zh": "研究诊断官" },
+      "displayName": {
+        "en": "Pei Shensi",
+        "zh": "裴慎思"
+      },
+      "profession": {
+        "en": "Research Diagnostician",
+        "zh": "研究诊断官"
+      },
       "avatar": "avatars/research-diagnostician.jpg",
       "role": "member"
     },
     {
       "id": "archivist",
-      "displayName": { "en": "Shi Zhiwen", "zh": "史治文" },
-      "profession": { "en": "Research Archivist", "zh": "科研档案治理官" },
+      "displayName": {
+        "en": "Shi Zhiwen",
+        "zh": "史治文"
+      },
+      "profession": {
+        "en": "Research Archivist",
+        "zh": "科研档案治理官"
+      },
       "avatar": "avatars/archivist.jpg",
       "role": "member"
     }
