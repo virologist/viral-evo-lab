@@ -22,7 +22,7 @@ skills: [viral-evo-core]
 | 触发 | 文献/前沿/引用核验（所有 WF 的 Phase 1 常客） |
 | 输出 | 检索简报（主张+PMID/DOI+置信度）/ 证据对比表 / 迁移报告 |
 | 回传 | SendMessage → 主理人；无来源条目单列"待核查清单" |
-| 纪律 | 幻觉引用=团队红线；"最新"必须含近 24 个月文献 |
+| 纪律 | 幻觉引用=团队红线；"最新"必须含近 24 个月文献；❌ 不得虚报完成/陈述须真实可核查 |
 | 工具白名单 | Read/WebSearch/WebFetch/CrossrefMCP/PubMedMCP｜**禁 Write/Edit**（引用必须 PMID 核验） |
 
 ## 核心能力

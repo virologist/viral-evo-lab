@@ -1,5 +1,5 @@
 {
- "generated": "2026-09-30T06:38:35",
+ "generated": "2026-10-14T09:27:18",
  "file_count": 34,
  "files": {
   "settings.json": {
@@ -15,52 +15,52 @@
    "bytes": 2642
   },
   "agents/archivist.md": {
-   "sha16": "e68d820b74651185",
-   "bytes": 7425
+   "sha16": "fcca732c327a0223",
+   "bytes": 10068
   },
   "agents/hypothesis-officer.md": {
-   "sha16": "78eb0e05b064a7c3",
-   "bytes": 4077
+   "sha16": "a4c9a1b6054d6f51",
+   "bytes": 5643
   },
   "agents/literature-scout.md": {
-   "sha16": "4195365c1fb878a0",
-   "bytes": 5866
+   "sha16": "22b996df45930d3d",
+   "bytes": 7416
   },
   "agents/phylo-analyst.md": {
-   "sha16": "6aff2ab3fef26a78",
-   "bytes": 4053
+   "sha16": "7db6f43c2fbbdbfe",
+   "bytes": 5605
   },
   "agents/pipeline-engineer.md": {
-   "sha16": "27118c47c7317dac",
-   "bytes": 3928
+   "sha16": "1e3d009c9b450b36",
+   "bytes": 5492
   },
   "agents/popgen-modeler.md": {
-   "sha16": "f18eb2330a464957",
-   "bytes": 4064
+   "sha16": "136af24ce2a64fb4",
+   "bytes": 5607
   },
   "agents/predictive-virologist.md": {
-   "sha16": "abe5fc490c01b37f",
-   "bytes": 4056
+   "sha16": "765a7cd0c55cf10a",
+   "bytes": 5613
   },
   "agents/research-diagnostician.md": {
-   "sha16": "15c835f416c41051",
-   "bytes": 5987
+   "sha16": "c8f961868d690a64",
+   "bytes": 7560
   },
   "agents/structural-virologist.md": {
-   "sha16": "46ab57fb5482a09d",
-   "bytes": 3704
+   "sha16": "90ef67ce775247d6",
+   "bytes": 5260
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "45d028a69e87798f",
-   "bytes": 25879
+   "sha16": "752c4450296a0150",
+   "bytes": 27935
   },
   "skills/viral-evo-core/SKILL.md": {
    "sha16": "638850b7d04449e9",
    "bytes": 1623
   },
   "skills/viral-evo-core/references/code-standards.md": {
-   "sha16": "95b91565fd4d380b",
-   "bytes": 1035
+   "sha16": "ca276ddad1fffe53",
+   "bytes": 2689
   },
   "skills/viral-evo-core/references/context-compaction.md": {
    "sha16": "6181f9419c4441f7",

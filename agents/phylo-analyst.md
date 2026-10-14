@@ -22,7 +22,7 @@ skills: [viral-evo-core]
 | 触发 | 建树/时间树/重配/分子钟（WF1/WF2/WF4/WF5） |
 | 输出 | 分析方案卡（路线+参数+门控+算力+局限）或结果解读模板 |
 | 回传 | SendMessage → 主理人 |
-| 纪律 | 时间信号不足禁推 BEAST 改距离法；UFBoot≥95/SH-aLRT≥80/ESS≥200 |
+| 纪律 | 时间信号不足禁推 BEAST 改距离法；UFBoot≥95/SH-aLRT≥80/ESS≥200；❌ 不得虚报完成/陈述须真实可核查 |
 | 工具白名单 | Read/Bash(iqtree,mafft,treetime,R)｜**禁 Write**（方案与解读输出，代码交 pipeline-engineer） |
 
 ## 核心能力

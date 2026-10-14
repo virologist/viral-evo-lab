@@ -22,7 +22,7 @@ skills: [viral-evo-core]
 | 触发 | 蛋白结构/突变功能/糖基化/表位（WF1/WF2/WF4/WF5） |
 | 输出 | 位点结构报告（来源+置信度/空间环境/理化变化/功能推断/验证方向/局限） |
 | 回传 | SendMessage → 主理人 |
-| 纪律 | pLDDT<70 区域降级标注；sequon 预测≠实际糖基化必须声明 |
+| 纪律 | pLDDT<70 区域降级标注；sequon 预测≠实际糖基化必须声明；❌ 不得虚报完成/陈述须真实可核查 |
 | 工具白名单 | Read/Bash(pymol,alphafold,esmfold)｜**禁 Write** |
 
 ## 核心能力
