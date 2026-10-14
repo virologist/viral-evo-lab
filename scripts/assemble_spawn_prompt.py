@@ -341,10 +341,10 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
     if not research_ops:
         research_ops = os.environ.get("RESEARCH_OPS_DIR", "")
 
-    # ---- 团队版本号（E1 · 2026-10-21）：从 git tag 探测最近含 v* 的 tag ----
+    # ---- 团队版本号（E1 · 2026-10-14）：从 git tag 探测最近含 v* 的 tag ----
     team_ver = _detect_team_version(expert_dir)
 
-    # ---- V1（2026-10-21）：spawn 前自动核验 task_payload 关键数字 ----
+    # ---- V1（2026-10-14）：spawn 前自动核验 task_payload 关键数字 ----
     # 边界：仅做数字存在性核对（确定性 grep），不判断数字合理性
     if task_text and os.environ.get("VERIFY_NUMBERS_AUTO", "1") != "0":
         payload_verdict = _auto_verify_payload(expert_dir, task_text, research_ops)
@@ -449,7 +449,7 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
 
     # 合法下游白名单：防止成员在 next_agent_hint 里编造不存在的成员
     # （实测出现成员建议 solution-architect / prior-art / ip-strategist 等本团没有的角色）
-    lines.append("【本团合法成员白名单】（next_agent_hint 只能从这里取值，禁止自创成员名）")
+    lines.append("【本团合法成员名单】（主理人路由专用；成员无路由权，勿自创成员名）")
     for m in member_ids:
         mark = " ← 你" if m == member_id else ""
         lines.append(f"- {m}{mark}")

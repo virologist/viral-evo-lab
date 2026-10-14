@@ -21,7 +21,7 @@ description: 病毒演化研究院共享方法库。当执行病毒遗传进化�
 | 上下文接近阈值/长会话/需要压缩时 | `references/context-compaction.md` |
 | 需要跨编号系统换算/从比对取残基 | `references/coordinate-mapping.md` |
 
-## 团队工具与契约（v1.2.3+ · 2026-10-21 补）
+## 团队工具与契约（v1.2.3+ · 2026-10-14 补）
 
 本包 `scripts/` 目录提供团队级确定性工具（路径由主理人装配时统一下发，成员按需 Read/Bash）：
 

@@ -421,7 +421,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 - [ ] status 自评与实际产出一致？failed/partial 不可伪装为 success
 - [ ] 引用是否含 PMID/DOI 或标注"待人工核验"？（防幻觉）
 - [ ] 是否触及 H-ANCHOR-1 类已被 M* 推翻的已 deprecated 结论？（防口径漂移）
-- [ ] **数字核验关卡（V1 升级版 · 2026-10-21）**：收 envelope 时**一条命令核验产出端**——
+- [ ] **数字核验关卡（V1 升级版 · 2026-10-14）**：收 envelope 时**一条命令核验产出端**——
       `python3 <专家包>/scripts/verify_member_output.py <run-dir> <task-id> --gate`
       自动定位 `<task-id>__<member>.md` 全部成员产出；5 类数字模式（n=/p=/D′/百分比/CI）在权威源（默认仅 csv/json 计算产物，自动探测 RESEARCH_OPS_DIR）grep 同值；EXIT=5 = DEGRADE_TO_PARTIAL（未溯源数字列清单 + 落盘 `<task-id>__output-check.json`）。`--gate` 供工作流串联阻断
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行

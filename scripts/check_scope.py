@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-check_scope.py —— 专家包落盘前自检（P2 · 2026-10-21）
+check_scope.py —— 专家包落盘前自检（P2 · 2026-10-14）
 执行：检查修改/新增的 .md/.py 是否含"项目特定叙事"（违反两仓分层纪律）
 用法：python3 scripts/check_scope.py [paths...（默认全仓 .md/.py）]
 退出码：0=clean；3=含项目特定叙事

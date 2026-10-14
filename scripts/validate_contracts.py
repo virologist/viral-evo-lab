@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-validate_contracts.py —— 团队契约文本检查（V2 · 2026-10-21）
+validate_contracts.py —— 团队契约文本检查（V2 · 2026-10-14）
 执行：扫描 agents/*.md 是否含关键契约条款（输入信封/工具白名单/纪律审判等）
 边界：仅做"关键词存在性"确定性检查；不判断语义
 返回：EXIT=0 全过；EXIT=5 缺条款
@@ -22,7 +22,7 @@ CONTRACTS = {
     "知识态注入（hypotheses/knowledge_index）": r"confirmed_hypotheses|knowledge_index|RESEARCH_OPS_DIR|知识态",
 }
 
-# B（2026-10-21）：skills 层契约（SKILL.md 唯一入口须索引团队工具+核心铁律）
+# B（2026-10-14）：skills 层契约（SKILL.md 唯一入口须索引团队工具+核心铁律）
 SKILL_CONTRACTS = {
     "团队工具索引（scripts/ 全清单）": r"assemble_spawn_prompt|verify_member_output|check_scope|write_checklist|find_knowledge|validate_contracts",
     "数字必溯源铁律": r"数字必溯源|未溯源|待人工核验",
@@ -45,7 +45,7 @@ def check_agent(agent_path: Path) -> list[dict]:
 
 
 def check_skill(skill_md: Path) -> list[dict]:
-    """B（2026-10-21）：skills 层契约孤岛检查。
+    """B（2026-10-14）：skills 层契约孤岛检查。
     SKILL.md 是成员任务型入口，须索引团队工具 + 两条铁律（数字溯源/禁项目叙事）。
     references/*.md 按需加载，不强检（避免过度扩散）。
     """
