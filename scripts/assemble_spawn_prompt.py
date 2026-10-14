@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-成员 spawn 人设装配器（确定性工程 · 专家包通用）
-==================================================
-用途：把「成员 MD 人设 + 技能资源绝对路径 + task_payload + 输出契约」确定性地
+成员 spawn 人设装配器（viral-evo-lab 定制版 = shared-core 公共版 + V1 增量）
+==========================================================================
+⚠ 来源声明（v3.4.1 R9，2026-10-14）：
+    本文件 = shared-core 公共版（plugins/shared-core/assemble_spawn_prompt.py，369 行）
+    + 本包 V1 增量（约 105 行：git tag 版本探测 _detect_team_version /
+    V1 关键数字模式 _V1_PATTERNS / _v1_extract / spawn 前自动核验 _auto_verify_payload）。
+    其余 4 个无差异包已改为 shim 转调 shared-core；本包因有实质增量，**独立维护**。
+    同步纪律：shared-core 公共逻辑演进时，须评估本包是否需要跟进（diff 公共版与本文件，
+    公共段变更按需合并；V1 增量段保持私有）。合并记录写 CHANGELOG。
+    当前基线：shared-core 公共版 369 行（2026-10-14 下沉时快照）。
+
+用途（公共能力）：把「成员 MD 人设 + 技能资源绝对路径 + task_payload + 输出契约」确定性地
 拼装成一份可直接作为 Agent 工具 prompt 的 spawn 文案，供主理人下发。
 
 为什么要这个脚本：

@@ -77,14 +77,18 @@ def extract_numbers(text: str, min_digits: int):
     return uniq
 
 def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False) -> str:
-    """把权威源（csv/json/md/txt）读成一个大文本（grep 池）；exclude=路径关键字黑名单。"""
+    """把权威源（csv/json/md/txt）读成一个大文本（grep 池）；exclude=**文件名**关键字黑名单。
+
+    2026-10-21 修：exclude 曾匹配完整路径（str(f)），导致父目录名含关键字时
+    整个目录被误杀（如 /tmp/vmo_test/ 被 --exclude "_" 清空）。现仅匹配 f.name。
+    """
     exclude = exclude or []
     chunks = []
     for sp in paths:
         p = Path(sp)
         if p.is_dir():
             for f in sorted(p.rglob("*")):
-                if any(x in str(f) for x in exclude):
+                if any(x in f.name for x in exclude):
                     continue
                 ok_suffix = (".csv", ".json", ".md", ".txt") if allow_md else (".csv", ".json")
                 if f.suffix.lower() in ok_suffix and f.is_file():
@@ -96,7 +100,7 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
             ok_suffix2 = (".csv", ".json", ".md", ".txt") if allow_md else (".csv", ".json")
             if not (p.is_file() and p.suffix.lower() in ok_suffix2):
                 continue
-            if any(x in str(p) for x in exclude):
+            if any(x in p.name for x in exclude):
                 continue
             chunks.append(p.read_text(encoding="utf-8", errors="ignore"))
     return "\n".join(chunks)
