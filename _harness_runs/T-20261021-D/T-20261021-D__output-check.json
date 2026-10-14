@@ -1,0 +1,18 @@
+{
+  "ts": "2026-10-14T22:37:49",
+  "task_id": "T-20261021-D",
+  "checked_artifacts": [
+    "T-20261021-D__literature-scout.md"
+  ],
+  "unverified": [
+    {
+      "member": "literature-scout",
+      "kind": "pct",
+      "value": "79"
+    }
+  ],
+  "verdict": "DEGRADE",
+  "sources_used": [
+    "/Users/biodog/Library/CloudStorage/OneDrive-Personal/GPT/WorkBuddy/2026-09-10-11-38-32/research-ops/outputs"
+  ]
+}
