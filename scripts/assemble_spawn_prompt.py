@@ -461,6 +461,23 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
 
 # ---------------------------------------------------------------- CLI
 
+def _autodetect_research_ops() -> str:
+    """C1（2026-10-21）：自动探测 research-ops 路径（取代裸环境变量依赖）
+    探测顺序：env > CWD/research-ops > 专家包同级 research-ops > 静默跳过
+    """
+    env_v = os.environ.get("RESEARCH_OPS_DIR", "").strip()
+    if env_v and Path(env_v).is_dir():
+        return env_v
+    cwd_ro = Path.cwd() / "research-ops"
+    if cwd_ro.is_dir():
+        return str(cwd_ro.resolve())
+    expert_parent = Path(__file__).resolve().parent.parent.parent
+    sibling = expert_parent / "research-ops"
+    if sibling.is_dir():
+        return str(sibling.resolve())
+    return ""
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(
         description="成员 spawn 人设装配器：把成员 MD + 技能路径 + task_payload 拼成 spawn prompt")
@@ -471,6 +488,8 @@ def main() -> int:
     ap.add_argument("--phase", type=int, help="阶段号")
     ap.add_argument("--task-id", help="任务 ID，如 T-20260929-001")
     ap.add_argument("--out", help="输出到文件（默认 stdout）")
+    ap.add_argument("--no-autodetect", action="store_true",
+                    help="禁用 RESEARCH_OPS_DIR 自动探测（C1）")
     ap.add_argument("--check-task-package", action="store_true",
                     help="校验任务包四要素齐全，缺则 exit 4")
     ap.add_argument("--run-dir", default=None,
@@ -483,6 +502,12 @@ def main() -> int:
     expert_dir = resolve_expert_dir(args.expert_dir)
     plugin = load_plugin(expert_dir)
     member_ids = load_member_ids(plugin)
+    # C1：自动探测 RESEARCH_OPS_DIR（除非禁用）
+    if not args.no_autodetect and not os.environ.get("RESEARCH_OPS_DIR"):
+        auto = _autodetect_research_ops()
+        if auto:
+            os.environ["RESEARCH_OPS_DIR"] = auto
+            log(f"✅ C1 自动探测 RESEARCH_OPS_DIR = {auto}")
 
     if args.list_members:
         print("\n".join(member_ids))
