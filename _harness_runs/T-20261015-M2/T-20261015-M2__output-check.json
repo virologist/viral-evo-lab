@@ -1,0 +1,33 @@
+{
+  "ts": "2026-10-15T07:36:28",
+  "task_id": "T-20261015-M2",
+  "checked_artifacts": [
+    "T-20261015-M2__literature-scout.md",
+    "T-20261015-M2__research-diagnostician.md"
+  ],
+  "artifact_mtimes": {
+    "T-20261015-M2__literature-scout.md": 1792020552,
+    "T-20261015-M2__research-diagnostician.md": 1792020723
+  },
+  "unverified": [
+    {
+      "member": "literature-scout",
+      "kind": "pct",
+      "value": "40"
+    },
+    {
+      "member": "literature-scout",
+      "kind": "pct",
+      "value": "60"
+    },
+    {
+      "member": "literature-scout",
+      "kind": "pct",
+      "value": "24"
+    }
+  ],
+  "verdict": "DEGRADE",
+  "sources_used": [
+    "/Users/biodog/Library/CloudStorage/OneDrive-Personal/GPT/WorkBuddy/2026-09-10-11-38-32/research-ops/outputs"
+  ]
+}

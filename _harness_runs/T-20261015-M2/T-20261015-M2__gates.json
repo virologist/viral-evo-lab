@@ -1,0 +1,32 @@
+{
+  "ts": "2026-10-15T07:36:42",
+  "task_id": "T-20261015-M2",
+  "gates": [
+    {
+      "gate": "G3 产出落盘",
+      "ok": true,
+      "detail": "2 份 artifact"
+    },
+    {
+      "gate": "G1 信封完整",
+      "ok": true,
+      "detail": "literature-scout: agent_id=literature-scout status=success confidence=88 | research-diagnostician: agent_id=research-diagnostician status=success confidence=88"
+    },
+    {
+      "gate": "G2 数字溯源",
+      "ok": false,
+      "detail": "3 个未溯源（含外部引文数字时主理人人工核后放行并在 checklist 记录）"
+    },
+    {
+      "gate": "G4 核验留痕",
+      "ok": true,
+      "detail": "T-20261015-M2__output-check.json（mtime 指纹一致）"
+    },
+    {
+      "gate": "G5 审判留痕",
+      "ok": true,
+      "detail": "T-20261015-M2__checklist.json"
+    }
+  ],
+  "verdict": "FAIL"
+}
