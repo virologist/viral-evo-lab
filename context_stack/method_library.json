@@ -5,23 +5,63 @@
     "write_rule": "archivist 仅在有新增/变更条目时增量更新；纯检索轮零写放大",
     "human_view": "本 JSON 是机器真源；method_library.md 是人类可读视图，由 archivist 从 JSON 渲染"
   },
-  "last_updated": "2026-09-18T11:44:00+08:00",
+  "last_updated": "2026-10-14T20:55:00+08:00",
   "project_pipelines": {
     "production": {
       "id": "P-H5Nx-v5.1",
       "description": "H5Nx v5.1 投稿稿配套生产管线",
       "steps": [
-        {"step": 1, "tool": "NCBI/GISAID", "purpose": "序列检索"},
-        {"step": 2, "tool": "MAFFT", "params": "--auto ≤1000seq / --thread >1000", "qc": "缺失率 <5%"},
-        {"step": 3, "tool": "MUSCLE5", "purpose": "蛋白序列比对", "note": "用于蛋白级模块"},
-        {"step": 4, "tool": "IQ-TREE 3.x", "params": "MFP 自动模型选择", "qc": "UFBoot≥95, SH-aLRT≥80"},
-        {"step": 5, "tool": "HyPhy FUBAR", "purpose": "位点级选择压（贝叶斯）", "qc": "FDR p<0.05"},
-        {"step": 6, "tool": "PAML M7/M8", "purpose": "位点模型似然比", "qc": "FUBAR+PAML 双显著方报位点"},
-        {"step": 7, "tool": "AlphaFold3", "purpose": "结构验证（精度优先）"},
-        {"step": 8, "tool": "ESMFold", "purpose": "结构预测（批量速度优先）"}
+        {
+          "step": 1,
+          "tool": "NCBI/GISAID",
+          "purpose": "序列检索"
+        },
+        {
+          "step": 2,
+          "tool": "MAFFT",
+          "params": "--auto ≤1000seq / --thread >1000",
+          "qc": "缺失率 <5%"
+        },
+        {
+          "step": 3,
+          "tool": "MUSCLE5",
+          "purpose": "蛋白序列比对",
+          "note": "用于蛋白级模块"
+        },
+        {
+          "step": 4,
+          "tool": "IQ-TREE 3.x",
+          "params": "MFP 自动模型选择",
+          "qc": "UFBoot≥95, SH-aLRT≥80"
+        },
+        {
+          "step": 5,
+          "tool": "HyPhy FUBAR",
+          "purpose": "位点级选择压（贝叶斯）",
+          "qc": "FDR p<0.05"
+        },
+        {
+          "step": 6,
+          "tool": "PAML M7/M8",
+          "purpose": "位点模型似然比",
+          "qc": "FUBAR+PAML 双显著方报位点"
+        },
+        {
+          "step": 7,
+          "tool": "AlphaFold3",
+          "purpose": "结构验证（精度优先）"
+        },
+        {
+          "step": 8,
+          "tool": "ESMFold",
+          "purpose": "结构预测（批量速度优先）"
+        }
       ],
       "timetree": {
-        "tools": ["BEAST2", "TreeTime"],
+        "tools": [
+          "BEAST2",
+          "TreeTime"
+        ],
         "selection": "BEAST2 精度优先；TreeTime 探索优先",
         "qc": "ESS≥200 + Tracer 收敛诊断",
         "first_check": "root-to-tip 回归评估时间信号，信号不足改推距离法（LSD/TreeDater）"
@@ -48,10 +88,87 @@
   "frontier_anchors_2025_2026": {
     "authoritative_source": "skills/viral-evo-core/references/frontier-2025-2026.md",
     "candidates": [
-      {"method": "BEAST2 + CoalRe", "use": "分节段病毒重配网络分析（8 节段禽流感直接适用）", "source": "RdRp Summit 2026-02 社区共识", "status": "候选待验证"},
-      {"method": "DMS 适应度景观", "use": "突变效应依赖遗传背景（entrenchment），支撑预适应 enabling 叙事", "source": "Bloom 组 Nat Ecol Evol 2025, doi:10.1038/s41559-025-02895-1", "status": "候选待验证"},
-      {"method": "蛋白语言模型（BiLSTM/ProtBERT）", "use": "仅从 HA 序列预测抗原性 / in silico DMS 排序逃逸突变", "source": "Sci Rep 2025, PMID:40592976", "status": "候选待验证"},
-      {"method": "FoldTree/Foldseek 结构系统发育", "use": "高分化蛋白家族深节点校验", "source": "Mol Evol Sci 2025 方法综述", "status": "候选待验证"}
+      {
+        "method": "BEAST2 + CoalRe",
+        "use": "分节段病毒重配网络分析（8 节段禽流感直接适用）",
+        "source": "RdRp Summit 2026-02 社区共识",
+        "status": "候选待验证"
+      },
+      {
+        "method": "DMS 适应度景观",
+        "use": "突变效应依赖遗传背景（entrenchment），支撑预适应 enabling 叙事",
+        "source": "Bloom 组 Nat Ecol Evol 2025, doi:10.1038/s41559-025-02895-1",
+        "status": "候选待验证"
+      },
+      {
+        "method": "蛋白语言模型（BiLSTM/ProtBERT）",
+        "use": "仅从 HA 序列预测抗原性 / in silico DMS 排序逃逸突变",
+        "source": "Sci Rep 2025, PMID:40592976",
+        "status": "候选待验证"
+      },
+      {
+        "method": "FoldTree/Foldseek 结构系统发育",
+        "use": "高分化蛋白家族深节点校验",
+        "source": "Mol Evol Sci 2025 方法综述",
+        "status": "候选待验证"
+      }
     ]
-  }
+  },
+  "methods": [
+    {
+      "id": "METH-DPRIME-PROB-SCALE",
+      "name": "D′ Lewontin 概率标度计算（格子数标度陷阱）",
+      "module": "M17/M18/M20",
+      "core": "D = p11·p00 − p10·p01（全部除 N² 后的概率），D_max = min(pA·pb, pB·pa)；❌禁用格子数当 D 配概率分母（会得百万级）",
+      "pitfall": "两次实战错误：格子数/概率混标度=D′ 百万级；分子记错=D′=0。分层 D′=±1 是空单元算术后果禁读作强协同",
+      "verify": "M20 §3：全样本 D′=0.9441 bootstrap CI[0.893,0.988]；4h 内分层 D′=0.081",
+      "reusable": "H10/H1N1 任何 LD 分析直接套用",
+      "source": "09_Supplementary/M_statistical/M20_robustness_suite/M20_robustness_computation.py",
+      "added": "2026-10-14"
+    },
+    {
+      "id": "METH-FOUR-CALIBER",
+      "name": "多口径并列 GLMM（caliber panel）",
+      "module": "M18",
+      "core": "C0(仅EPI)/C1(+Province)/C2(去Other宿主)/C3(+仅Top4clade) 四档口径同规格拟合，并列报告点估计与显著性——不选'对的口径'，报告'口径敏感性'",
+      "pitfall": "n 差异源于宿主分类函数关键词边界；任何引用必须声明口径与分类函数版本",
+      "verify": "M18: C0-C2 一致(n=1892)，C3 剔混合 clade 后 Human p=0.022→0.92",
+      "reusable": "所有'过滤口径分歧'型争议的解决方案",
+      "source": "09_Supplementary/M_statistical/M18_mammal_caliber_uniform/M18_caliber_computation.ipynb",
+      "added": "2026-10-14"
+    },
+    {
+      "id": "METH-LOSO-PRECRITERIA",
+      "name": "LOSO 预指定判据",
+      "module": "M21",
+      "core": "运行前锁定：留一子样本系数符号一致 且极差<0.10 → 稳健；否则降级。两维度跑：subtype + province（70 次）",
+      "pitfall": "事后改判据=证据偷跑；只跑一个维度会漏 subtype 敏感性（H5N6 依赖即此发现）",
+      "verify": "M21: province 极差0.053稳定；subtype LOO-H5N6 符号翻转→Human 降级",
+      "reusable": "任何'结论是否被单一子集驱动'的检验",
+      "source": "09_Supplementary/M_statistical/M21_pglmm_loso/M21_computation.py",
+      "added": "2026-10-14"
+    },
+    {
+      "id": "METH-CLUSTER-ROBUST-PSEUDOREP",
+      "name": "伪重复三路检验（cluster-robust/crossed RE/PGLMM）",
+      "module": "M21",
+      "core": "①OLS cluster-robust SE ratio（阈值1.5）②MixedLM crossed vc_formula ③phylolm PGLMM 终裁；三路并列而非单点",
+      "pitfall": "Province RE 已吸收大部分省内相关时 naive SE 只低估 6-8%——'伪重复'指控需实证而非默认成立",
+      "verify": "M21: ratio=1.06-1.08 轻度；crossed 差 0.019 未确证",
+      "reusable": "红队'伪重复'攻击的标准回应模板",
+      "source": "09_Supplementary/M_statistical/M21_pglmm_loso/M21_computation.py",
+      "added": "2026-10-14"
+    },
+    {
+      "id": "METH-NUMBER-VERIFY-GATE",
+      "name": "关键数字核验关卡（幻觉拦截）",
+      "module": "专家包 verify_numbers.py",
+      "core": "产出中 n=/p=/D′/百分比/CI 提取 → 在权威源（仅 csv/json 计算产物，禁 md 循环自证）grep 同值 → 未命中=DEGRADE_TO_PARTIAL",
+      "pitfall": "A156T=20.58% 事故：幻觉数字流入 sentinel CSV+日志+汇报 16 天才被真源核查推翻。归一化禁截断（:g 制造假阳性 20.58→20.6 误命中）",
+      "verify": "R12 冒烟：幻觉被 EXIT=5 拦截，真值 EXIT=0 放行",
+      "reusable": "所有成员产出的 envelope 前置关卡",
+      "source": "viral-evo-lab/scripts/verify_numbers.py",
+      "added": "2026-10-14"
+    }
+  ]
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "last_updated": "2026-10-14T15:30:00+08:00",
+  "last_updated": "2026-10-14T21:00:00+08:00",
   "purpose": "跨模块/跨会话知识地图——H5Nx 项目的'如何找到某结论的证据链'机器可读索引；检索关键词→因果链→文件路径",
   "topics": [
     {
@@ -34,6 +34,12 @@
         "M17",
         "M20",
         "v6.5"
+      ],
+      "linked_findings": [
+        "H-04",
+        "C-01",
+        "M-05",
+        "M-12"
       ]
     },
     {
@@ -63,6 +69,11 @@
         "LOO",
         "family",
         "H-ANCHOR-3"
+      ],
+      "linked_findings": [
+        "H-02",
+        "M-02",
+        "M-13"
       ]
     },
     {
@@ -89,6 +100,10 @@
         "2476",
         "V1b",
         "反推"
+      ],
+      "linked_findings": [
+        "M-11",
+        "H-09"
       ]
     },
     {
@@ -114,6 +129,11 @@
         "coordinate-mapping",
         "G140",
         "G70"
+      ],
+      "linked_findings": [
+        "N-01",
+        "N-02",
+        "G-01"
       ]
     },
     {
@@ -143,7 +163,8 @@
         "discipline-sentinel",
         "M-11",
         "M19"
-      ]
+      ],
+      "linked_findings": []
     }
   ],
   "index_meta": {
