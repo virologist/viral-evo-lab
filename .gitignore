@@ -34,3 +34,4 @@ venv/
 /outputs/
 /runs/
 *.results.json
+.pending-preview-session
