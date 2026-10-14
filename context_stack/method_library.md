@@ -31,7 +31,7 @@
 
 ## METH-NUMBER-VERIFY-GATE — 关键数字核验关卡（幻觉拦截）
 - **核心**：产出中 n=/p=/D′/百分比/CI 提取 → 在权威源（仅 csv/json 计算产物，禁 md 循环自证）grep 同值 → 未命中=DEGRADE_TO_PARTIAL
-- **陷阱**：A156T=20.58% 事故：幻觉数字流入 sentinel CSV+日志+汇报 16 天才被真源核查推翻。归一化禁截断（:g 制造假阳性 20.58→20.6 误命中）
-- **验证**：R12 冒烟：幻觉被 EXIT=5 拦截，真值 EXIT=0 放行
+- **陷阱**：LLM 产出关键数字可能无中生有；归一化禁截断（:g 假阳性）；权威源禁含 md 叙述与已证伪文件
+- **验证**：冒烟：幻觉数字被 EXIT=5 拦截，真值 EXIT=0 放行
 - **复用**：所有成员产出的 envelope 前置关卡
 - **源码**：`viral-evo-lab/scripts/verify_numbers.py`
