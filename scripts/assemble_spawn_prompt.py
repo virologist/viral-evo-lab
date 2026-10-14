@@ -59,6 +59,111 @@ def log(msg: str) -> None:
     print(f"{LOG_PREFIX} {msg}", file=sys.stderr)
 
 
+def _detect_team_version(expert_dir: Path) -> str | None:
+    """从 git tag 探测最近 v* 版本号（v1.2.2 → '1.2.2'）；失败返回 None。"""
+    try:
+        import subprocess
+        r = subprocess.run(
+            ["git", "-C", str(expert_dir), "tag", "--list", "v*", "--sort=-creatordate"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode != 0:
+            return None
+        tags = [t for t in r.stdout.strip().splitlines() if t.startswith("v")]
+        if not tags:
+            return None
+        return tags[0].lstrip("v")
+    except (OSError, subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+
+
+# V1 关键数字模式（与 verify_numbers.py 对齐；避免循环 import，直接内联）
+_V1_PATTERNS = [
+    ("pct",    re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")),
+    ("n_eq",   re.compile(r"\bn\s*=\s*(\d{2,6})\b", re.I)),
+    ("p_val",  re.compile(r"\bp\s*=\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)", re.I)),
+    ("dprime", re.compile(r"D[\u2032\u2035]\s*=\s*([+-]?\d\.\d+)")),
+    ("ci",     re.compile(r"CI\s*[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]")),
+]
+_V1_EXCLUDE_YEAR = re.compile(r"^20[0-2]\d$")
+_V1_EXCLUDE_VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
+
+
+def _v1_extract(payload: str) -> list[tuple[str, str]]:
+    """从 task_payload 文本提取关键数字（与 verify_numbers.py 同口径）。"""
+    out, seen = [], set()
+    for kind, pat in _V1_PATTERNS:
+        for m in pat.finditer(payload):
+            vals = list(m.groups())
+            if kind == "ci":
+                # CI 区间取两端
+                vals = [vals[0], vals[1]]
+            else:
+                vals = [vals[0]]
+            for v in vals:
+                if not v or _V1_EXCLUDE_YEAR.match(v) or _V1_EXCLUDE_VERSION.match(v):
+                    continue
+                key = (kind, v)
+                if key in seen:
+                    continue
+                seen.add(key); out.append((kind, v))
+    return out
+
+
+def _auto_verify_payload(expert_dir: Path, payload: str, research_ops: str) -> dict:
+    """
+    V1：spawn 前自动核验 task_payload 中的关键数字。
+    权威源：context_stack/confirmed_hypotheses.json 引用的 CSV/JSON 目录（由 RESEARCH_OPS_DIR 推）。
+    缺失/未设置 → 静默跳过（不阻塞 spawn，记 stderr）。
+    """
+    if not research_ops:
+        log("V1 跳过：未设 RESEARCH_OPS_DIR，task_payload 数字未自动核验")
+        return {"unverified": [], "warning_text": None, "skipped": True}
+    # 权威源默认 = research-ops 的 M*/output 目录；若不存在则用 research-ops 全仓
+    sources = []
+    ctx = Path(research_ops) / "context_stack"
+    for sub in ("outputs", "data", "results"):
+        d = ctx / sub
+        if d.is_dir():
+            sources.append(str(d))
+    # 也尝试找 research-ops 下任何含 csv/json 的子目录
+    if not sources:
+        for d in sorted(Path(research_ops).rglob("output*")):
+            if d.is_dir() and d.suffix == "":
+                sources.append(str(d))
+    if not sources:
+        log(f"V1 跳过：未找到权威源目录（{research_ops} 下无 outputs/data/results）")
+        return {"unverified": [], "warning_text": None, "skipped": True}
+
+    # 复用 verify_numbers.py 的提取与匹配逻辑
+    nums = _v1_extract(payload)
+    if not nums:
+        return {"unverified": [], "warning_text": None}
+    # 加载权威源池
+    pool_chunks = []
+    for sp in sources:
+        pth = Path(sp)
+        if pth.is_dir():
+            for f in sorted(pth.rglob("*")):
+                if f.suffix.lower() in (".csv", ".json") and f.is_file():
+                    try:
+                        pool_chunks.append(f.read_text(encoding="utf-8", errors="ignore"))
+                    except OSError:
+                        pass
+    pool = "\n".join(pool_chunks)
+    unverified = []
+    for kind, val in nums:
+        cands = {val}
+        try:
+            f = float(val)
+            cands |= {f"{f:.2f}", f"{f:.3f}", f"{f:.4f}"} if f >= 1 else {f"{f:.3f}", f"{f:.4f}", f"{f:.5f}"}
+        except ValueError:
+            pass
+        if not any(c in pool for c in cands):
+            unverified.append({"kind": kind, "value": val})
+    return {"unverified": unverified, "warning_text": None, "skipped": False}
+
+
 # ---------------------------------------------------------------- 路径与元数据
 
 def resolve_expert_dir(explicit: str | None) -> Path:
@@ -213,13 +318,48 @@ def check_task_package(task_text: str) -> tuple[bool, list[str]]:
 def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
              task_text: str | None, phase: int | None,
              task_id: str | None, run_dir: str | None,
-             member_ids: list[str] | None = None) -> str:
+             member_ids: list[str] | None = None,
+             research_ops: str = "") -> str:
     """拼装最终 spawn prompt。结构固定，便于审计与 diff。"""
     skills = fm.get("skills") or []
     skill_paths = resolve_skill_paths(expert_dir, skills)
     shared = resolve_shared_refs(expert_dir)
+    if not research_ops:
+        research_ops = os.environ.get("RESEARCH_OPS_DIR", "")
+
+    # ---- 团队版本号（E1 · 2026-10-21）：从 git tag 探测最近含 v* 的 tag ----
+    team_ver = _detect_team_version(expert_dir)
+
+    # ---- V1（2026-10-21）：spawn 前自动核验 task_payload 关键数字 ----
+    # 边界：仅做数字存在性核对（确定性 grep），不判断数字合理性
+    if task_text and os.environ.get("VERIFY_NUMBERS_AUTO", "1") != "0":
+        payload_verdict = _auto_verify_payload(expert_dir, task_text, research_ops)
+        if payload_verdict["unverified"]:
+            log(f"⚠️  V1 警告：task_payload 含 {len(payload_verdict['unverified'])} 个未溯源数字：")
+            for u in payload_verdict["unverified"][:5]:
+                log(f"    {u['kind']}: {u['value']}")
+            log(f"  处置：spawn 仍继续（确定性 grep ≠ 语义判断），但主理人必须显式 ACK 或修改 task_payload")
+            # 写入 spawn prompt 头部 + checklist hint（避免 f-string 嵌套反斜杠）
+            sample = ", ".join(
+                f"{u['kind']}:{u['value']}"
+                for u in payload_verdict["unverified"][:3]
+            )
+            payload_verdict["warning_text"] = (
+                f"⚠️ V1 自动核验：task_payload 含 {len(payload_verdict['unverified'])} 个未溯源数字"
+                f"（{sample} 等）— 成员须把这些数字标 [待人工核验] 或在权威源中找到证据后重传"
+            )
+        else:
+            payload_verdict["warning_text"] = None
+    else:
+        payload_verdict = {"unverified": [], "warning_text": None}
 
     lines: list[str] = []
+    if team_ver:
+        lines.append(f"【团队规范版本】v{team_ver}（本 prompt 据此版本装配；若你读到本行为过时规范，请上报主理人）")
+        lines.append("")
+    if payload_verdict.get("warning_text"):
+        lines.append(payload_verdict["warning_text"])
+        lines.append("")
     lines.append(f"你是下面这份角色定义所描述的专家。请完整代入该角色，严格遵守其输出规范与接口契约。")
     lines.append("")
     lines.append("=" * 20 + " 角色定义（专家包成员 MD 全文） " + "=" * 20)
@@ -384,7 +524,8 @@ def main() -> int:
         log(f"✅ 运行目录就绪：{run_dir}")
 
     prompt = assemble(expert_dir, args.member, fm, body,
-                      task_text, args.phase, args.task_id, run_dir, member_ids)
+                      task_text, args.phase, args.task_id, run_dir, member_ids,
+                      research_ops=os.environ.get("RESEARCH_OPS_DIR", ""))
 
     if args.out:
         Path(args.out).expanduser().write_text(prompt, encoding="utf-8")
