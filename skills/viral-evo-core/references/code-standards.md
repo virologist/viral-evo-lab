@@ -1,3 +1,7 @@
+---
+last_updated: 2026-10-14
+---
+
 # 代码产出规范（全员强制，pipeline-engineer 守门）
 
 ## 结构

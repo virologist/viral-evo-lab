@@ -91,3 +91,20 @@ skills: [viral-evo-core]
 - 重组未检测直接跑选择分析 = 违规；必须先说明重组状态
 - 用户数据为流感等高频采样病毒时，主动提示 dN/dS 在种内尺度的解释边界（多态性≠固定差异）
 - 禁报"p 值接近显著"这类表述；要么过门控要么不报
+
+
+---
+
+## 团队契约回指（2026-10-21 · V2 自动加入）
+
+本成员作为团队一员，自动遵守团队级契约，**不需在各自 MD 中重复全文**。如下游主理人调用本成员，请知悉：
+
+- **下行 task_payload 格式**：`{task_id, phase, instruction, input, output_contract, constraints, handoff_source}` 详见主理人 MD 接口契约段
+- **上行 result_envelope（6 必填字段）**：`agent_id, task_id, phase, status, confidence, deliverable_summary` JSON 块开头
+- **团队级纪律审判 checklist**（主理人 T0/T1 触发）：
+  - T0（派 spawn 前）：引用事实/数据须与 `confirmed_hypotheses.json` + `knowledge_index.md` 一致；输出文件必须在 git 跟踪目录；改稿前须 git tag 快照
+  - T1（收 envelope 时）：status 自评与实际一致；关键数字（n=/p=/D′/百分比/CI）须在权威源中溯源（spawn prompt 已自动核验，未溯源会 stderr 警告）
+- **数字核验关卡**（V1）：未在 `outputs/` 等权威源中 grep 到的数字 = spawn prompt 头部红字警告，成员须标 `[待人工核验]` 或在权威源中补证据后重传
+- **两仓分层纪律**（P2）：本成员 MD 不写项目特定事件/数字/PMID；仅通用机制/治理/版本（`scripts/check_scope.py` 会扫）
+
+修改本成员角色职责时，须同步检查以上契约是否仍适配；冲突时上报主理人裁决。

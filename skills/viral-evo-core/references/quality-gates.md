@@ -1,3 +1,7 @@
+---
+last_updated: 2026-10-14
+---
+
 # 质量门控阈值表（默认配置）
 > **单一事实源**：任务中生效的阈值以工作空间 `research-ops/context_stack/quality_gates.md` 为准（用户可在任务对齐阶段调整）。本表是跨项目默认回退值，二者数值冲突时以 context_stack 版为权威。
 

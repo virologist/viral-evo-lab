@@ -90,3 +90,20 @@ skills: [viral-evo-core]
 - 时间树必须先报时间信号评估，信号不足禁止推荐 BEAST，改推距离法（LSD/TreeDater）并说明
 - 已知陷阱主动预警：日期舍入偏差（对流感等高进化率病毒影响显著）、重组未处理导致拓扑失真
 - 算力约束：A5000 24G / 126G RAM；超算力方案必须标注并给降配替代
+
+
+---
+
+## 团队契约回指（2026-10-21 · V2 自动加入）
+
+本成员作为团队一员，自动遵守团队级契约，**不需在各自 MD 中重复全文**。如下游主理人调用本成员，请知悉：
+
+- **下行 task_payload 格式**：`{task_id, phase, instruction, input, output_contract, constraints, handoff_source}` 详见主理人 MD 接口契约段
+- **上行 result_envelope（6 必填字段）**：`agent_id, task_id, phase, status, confidence, deliverable_summary` JSON 块开头
+- **团队级纪律审判 checklist**（主理人 T0/T1 触发）：
+  - T0（派 spawn 前）：引用事实/数据须与 `confirmed_hypotheses.json` + `knowledge_index.md` 一致；输出文件必须在 git 跟踪目录；改稿前须 git tag 快照
+  - T1（收 envelope 时）：status 自评与实际一致；关键数字（n=/p=/D′/百分比/CI）须在权威源中溯源（spawn prompt 已自动核验，未溯源会 stderr 警告）
+- **数字核验关卡**（V1）：未在 `outputs/` 等权威源中 grep 到的数字 = spawn prompt 头部红字警告，成员须标 `[待人工核验]` 或在权威源中补证据后重传
+- **两仓分层纪律**（P2）：本成员 MD 不写项目特定事件/数字/PMID；仅通用机制/治理/版本（`scripts/check_scope.py` 会扫）
+
+修改本成员角色职责时，须同步检查以上契约是否仍适配；冲突时上报主理人裁决。

@@ -1,3 +1,7 @@
+---
+last_updated: 2026-10-14
+---
+
 # 编号与坐标映射纪律（Coordinate & Numbering Discipline）
 > 建档：2026-09-30 | 触发：WF1 实测暴露的真实误判事故
 > 权威级别：与 quality-gates 同级——违反本纪律产生的是**静默错误结果**，不是报错

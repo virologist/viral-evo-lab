@@ -442,6 +442,12 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
         lines.append(f"- {m}{mark}")
     lines.append("")
 
+    lines.append("【推荐工具白名单】（本团成员惯例用法，仅供参考）")
+    lines.append("- Read / Write / Edit: 读写文件（Write 受 run_dir 限制）")
+    lines.append("- Bash: 跑脚本/查文件/执行命令（每个工具的实际调用频次由成员自决，无强制统计）")
+    lines.append("- WebSearch / WebFetch: 外部检索（literature-scout 主用）")
+    lines.append("- Agent: 派子任务（harness 团队场景）")
+    lines.append("")
     lines.append("【回传要求·双通道】")
     if run_dir:
         artifact = f"{run_dir}/{task_id or 'T-UNKNOWN'}__{member_id}.md"

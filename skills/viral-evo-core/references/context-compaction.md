@@ -1,3 +1,7 @@
+---
+last_updated: 2026-10-14
+---
+
 # 上下文压缩协议（Context Compaction）
 > P1-6 2026-09-18 建档。借鉴 Anthropic Managed Agents（2026-04）+ LangGraph compaction reducer + LlamaIndex CompactionEvent。
 > 目标：防 context rot——把"事件日志"与"模型上下文"分离，只把决策相关的最小切片放进 prompt。
