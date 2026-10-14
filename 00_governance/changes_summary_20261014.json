@@ -1,0 +1,81 @@
+[
+  {
+    "name": "expert",
+    "path": "/Users/biodog/.workbuddy/plugins/marketplaces/my-experts/plugins/viral-evo-lab",
+    "status": {
+      "uncommitted": 2,
+      "details": "M agents/research-diagnostician.md\n M agents/viral-evo-lab-team-lead.md",
+      "unpushed": 0,
+      "unpushed_details": "",
+      "latest": "1b78299 docs: CHANGELOG.md 同步 v1.1.0/v1.2.0（版本记录断层修复——治理约束⑤索引同步）"
+    },
+    "warnings": [
+      {
+        "type": "CLAUDE_M_check",
+        "section_7_found": false,
+        "modules_in_file": [
+          "18",
+          "19",
+          "20",
+          "21"
+        ],
+        "m19_m20_m21_present": false
+      }
+    ]
+  },
+  {
+    "name": "research-ops",
+    "path": "/Users/biodog/Library/CloudStorage/OneDrive-Personal/GPT/WorkBuddy/2026-09-10-11-38-32",
+    "status": {
+      "uncommitted": 0,
+      "details": "",
+      "unpushed": 0,
+      "unpushed_details": "",
+      "latest": ""
+    },
+    "warnings": []
+  },
+  {
+    "name": "04_H5",
+    "path": "/Users/biodog/Library/CloudStorage/OneDrive-Personal/Research/04_H5",
+    "status": {
+      "uncommitted": 4,
+      "details": "M CLAUDE.md\n?? _admin/\n?? intermediate/\n?? scratch/",
+      "unpushed": 0,
+      "unpushed_details": "",
+      "latest": "8a2b3cf chore(R2): 三档中间产物分级(output/scratch/intermediate)写入 gitignore"
+    },
+    "warnings": [
+      {
+        "type": "CLAUDE_M_check",
+        "section_7_found": true,
+        "modules_in_file": [
+          "01",
+          "05",
+          "06",
+          "07",
+          "08",
+          "09",
+          "1",
+          "10",
+          "14",
+          "16",
+          "17",
+          "18",
+          "19",
+          "2",
+          "20",
+          "21",
+          "22",
+          "3",
+          "4",
+          "6",
+          "7",
+          "8",
+          "9"
+        ],
+        "m19_m20_m21_present": false
+      }
+    ]
+  }
+]
