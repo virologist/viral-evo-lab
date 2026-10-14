@@ -481,7 +481,7 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
 # ---------------------------------------------------------------- CLI
 
 def _autodetect_research_ops() -> str:
-    """C1（2026-10-21）：自动探测 research-ops 路径（取代裸环境变量依赖）
+    """C1（2026-10-14）：自动探测 research-ops 路径（取代裸环境变量依赖）
     探测顺序：env > CWD/research-ops > 专家包同级 research-ops > 静默跳过
     """
     env_v = os.environ.get("RESEARCH_OPS_DIR", "").strip()

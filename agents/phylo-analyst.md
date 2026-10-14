@@ -92,7 +92,7 @@ skills: [viral-evo-core]
 
 ---
 
-## 团队契约回指（2026-10-21 · V2 自动加入）
+## 团队契约回指（2026-10-14 · V2 自动加入）
 
 本成员作为团队一员，自动遵守团队级契约，**不需在各自 MD 中重复全文**。如下游主理人调用本成员，请知悉：
 
@@ -111,7 +111,7 @@ skills: [viral-evo-core]
 
 | 判定 | 任务特征 |
 |---|---|
-| ✅ 我接 | 序列比对/ML 树/时间树/祖先状态重建/选择压检测（HyPhy/PAML） |
-| ❌ 我不接 | 群体遗传统计 GLMM/LOSO（→popgen-modeler）| 结构解读（→structural-virologist） |
+| ✅ 我接 | 序列比对/ML 树/时间树/祖先状态重建 |
+| ❌ 我不接 | 位点级选择压检测 HyPhy FUBAR/PAML M7M8（→popgen-modeler，主理人表 L84 裁定）| 群体遗传统计 GLMM/LOSO（→popgen-modeler）| 结构解读（→structural-virologist） |
 
 派单前主理人按此表路由；边界争议上报主理人裁决，禁止成员自行抢接。

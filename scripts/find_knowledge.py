@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-find_knowledge.py —— 跨三仓知识入口（S1 · 2026-10-21）
+find_knowledge.py —— 跨三仓知识入口（S1 · 2026-10-14）
 执行：在 04_H5 / research-ops / 专家包三仓统一 grep 查询关键词
 用法：python3 scripts/find_knowledge.py <query> [--limit 20] [--type md|py|json]
 返回：<仓库>::<相对路径>:<行号>:<内容>  排序按相关度

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-write_checklist.py —— R9/R14 纪律审判落盘工具（L1 · 2026-10-21）
+write_checklist.py —— R9/R14 纪律审判落盘工具（L1 · 2026-10-14）
 执行：生成 <run-dir>/<task_id>__checklist.json（机器读） + .md（人读）
 用法：python3 scripts/write_checklist.py <run-dir> <task_id> \
         --items 4 --passed 3 --sources-checked 2 --hallucinated 1 \

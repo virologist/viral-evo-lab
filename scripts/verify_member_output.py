@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-verify_member_output.py —— 产出端数字核验关卡（A · 2026-10-21 V1 升级）
+verify_member_output.py —— 产出端数字核验关卡（A · 2026-10-14 V1 升级）
 =====================================================================
 动机：V1（装配时）只核 task_payload 输入端；成员产出（run-dir 落盘 artifact）
 仍靠主理人手工跑 verify_numbers.py——"已落盘工具未触发"的老毛病。

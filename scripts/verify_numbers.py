@@ -79,7 +79,7 @@ def extract_numbers(text: str, min_digits: int):
 def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False) -> str:
     """把权威源（csv/json/md/txt）读成一个大文本（grep 池）；exclude=**文件名**关键字黑名单。
 
-    2026-10-21 修：exclude 曾匹配完整路径（str(f)），导致父目录名含关键字时
+    2026-10-14 修：exclude 曾匹配完整路径（str(f)），导致父目录名含关键字时
     整个目录被误杀（如 /tmp/vmo_test/ 被 --exclude "_" 清空）。现仅匹配 f.name。
     """
     exclude = exclude or []
