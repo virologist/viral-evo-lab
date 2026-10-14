@@ -432,6 +432,12 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 - [ ] status 自评与实际产出一致？failed/partial 不可伪装为 success
 - [ ] 引用是否含 PMID/DOI 或标注"待人工核验"？（防幻觉）
 - [ ] 是否触及 H-ANCHOR-1 类已被 M* 推翻的已 deprecated 结论？（防口径漂移）
+- [ ] **数字核验关卡（R12 2026-10-14）**：对含关键数字（n=/p=/D′/百分比/CI）的产出，跑
+      `python3 <专家包>/scripts/verify_numbers.py <产出文件> --sources <计算产物目录> --exclude _trash`
+      权威源**只认 csv/json 计算产物**（md 叙述循环自证禁入）；EXIT=5（未溯源数字）→ envelope 降级 partial 或要求成员补 [待人工核验] 标注后重传
+
+### 执行痕迹（R14 · checklist 落盘纪律）
+T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md`（3 行以内：时间/项数/结论）。**无 checklist 痕迹 = 该任务 VERIFY 未执行**——事后审计以文件为准，不以"我记得跑过"为准。
 
 ### T2 · 任务收尾（archivist 执行，写入 knowledge_index.md）
 - [ ] 新发现/新方法是否入 5 主题索引？新文件是否入文件路径清单？

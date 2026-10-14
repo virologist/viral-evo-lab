@@ -241,6 +241,38 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
         lines.append(f"- {p}")
     lines.append("")
 
+    # ---- R11（2026-10-14）：项目知识态注入（活跃/废弃假说 + 知识地图）----
+    # 目的：spawn 时刻拦截"引用已废弃结论/幻觉数字"（A156T 事故根治点）。
+    # 缺失时静默跳过（不阻塞装配），但打印 stderr 提醒。
+    research_ops = os.environ.get("RESEARCH_OPS_DIR", "")
+    if research_ops:
+        hyp = Path(research_ops) / "context_stack/confirmed_hypotheses.json"
+        kidx = Path(research_ops) / "context_stack/knowledge_index.md"
+        inj: list[str] = []
+        if hyp.is_file():
+            try:
+                d = json.loads(hyp.read_text(encoding="utf-8"))
+                active = [h.get("id") for h in d.get("active_hypotheses", [])
+                          if h.get("status") != "deprecated"]
+                deprec = [h.get("id") for h in d.get("active_hypotheses", [])
+                          if h.get("status") == "deprecated"]
+                inj.append("【项目知识态·硬约束】（引用结论前必查；违反=虚报）")
+                inj.append(f"- 活跃假说（可引用）：{', '.join(x or '?' for x in active) or '（无）'}")
+                inj.append(f"- 已废弃假说（🔴禁止引用为当前结论，只能作历史陈述）："
+                           f"{', '.join(x or '?' for x in deprec) or '（无）'}")
+                inj.append(f"- 权威源：{hyp}")
+                inj.append("- 任务产出中的关键数字（n=/百分比/p=/D′值）必须能在权威源 CSV 中 grep 到；"
+                           "找不到 = 标注[待人工核验]，禁止直接当作事实陈述")
+            except (OSError, json.JSONDecodeError) as e:
+                log(f"confirmed_hypotheses.json 解析失败，跳过注入：{e}")
+        if kidx.is_file():
+            inj.append(f"- 知识地图（结论→证据链→文件路径）：{kidx}")
+        if inj:
+            lines.extend(inj)
+            lines.append("")
+    else:
+        log("未设置 RESEARCH_OPS_DIR，跳过知识态注入（建议：export RESEARCH_OPS_DIR=<research-ops 绝对路径>）")
+
     if task_id or phase is not None:
         lines.append("【任务标识】")
         if task_id:
