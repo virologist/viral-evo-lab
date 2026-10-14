@@ -109,3 +109,29 @@ D 演练实录：成员简报中"约 79% 从业者"（转述 arXiv:2503.06745）
 - Related Files: scripts/verify_member_output.py
 
 ---
+
+## [LRN-20261015-005] correction
+
+**Logged**: 2026-10-15T06:20:00+08:00
+**Priority**: high
+**Status**: pending
+**Area**: tests
+
+### Summary
+R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常量 CSV（M18.csv），直到 A→D 收官审计才发现——假数据在池里会被 V1/产出端核验当真源匹配，等于核验关卡失效
+
+### Details
+冒烟测试的产物与真实权威源混居同一目录，无隔离标记。D 演练时 verify_member_output 用该池匹配成员产出中的真值数字（0.9441 等），"found" 是假象——匹配到的是我自己编的冒烟常量。
+
+### Suggested Action
+- ✅ 已删 M18.csv + outputs/README.md（"本目录不放示例/冒烟数据"）
+- 规则固化：**冒烟测试的权威源必须用 /tmp 或独立 smoke 目录，禁止入项目权威源池**；verify 类脚本加 `--sources` 显式指向时，主理人须确认路径非 smoke
+- LRN-004（外部引文数字边界）的完整链条：关卡边界 = 本地池真伪 × 外部引文人判，两端都要人管
+
+### Metadata
+- Source: conversation
+- Tags: smoke-test, authoritative-pool, contamination
+- Recurrence-Count: 1
+- See Also: LRN-20261014-004
+
+---
