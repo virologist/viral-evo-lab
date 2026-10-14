@@ -6,6 +6,7 @@ validate_contracts.py —— 团队契约文本检查（V2 · 2026-10-21）
 边界：仅做"关键词存在性"确定性检查；不判断语义
 返回：EXIT=0 全过；EXIT=5 缺条款
 """
+import json
 import re
 import sys
 from pathlib import Path
@@ -59,9 +60,30 @@ def check_skill(skill_md: Path) -> list[dict]:
     return miss
 
 
+def check_manifests(base: Path) -> list[dict]:
+    """P2-⑩（2026-10-15）：双 manifest 版本一致性（今日曾 2 次不同步）。"""
+    miss = []
+    versions = {}
+    for mf in (".codebuddy-plugin/plugin.json", ".claude-plugin/plugin.json"):
+        p = base / mf
+        try:
+            versions[mf] = json.loads(p.read_text(encoding="utf-8")).get("version", "?")
+        except (OSError, json.JSONDecodeError) as e:
+            miss.append({"contract": f"{mf} 读取失败", "missing_pattern": str(e)})
+    if len(set(versions.values())) > 1:
+        miss.append({"contract": "双 manifest version 不一致",
+                     "missing_pattern": str(versions)})
+    return miss
+
+
 def main() -> int:
     base = Path(__file__).resolve().parent.parent
     total_missing = 0
+
+    # ⓪ 双 manifest 版本一致性
+    for m in check_manifests(base):
+        total_missing += 1
+        print(f"❌ manifest: {m['contract']}（{m['missing_pattern']}）")
 
     # ① agents 层（9 员）
     for ag in sorted((base / "agents").glob("*.md")):
@@ -89,7 +111,7 @@ def main() -> int:
     if total_missing:
         print(f"\n总计 {total_missing} 处契约缺失——影响层间一致性，建议补齐")
         return 5
-    print("\n✅ 全员契约完整（agents 9 + skills 1）")
+    print("\n✅ 全员契约完整（manifest 一致 + agents 9 + skills 1）")
     return 0
 
 

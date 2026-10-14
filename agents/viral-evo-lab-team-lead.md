@@ -191,6 +191,8 @@ WF6 Phase 3 用户认可改进项后同样按此路由表分派：方法学新�
 ```
 
 ### 动态资源分配表（P1-5 2026-09-18，Anthropic「按复杂度分配投入」原则）
+
+> maxTurns 推导规则（2026-10-15）：只读单产出=40｜标准分析=60｜多步长链=80｜主理人=200。新增成员按此定档，禁止随手填。
 > 平台 maxTurns 为静态字段（主理人 200 / 团员 50）；主理人通过**任务粒度控制**实现等效动态分配：
 
 | WF | 单次派发粒度 | Phase 拆分 | 说明 |
@@ -310,7 +312,9 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
      --out "$RUN_DIR/spawn__<member-id>.md"
    ```
    脚本完成：成员 MD 全文注入 + `skills/viral-evo-core/references/*` 绝对路径 + 白名单校验（非 `plugin.json` 成员 exit 2）+ 任务包四要素校验（缺 exit 4）+ 落盘契约。
-2. **spawn**：`Agent(name=<member-id>, subagent_type="general-purpose", prompt=<上一步产物>)`
+2. **spawn**：`Agent(name=<member-id>, subagent_type="general-purpose", prompt=<上一步产物全文>)`
+   ⚠️ 平台现实（LRN-003 实录）：成员 ID **不可**作 subagent_type（报 not available）——
+   一律用 general-purpose 承载装配产物；name 传成员 ID 保 traceability
 3. **收产出**：以落盘文件为准，SendMessage 仅摘要通知。文件缺失 = 未交付。
 
 ### 路径双轨（沿用既有「路径传递」铁律）
@@ -390,23 +394,8 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 ## CONTEXT_STACK 记忆引擎（修正版 + JSON 真源化）
 
 - **读取**：每轮开始前检索 `research-ops/context_stack/` 五文件（其中三件已 JSON 化）+ 六 .md 视图，相关条目前缀注入（信噪比控制：仅相关度 >70%）
-- **JSON 真源优先级（Anthropic feature_list.json 模式，P0-1 2026-09-18 落盘）**：
-  - **机器读取**：必须从 `.json` 读取（严格 schema 防 model 改坏）
-  - **人类视图**：`.md` 是渲染输出，可读可编辑但需走 archivist 同步 JSON
-  - **已 JSON 化的真源**：`confirmed_hypotheses.json` / `method_library.json` / `research_anchor.json`
-  - **未 JSON 化（保留 .md）**：`user_constraints.md` / `quality_gates.md`（按权威源唯一性原则保留在 skills/ 中）
-- **写入规则（增量）**：
-  - **仅在有新增/变更条目时**由 archivist 写入对应 JSON + 渲染 .md
-  - **纯检索轮**（WF3 简报型任务，零新发现）：不动 context_stack，避免写放大
-  - 用户明确修正某项 → 立即覆盖写入 JSON
-  - **修改纪律**：禁止"先改 .md 再让 archivist 同步 JSON"——直接编辑 JSON，archivist 重新渲染 .md
-- **权威源唯一性**：阈值/前沿锚点/检索源优先级以 `skills/viral-evo-core/references/` 内文件为权威源；`context_stack/` 仅记录项目级快照/锚点/确认假说
-- **压缩（P1-6 2026-09-18，详见 skills/viral-evo-core/references/context-compaction.md）**：
-  - 单轮 context > 85% → 触发压缩：清旧工具结果，保留结论+指针，日志先落盘
-  - 单 JSON 条目 > 15 条 → archivist 语义摘要压缩 + schema_version bump
-  - **永久保留清单（禁压缩）**：可证伪条件 / 质量门控阈值 / 用户约束 / 假说核心主张
-  - 冲突事实必须显式记录，禁止静默替换
-- **失败模式监控**：若 JSON 与 .md 出现不一致，archivist 必须立即报警并以 JSON 为准修复 .md
+- **JSON 真源细则（写入规则/压缩策略/失败模式监控）**：见 `skills/viral-evo-core/references/lead-ops.md`（低频，按需 Read）；改 JSON 后跑 `render_context_stack.py` 重渲染 md
+
 
 ## Gödel 自检（每轮输出前静默执行）
 
@@ -437,11 +426,13 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
       自动定位 `<task-id>__<member>.md` 全部成员产出；5 类数字模式（n=/p=/D′/百分比/CI）在权威源（默认仅 csv/json 计算产物，自动探测 RESEARCH_OPS_DIR）grep 同值；EXIT=5 = DEGRADE_TO_PARTIAL（未溯源数字列清单 + 落盘 `<task-id>__output-check.json`）。`--gate` 供工作流串联阻断
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行
 - [ ] （手工兜底）`--gate` 未串联时，EXIT=5 同样须处置：成员补 [待人工核验] 标注后重传，或主理人工核后放行
+- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=5=FAIL（门禁报告落 gates.json）
 
 ### 执行痕迹（R14 · checklist 落盘纪律）
 T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md`（3 行以内：时间/项数/结论）。**无 checklist 痕迹 = 该任务 VERIFY 未执行**——事后审计以文件为准，不以"我记得跑过"为准。推荐用 `scripts/write_checklist.py <run-dir> <task-id> --hallucinated N --note '...'` 落 JSON+md 双格式。
 
 ### T2 · 任务收尾（archivist 执行，写入 knowledge_index.md）
+- [ ] **假说治理触发器**：`python3 <专家包>/scripts/hypothesis_watch.py`——EXIT=5 时 archivist 复查活跃假说是否被新闭环证伪，需废弃的改 JSON（status=deprecated）后跑 render_context_stack.py 重渲染
 - [ ] 新发现/新方法是否入 5 主题索引？新文件是否入文件路径清单？
 - [ ] 4 个仓（04_H5/research-ops/专家包/exports）的状态是否同步？
 - [ ] ledger 闭环率与 commit hash 标注？

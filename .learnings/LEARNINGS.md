@@ -135,3 +135,29 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - See Also: LRN-20261014-004
 
 ---
+
+## [LRN-20261015-006] insight
+
+**Logged**: 2026-10-15T06:50:00+08:00
+**Priority**: high
+**Status**: pending
+**Area**: tests
+
+### Summary
+五维度并行诊断中，诊断子代理自身出现证据幻觉（5 条 spot-check 里 2 条被证伪：声称"20.58% 幻觉值在 frontier-2025-2026.md:12"实为 GOVERNANCE_BOUNDARIES.md 的反面示例；声称"_trash_20261014 58M 失踪"实为存在）——子代理的"证据"同样需要验证层
+
+### Details
+今天让 5 个 general-purpose 子代理并行诊断专家团，回传质量总体高（每条带文件:行号），但抽查发现 2/5 条要害证据不实。模式：子代理把"黑名单/反面示例中出现的关键词"误报为"正文污染"；把 find 命令失败误报为"文件失踪"。这与 MAST 分类学的 Superficial Verification 失败模式同构——**验证者本身也会表面验证**。
+
+### Suggested Action
+- 诊断/审计类子代理回传后，**主理人必须抽查 ≥2 条要害证据**（grep 原文）才可采信进报告——本次已执行并当场纠正
+- 子代理 prompt 应要求："证据须给可复核的定位（文件:行号+原文摘录），不得只给结论"——本次 prompt 已含此要求但仍出现幻觉，说明要求不够，需加"摘录原文片段"
+- 团队 V 层哲学（确定性关卡+人判）对子代理产出同样适用
+
+### Metadata
+- Source: conversation
+- Tags: subagent-hallucination, verification, MAST
+- Recurrence-Count: 1
+- See Also: LRN-20261014-004, LRN-20261015-005
+
+---

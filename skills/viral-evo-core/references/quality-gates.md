@@ -22,3 +22,20 @@ last_updated: 2026-10-14
 ## 原则
 - 门控在任务对齐阶段与用户确认；调整写入 quality_gates.md 覆盖本表
 - 门控未通过 → 暂停 → 报告原因 → 给改进方案（不静默降级）
+
+## 团队级脚本化门禁（D2 修复 · 2026-10-15）
+
+上表为**领域分析门**（成员自查）；下表为**团队协作门**（主理人收产出时跑，已脚本化）：
+
+| 门 | 检查内容 | 执行方式 |
+|---|---|---|
+| G1 信封完整 | artifact 头部 JSON 含 6 必填字段 + status 合法 | `scripts/check_gates.py <run-dir> <task-id>` |
+| G2 数字溯源 | 关键数字在权威源 grep 得到（外部引文数字由主理人人工核 URL 后放行） | 同上（或 verify_member_output.py 单独跑） |
+| G3 产出落盘 | `<task-id>__<member>.md` 存在 | 同上 |
+| G4 核验留痕 | output-check.json 已生成 | 同上 |
+| G5 审判留痕 | checklist.json 已生成（T0/T1 凭证） | 同上 |
+| 假说治理 | 活跃假说无"晚于池更新的 fatal/severe 证伪"积压 | `scripts/hypothesis_watch.py`（T2 必跑） |
+| 契约完整 | manifest 一致 + agents 9 + skills 1 契约条款在位 | `scripts/validate_contracts.py` |
+| 叙事边界 | 包内无项目特定事件污染 | `scripts/check_scope.py` |
+
+全部门禁 **EXIT=0 过 / 5 FAIL**，可串联 CI；报告落 `<run-dir>/<task-id>__gates.json`。

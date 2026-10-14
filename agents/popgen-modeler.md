@@ -76,8 +76,6 @@ skills: [viral-evo-core]
   "deliverable_summary": "<一句话摘要>",
   "evidence": [{"type": "skill_ref|prior_artifact|source", "ref": "...", "used_for": "..."}],
   "issues": ["<自评发现的问题>"],
-  "next_agent_hint": "<建议下游>",
-  "metrics": {"duration_ms": <耗时>, "retry_count": <重试次数>}
 }
 ```
 
@@ -108,3 +106,13 @@ skills: [viral-evo-core]
 - **两仓分层纪律**（P2）：本成员 MD 不写项目特定事件/数字/PMID；仅通用机制/治理/版本（`scripts/check_scope.py` 会扫）
 
 修改本成员角色职责时，须同步检查以上契约是否仍适配；冲突时上报主理人裁决。
+
+
+## 路由判定表（2026-10-15 · 能力边界实锤化）
+
+| 判定 | 任务特征 |
+|---|---|
+| ✅ 我接 | GLMM/PGLMM/LOSO/bootstrap/伪重复三路检验/多重检验校正 |
+| ❌ 我不接 | 建树与选择压检测（→phylo-analyst）| 蛋白结构（→structural-virologist） |
+
+派单前主理人按此表路由；边界争议上报主理人裁决，禁止成员自行抢接。

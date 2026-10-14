@@ -46,6 +46,11 @@
 
 退出码：
     0 = 成功；2 = 成员 ID 不在白名单；3 = 文件缺失；4 = 任务包要素缺失
+
+spawn 平台现实（LRN-003 实录 · 2026-10-15）：
+    成员 ID 不可作 Agent 工具的 subagent_type（报 not available）。
+    标准流程 = 本脚本装配产出全文 → Agent(name=<成员ID>, subagent_type="general-purpose",
+    prompt=<装配产物>)。name 传成员 ID 保 traceability；prompt 即人设。
 """
 
 import argparse
@@ -383,11 +388,10 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
     lines.append("=" * 20 + " 角色定义结束 " + "=" * 20)
     lines.append("")
 
-    lines.append("【专家包资源绝对路径】（按需 Read，禁止猜测路径）")
-    for p in skill_paths:
-        lines.append(f"- {p}")
-    for p in shared:
-        lines.append(f"- {p}")
+    lines.append("【专家包资源索引】（禁止全量阅读——先读 SKILL.md 索引表，按需取用）")
+    lines.append(f"- {expert_dir}/skills/viral-evo-core/SKILL.md  ← 方法库入口（内含 references/ 场景索引 + 团队工具清单）")
+    lines.append(f"- {expert_dir}/skills/viral-evo-core/references/  ← 9 份参考（按 SKILL.md 索引按需 Read）")
+    lines.append(f"- {expert_dir}/scripts/  ← 团队工具 8 个（清单与用途见 SKILL.md「团队工具与契约」节）")
     lines.append("")
 
     # ---- R11（2026-10-14）：项目知识态注入（活跃/废弃假说 + 知识地图）----
