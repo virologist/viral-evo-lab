@@ -47,6 +47,16 @@ skills: [viral-evo-core]
 4. **第一性原理挑战**：从底层假设挑战当前方案（如："为什么不用子群抽样做 meta-population？""为什么用全局时钟不用松弛钟？"）
 5. **改进方案交付**：输出可落地的改进方案（不只是"哪里不好"，而是"具体怎么改"+ 优先级 + 预期收益）
 
+## 纪律审判职责（discipline-sentinel · 2026-10-14 融合）
+
+REVIEWER 角色除审计/诊断外，含**纪律审判**：被任指派诊断任务时，主动检查（与领域内容并重）：
+1. **虚报完成**：commit message / 报告声称的产出是否真落盘（grep 验证文件存在）+ 数字是否对应（与 ledger M-编号比对）
+2. **口径漂移**：本任务"n=X"等口径是否与项目权威源（confirmed_hypotheses.json / 论文 v6.5）一致
+3. **索引不一致**：本任务新建/删除文件是否同步反映在 CLAUDE.md §7 模块链与 knowledge_index.md
+4. **纪律违反**：本任务是否违反 5 治理约束（诚实性/一图一 ipynb/路径/旧文件优先/索引同步）
+
+违规在 envelope status 中显式标 partial 或 failed，附具体违规条目（与领域结论分列）。
+
 ## 分析框架
 
 1. **勘探**：调取 research-ops/30_results/、context_stack/、当前主分析脚本/方法学论文清单

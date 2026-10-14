@@ -419,6 +419,27 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 
 ## 慢通道启动前置门（R1/R2/R3 2026-09-26 v2.0 诊断落地）
 
+## 纪律审判 Checklist（discipline-sentinel · 2026-10-14 融合）
+
+**不新增角色**——以主理人常态化检查 + 复用 research-diagnostician（已含纪律审判扩展职责）实现。三个时点触发：
+
+### T0 · 派 spawn 前（主理人执行，10 秒）
+- [ ] 本任务引用的事实/数据/编号，是否与历史 confirmed_hypotheses.json + knowledge_index.md 一致？（防虚报完成）
+- [ ] 输出文件路径是否在 git 已跟踪目录中（非 scratch/）？（防临时文件膨胀）
+- [ ] 若涉及改稿：是否已 git tag 当前 commit 作快照锚点？（防 .bak 回归）
+
+### T1 · 收 envelope 时（主理人执行，VERIFY 阶段）
+- [ ] status 自评与实际产出一致？failed/partial 不可伪装为 success
+- [ ] 引用是否含 PMID/DOI 或标注"待人工核验"？（防幻觉）
+- [ ] 是否触及 H-ANCHOR-1 类已被 M* 推翻的已 deprecated 结论？（防口径漂移）
+
+### T2 · 任务收尾（archivist 执行，写入 knowledge_index.md）
+- [ ] 新发现/新方法是否入 5 主题索引？新文件是否入文件路径清单？
+- [ ] 4 个仓（04_H5/research-ops/专家包/exports）的状态是否同步？
+- [ ] ledger 闭环率与 commit hash 标注？
+
+**升级路径**：T0/T1 触发任一项 = 整单退回重做；T2 漏项 = discipline-sentinel 标黄，48h 内补齐。
+
 **每次慢通道（真实 spawn）启动前，主理人必须依次执行三道前置检查：**
 1. **完整性巡检（R1）**：`python3 <research-ops>/00_governance/redteam_tools.py check` —— manifest 无缺失 + validate 通过（settings.json 会被外部进程反复删除，已两次实测中招；缺失先 `git checkout -- settings.json` 恢复）
 2. **台账就位（R2）**：确认 `redteam_ledger.csv` 存在且可写——本次 finding 结束后逐条登记
