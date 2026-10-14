@@ -113,13 +113,14 @@ def main() -> int:
         else:
             print(f"✅ {member}: {len(nums)} 个数字全部溯源")
 
-    # 落盘 output-check.json
+    # 落盘 output-check.json（C1 修复：记录 artifact mtime 指纹，防核验后改动绕过留痕）
     if not args.no_checklist:
         verdict = "PASS" if not all_unverified else "DEGRADE"
         payload = {
             "ts": datetime.now().isoformat(timespec="seconds"),
             "task_id": args.task_id,
             "checked_artifacts": [a.name for a in artifacts],
+            "artifact_mtimes": {a.name: int(a.stat().st_mtime) for a in artifacts},
             "unverified": all_unverified,
             "verdict": verdict,
             "sources_used": sources,

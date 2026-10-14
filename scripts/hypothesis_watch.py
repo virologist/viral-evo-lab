@@ -66,21 +66,42 @@ def main() -> int:
         return 3
 
     hyp = json.loads(hyp_p.read_text(encoding="utf-8"))
+    if not isinstance(hyp.get("active_hypotheses"), list):
+        print("❌ 假说池结构异常（active_hypotheses 非 list）", file=sys.stderr)
+        return 3
     hyp_updated = parse_dt(hyp.get("last_updated", ""))
     if hyp_updated is None:
         print("❌ 假说池 last_updated 无法解析", file=sys.stderr)
         return 3
 
-    # 台账：晚于假说池更新的 closed fatal/severe
+    # H1 修复（审计 C1 2026-10-15）：已处置清单按 finding_id 记账，防"bump 时间戳洗白"
+    state_p = Path(ro) / "00_governance/hypothesis_watch_state.json"
+    handled = set()
+    if state_p.is_file():
+        try:
+            handled = set(json.loads(state_p.read_text(encoding="utf-8")).get("handled_finding_ids", []))
+        except (json.JSONDecodeError, OSError):
+            handled = set()
+
+    # 台账：晚于假说池更新的 closed fatal/severe（排除已处置）
     late_fatal = []
     with led_p.open(encoding="utf-8-sig") as f:
         for row in csv.DictReader(f):
+            fid = row.get("finding_id", "")
+            if fid in handled:
+                continue
             if row.get("status", "").lower() != "closed":
                 continue
             if row.get("severity", "").lower() not in ("fatal", "severe"):
                 continue
             cd = parse_dt(row.get("closed_date", "") or "")
-            if cd and cd > hyp_updated:
+            if cd is None:
+                continue
+            # H2 修复（审计 2026-10-15）：closed_date 为纯日期时按"同日即算晚于"（避免同日晚闭环漏报）
+            if len((row.get("closed_date") or "").strip()) <= 10:
+                if cd.date() >= hyp_updated.date():
+                    late_fatal.append(row)
+            elif cd > hyp_updated:
                 late_fatal.append(row)
 
     age_days = (datetime.now() - hyp_updated).days
@@ -104,7 +125,9 @@ def main() -> int:
         print("\n裁决: REVIEW_REQUIRED")
         for a in alerts:
             print(f"  ⚠️  {a}")
-        print("  处置：archivist 逐条比对 → 需废弃的标 deprecated（同步 md 视图）→ 复跑本脚本至 exit 0")
+        print("  处置：archivist 逐条比对 → 需废弃的标 deprecated（改 JSON 后跑 render_context_stack.py）")
+        print("  →  复查完成后把处置过的 finding_id 写入 00_governance/hypothesis_watch_state.json")
+        print('     （格式 {"handled_finding_ids": ["H-XX", ...]}），本脚本才对其静默')
         return 5
     print("\n裁决: CLEAN（无需复查）")
     return 0

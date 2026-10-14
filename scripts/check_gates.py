@@ -30,23 +30,27 @@ VALID_STATUS = {"success", "partial", "failed", "blocked"}
 
 
 def load_member_output():
-    """复用 verify_member_output 的核验逻辑（同目录 import）。"""
+    """复用 verify_member_output 的核验逻辑（同目录 import；C3 修复：异常转 exit 3 契约）。"""
     here = Path(__file__).resolve().parent
-    spec = importlib.util.spec_from_file_location("vmo", here / "verify_member_output.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    try:
+        spec = importlib.util.spec_from_file_location("vmo", here / "verify_member_output.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, SyntaxError) as e:
+        print(f"❌ verify_member_output.py 加载失败: {e}", file=sys.stderr)
+        sys.exit(3)
 
 
 import importlib.util  # noqa: E402  （置于此处供 load_member_output 使用）
 
-ENVELOPE_SKIP_BYTES = 400  # 信封 JSON 通常在文件头 400B 内
+ENVELOPE_SKIP_CHARS = 2000  # C2 修复（审计 2026-10-15）：信封 summary 无长度上限，400 字符会截断合法信封
 
 
 def check_envelope(art: Path) -> tuple[bool, str]:
     """G1：artifact 头部找 JSON 信封，验 6 必填 + status 合法。"""
     try:
-        head = art.read_text(encoding="utf-8", errors="ignore")[:ENVELOPE_SKIP_BYTES]
+        head = art.read_text(encoding="utf-8", errors="ignore")[:ENVELOPE_SKIP_CHARS]
     except OSError as e:
         return False, f"读取失败: {e}"
     # 信封可能是独立 JSON 行/块——逐行尝试解析含 agent_id 的 JSON 对象
@@ -66,7 +70,7 @@ def check_envelope(art: Path) -> tuple[bool, str]:
         if str(obj.get("status", "")).lower() not in VALID_STATUS:
             return False, f"status 非法: {obj.get('status')}"
         return True, f"agent_id={obj.get('agent_id')} status={obj.get('status')} confidence={obj.get('confidence')}"
-    return False, "头部 400B 内未找到含 agent_id 的 JSON 信封"
+    return False, "头部 2000 字符内未找到含 agent_id 的 JSON 信封"
 
 
 def main() -> int:
@@ -129,8 +133,25 @@ def main() -> int:
         g2_ok = unverified_n == 0
         record("G2 数字溯源", g2_ok, "全部溯源" if g2_ok else f"{unverified_n} 个未溯源（含外部引文数字时主理人人工核后放行并在 checklist 记录）")
 
+    # G4 核验留痕（C1 修复：核对 artifact mtime 指纹，防核验后改动绕过）
     oc = run_dir / f"{args.task_id}__output-check.json"
-    record("G4 核验留痕", oc.is_file(), str(oc.name) if oc.is_file() else "output-check.json 缺失（跑 verify_member_output 即生成）")
+    if not oc.is_file():
+        record("G4 核验留痕", False, "output-check.json 缺失（跑 verify_member_output 即生成）")
+    else:
+        try:
+            oc_data = json.loads(oc.read_text(encoding="utf-8"))
+            mtimes = oc_data.get("artifact_mtimes", {})
+            tampered = [
+                a.name for a in artifacts
+                if a.name in mtimes and int(a.stat().st_mtime) != mtimes[a.name]
+            ]
+            if tampered:
+                record("G4 核验留痕", False,
+                       f"artifact 在核验后被修改（mtime 不符）: {tampered}——须重跑 verify_member_output")
+            else:
+                record("G4 核验留痕", True, f"{oc.name}（mtime 指纹一致）")
+        except (json.JSONDecodeError, OSError) as e:
+            record("G4 核验留痕", False, f"output-check.json 解析失败: {e}")
 
     # G5 审判留痕
     cl = run_dir / f"{args.task_id}__checklist.json"
