@@ -32,14 +32,12 @@
 - Q3 里程碑：paper/_milestones/H5Nx_v6.5_EMI投稿版_20261014.docx
 - 专家团 v1.2.0 Changelog 已沉淀实战验证
 
-## 5. Q2 瘦身状态 ⚠️
-**未完成**——filter-repo 改写历史因 OOM 杀进程。`.git` 仍 784M，6 个大 blob 仍占历史。
-- 备份 tag：`backup-pre-q2-thin`（Q1 前状态）
-- 回滚路径：`git reset --hard backup-pre-q2-thin`
-- 替代方案（待你拍板）：
-  - A. 用 `git filter-branch --index-filter`（内存友好，慢 30-60 分钟）
-  - B. 部署 BFG Repo-Cleaner（需 brew install bfg-repo-cleaner）
-  - C. **接受现状**（.git 784M vs 工作区 1.5G 仍是健康比，工作区减肥已达成）
+## 5. Q2 瘦身状态 ✅（2026-10-14 14:45 完成）
+**已完成**——nohup 独立进程跑 filter-repo（此前 2 次 SIGTERM 为前台超时误杀，非 OOM）。
+- .git **544M → 273M**（-271M / -50%）；4 个大 blob 从全部历史清除
+- 工作区 1.8G → 1.5G（-300M）；总计 04_H5 从 2.34G → 1.5G（-840M）
+- force push 完成（ed9b320...4afed19 forced update）；旧历史安全网=远端分支 `backup-pre-git-slim-20261014`（ed9b320）+ 仓库外备份 `Research/.git_backup_04H5_20261014`（545M，验证稳定后可删）
+- 保留：NA_N6/NA_N8 position_map（被 r4_Glyco_num.ipynb 引用）、原始数据（xls/xlsx/ipynb）、协作内容（溱湖/90_collab）
 
 ## 6. 待建机制（方案 3/4/5）
 - ⏳ `scripts/push_all.sh`（三仓库 push 一条命令）— 待建
