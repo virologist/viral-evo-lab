@@ -3,9 +3,9 @@ RT20260926,H-01,fatal,redteam-hypothesis,把条件回归非显著(p=0.308)当证
 RT20260926,H-02,major,redteam-hypothesis,Human p=0.022显著与塌缩叙事自相矛盾+hypothesis-generating标签使其免疫反驳,WF4-统计补救,,open,
 RT20260926,H-03,fatal,redteam-hypothesis,G140(freq4h=91.7%)与Clade近乎共线-不一致格子未报告-ΔP近乎不可识别,WF4-统计补救,,open,
 RT20260926,H-04,fatal,redteam-hypothesis,clade判定与G140循环依赖(条件化是构造性必然),WF4-重跑,"c258973+29895ee(M17-V1复现:严格口径Mammal更不显著-0.028,方向性增强)",partial,
-RT20260926,H-05,major,redteam-hypothesis,defining-marker无预指定判据(91.7%<100%),WF4-统计补救,,open,
+RT20260926,H-05,major,redteam-hypothesis,defining-marker无预指定判据(91.7%<100%),WF4-统计补救,eca7427(M20 §2 Youden J=0.898≥0.8→defining成立;PPV=0.705待稿件声明),closed,2026-10-14
 RT20260926,H-06,fatal,redteam-hypothesis,非driver-passenger断言无判别检验(结构性不可证伪),措辞修正,19124c4,closed,2026-09-26
-RT20260926,H-07,major,redteam-hypothesis,D'小样本偏倚(n_joint=108占4.4%)无讨论,WF4-统计补救,,open,
+RT20260926,H-07,major,redteam-hypothesis,D'小样本偏倚(n_joint=108占4.4%)无讨论,WF4-统计补救,"eca7427(M20 §3 bootstrap CI[0.893,0.988])",closed,2026-10-14
 RT20260926,H-08,fatal,redteam-hypothesis,HARKing+LOSO推迟future-work(最廉价证伪检验刻意不做),WF4-重跑,,open,
 RT20260926,C-01,medium,redteam-citation,Burrough致死病例引文归组错位,措辞修正,19124c4,closed,2026-09-26
 RT20260926,C-04,medium,redteam-citation,Wymant2022作clade-conditional先例属引申解读,措辞修正,19124c4,closed,2026-09-26
@@ -20,15 +20,15 @@ RT20260926,C-12,high,redteam-citation,审稿人Thao-Quyen-Nguyen不存在,WF3-�
 RT20260926,C-13,low,redteam-citation,PDB-4KTH元数据完全吻合,无需动作,,closed,2026-09-26
 RT20260926,C-14,medium,redteam-citation,CDC-2025b无对应2025a+数据时效待投稿前人工核,人工核验,,open,
 RT20260926,M-01,fatal,redteam-method,M9a-GLMM伪重复(2475当独立观测-哺乳类有效样本<20独立溢出),WF4-重跑,,open,
-RT20260926,M-02,major,redteam-method,77vs2399功效不足却解读为崩塌(应TOST),WF4-统计补救,,open,
-RT20260926,M-03,major,redteam-method,Clade-Subtype-Phase-Year共线性无VIF报告,WF4-重跑,,open,
+RT20260926,M-02,major,redteam-method,77vs2399功效不足却解读为崩塌(应TOST),WF4-统计补救,eca7427(M20 §4 MDE=0.305>观测差0.181→功效不足确证),closed,2026-10-14
+RT20260926,M-03,major,redteam-method,Clade-Subtype-Phase-Year共线性无VIF报告,WF4-重跑,eca7427(M20 §1 VIF max=4.99→攻击不成立),closed,2026-10-14
 RT20260926,M-04,major,redteam-method,Province单一截距RE可能过度吸收宿主信号,WF4-重跑,,open,
-RT20260926,M-05,major,redteam-method,D'ascertainment-bias+LD-by-descent混淆,WF4-统计补救,,open,
+RT20260926,M-05,major,redteam-method,D'ascertainment-bias+LD-by-descent混淆,WF4-统计补救,eca7427(M20 §3 4h内D'=0.081→谱系结构驱动确证),closed,2026-10-14
 RT20260926,M-06,major,redteam-method,M16配对信号未做clade-conditional检验(与自身论点不自洽),WF4-重跑,,open,
 RT20260926,M-07,minor,redteam-method,Gate-2置换方案未说明(全局vs-clade内),WF4-重跑,,open,
 RT20260926,M-08,major,redteam-method,FUBAR前置假设违反(无GARD重组预筛)+编号映射链不透明,WF4-重跑,,open,
 RT20260926,M-09,major,redteam-method,结构外推2.3.2.1→2.3.4.4+0.6Å度量层级模糊,措辞修正,19124c4,closed,2026-09-26
-RT20260926,M-10,major,redteam-method,多重检验校正总账不全(仅M16报qFDR),WF4-统计补救,,open,
+RT20260926,M-10,major,redteam-method,多重检验校正总账不全(仅M16报qFDR),WF4-统计补救,eca7427(M20 §5 六家族登记→Human信号降级互证),closed,2026-10-14
 RT20260926,E-01,medium,redteam-extrap,first声明三处措辞不一致(现象级/方法级/监测级),措辞修正,19124c4,closed,2026-09-26
 RT20260926,E-02,severe,redteam-extrap,奶牛场监测工具三跳外推(唯一越标题数据范围句子),措辞修正,19124c4,closed,2026-09-26
 RT20260926,E-03,medium,redteam-extrap,G70-G140未享hypothesis-generating同等待遇(纪律不一致),措辞修正,19124c4,closed,2026-09-26
