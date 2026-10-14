@@ -1,7 +1,7 @@
 trace_id,finding_id,severity,source_agent,finding_summary,route,fix_commit,status,closed_date
-RT20260926,H-01,fatal,redteam-hypothesis,把条件回归非显著(p=0.308)当证伪(absence of evidence),WF4-统计补救,,open,
+RT20260926,H-01,fatal,redteam-hypothesis,把条件回归非显著(p=0.308)当证伪(absence of evidence),WF4-统计补救,98f845a(v6.5#6: MDE=0.305功效声明'非显著≠无效应'已入稿),closed,2026-10-14
 RT20260926,H-02,major,redteam-hypothesis,Human p=0.022显著与塌缩叙事自相矛盾+hypothesis-generating标签使其免疫反驳,WF4-统计补救,2a60eec+eca7427(M18 C3 p=0.92 + M21 LOO-H5N6 p=0.774 三重互证→Human信号降级H5N6-dependent),closed,2026-10-14
-RT20260926,H-03,fatal,redteam-hypothesis,G140(freq4h=91.7%)与Clade近乎共线-不一致格子未报告-ΔP近乎不可识别,WF4-统计补救,,open,
+RT20260926,H-03,fatal,redteam-hypothesis,G140(freq4h=91.7%)与Clade近乎共线-不一致格子未报告-ΔP近乎不可识别,WF4-统计补救,98f845a(v6.5#5: PPV=0.705/Youden J=0.898判据声明已入稿; 不一致格n=11已量化M20),closed,2026-10-14
 RT20260926,H-04,fatal,redteam-hypothesis,clade判定与G140循环依赖(条件化是构造性必然),WF4-重跑,"c258973+29895ee(M17-V1复现:严格口径Mammal更不显著-0.028,方向性增强)",partial,
 RT20260926,H-05,major,redteam-hypothesis,defining-marker无预指定判据(91.7%<100%),WF4-统计补救,eca7427(M20 §2 Youden J=0.898≥0.8→defining成立;PPV=0.705待稿件声明),closed,2026-10-14
 RT20260926,H-06,fatal,redteam-hypothesis,非driver-passenger断言无判别检验(结构性不可证伪),措辞修正,19124c4,closed,2026-09-26
@@ -46,4 +46,4 @@ RT20261014,G-01,fatal,rt2-diagnostician,"M18_D'落盘CSV为错版0/退化值(09-
 RT20261014,G-02,high,rt2-diagnostician,"M18两核心CSV无生成脚本(仅README+落盘,计算链缺失)",补计算主notebook,"201ce73(M18_caliber_computation.ipynb,5cells语法过)",closed,2026-10-14
 RT20261014,G-03,medium,rt2-diagnostician,M17六文件滞留主output(V1三件套已被V1b取代/2.18MB孤儿pkl/M11前缀错位/forensics双件),归档到_archive(非删除),8e3f838(ARCHIVE_NOTE.md登记六文件归档原因),closed,2026-10-14
 RT20261014,G-04,low,rt2-diagnostician,"M17 README承诺输出未生成(标注待服务器,文档超前非隐瞒)+模块结构与§7漂移",README已含待服务器标注,8bdfeb3+201ce73(M18结构已补齐),closed,2026-10-14
-RT20261014,G-05,medium,rt2-diagnostician,论文L130称M18'n=2475 with M14 caliber'但M18落盘无2475口径(疑似笔误或指V1b),[待人工核验]需作者确认L130指哪条口径链,—,open,
+RT20261014,G-05,medium,rt2-diagnostician,论文L130称M18'n=2475 with M14 caliber'但M18落盘无2475口径(疑似笔误或指V1b),[待人工核验]需作者确认L130指哪条口径链,98f845a(v6.5#1: M18口径不准确陈述已修正为四口径panel),closed,2026-10-14
