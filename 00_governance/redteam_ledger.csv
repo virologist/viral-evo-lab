@@ -42,3 +42,8 @@ RT20260930,M-12,major,wf1-scout,"D'在freq(G140)=0.9706近乎单态位点退化(
 RT20260930,M-13,major,wf1-scout,"标准逻辑回归在系统发育相关下inflated Type I error(PMID20525617),clade固定效应只是粗粒度离散化,clade内相关仍在",列为Mammal ΔP塌缩第三候选解释(前founder混杂/功效不足),未编号,open,
 RT20260930,N-01,fatal,主会话-WF1自检,"编号映射:论文唯一H3↔H5锚点A160T=-4外推124→H3 128落点P128S,但H3-128野生型为P(非sequon的N),offset在该区段不恒定(H3含125b类插入码)","绕过编号映射,直接sequon基序核验(N-X-S/T)",01cb45f(sequon自洽: G140=N124-H125-T126 20.26% / G70=N54-C55-S56 4.81%),closed,2026-09-30
 RT20260930,N-02,minor,主会话-WF1自检,"直接用比对列索引(含gap)取残基编号,误判G140 sequon=0.92%(实为20.26%);坐标映射纪律第一条新增references/coordinate-mapping.md(实测事故原型)",72b9dfe已记录三条铁律(去gap/显式换算/落点验证),72b9dfe,closed,2026-09-30
+RT20261014,G-01,fatal,rt2-diagnostician,"M18_D'落盘CSV为错版0/退化值(09-30计算后未覆盖CSV,commit叙述与落盘矛盾;按权威层级CSV>文档,权威源曾是错误值)",重算覆盖,"201ce73(D'=0.9441断言验收过,recalc_date注记)",closed,2026-10-14
+RT20261014,G-02,high,rt2-diagnostician,"M18两核心CSV无生成脚本(仅README+落盘,计算链缺失)",补计算主notebook,"201ce73(M18_caliber_computation.ipynb,5cells语法过)",closed,2026-10-14
+RT20261014,G-03,medium,rt2-diagnostician,M17六文件滞留主output(V1三件套已被V1b取代/2.18MB孤儿pkl/M11前缀错位/forensics双件),归档到_archive(非删除),8e3f838(ARCHIVE_NOTE.md登记六文件归档原因),closed,2026-10-14
+RT20261014,G-04,low,rt2-diagnostician,"M17 README承诺输出未生成(标注待服务器,文档超前非隐瞒)+模块结构与§7漂移",README已含待服务器标注,8bdfeb3+201ce73(M18结构已补齐),closed,2026-10-14
+RT20261014,G-05,medium,rt2-diagnostician,论文L130称M18'n=2475 with M14 caliber'但M18落盘无2475口径(疑似笔误或指V1b),[待人工核验]需作者确认L130指哪条口径链,—,open,
