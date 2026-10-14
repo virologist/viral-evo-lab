@@ -5,7 +5,7 @@
     "write_rule": "archivist 仅在有新增/变更条目时增量更新；纯检索轮零写放大",
     "human_view": "本 JSON 是机器真源；method_library.md 是人类可读视图，由 archivist 从 JSON 渲染"
   },
-  "last_updated": "2026-10-14T20:55:00+08:00",
+  "last_updated": "2026-10-14T21:30:00+08:00",
   "project_pipelines": {
     "production": {
       "id": "P-H5Nx-v5.1",
@@ -124,7 +124,9 @@
       "verify": "M20 §3：全样本 D′=0.9441 bootstrap CI[0.893,0.988]；4h 内分层 D′=0.081",
       "reusable": "H10/H1N1 任何 LD 分析直接套用",
       "source": "09_Supplementary/M_statistical/M20_robustness_suite/M20_robustness_computation.py",
-      "added": "2026-10-14"
+      "added": "2026-10-14",
+      "last_reused": null,
+      "reuse_outcome": null
     },
     {
       "id": "METH-FOUR-CALIBER",
@@ -135,7 +137,9 @@
       "verify": "M18: C0-C2 一致(n=1892)，C3 剔混合 clade 后 Human p=0.022→0.92",
       "reusable": "所有'过滤口径分歧'型争议的解决方案",
       "source": "09_Supplementary/M_statistical/M18_mammal_caliber_uniform/M18_caliber_computation.ipynb",
-      "added": "2026-10-14"
+      "added": "2026-10-14",
+      "last_reused": null,
+      "reuse_outcome": null
     },
     {
       "id": "METH-LOSO-PRECRITERIA",
@@ -146,7 +150,9 @@
       "verify": "M21: province 极差0.053稳定；subtype LOO-H5N6 符号翻转→Human 降级",
       "reusable": "任何'结论是否被单一子集驱动'的检验",
       "source": "09_Supplementary/M_statistical/M21_pglmm_loso/M21_computation.py",
-      "added": "2026-10-14"
+      "added": "2026-10-14",
+      "last_reused": null,
+      "reuse_outcome": null
     },
     {
       "id": "METH-CLUSTER-ROBUST-PSEUDOREP",
@@ -157,7 +163,9 @@
       "verify": "M21: ratio=1.06-1.08 轻度；crossed 差 0.019 未确证",
       "reusable": "红队'伪重复'攻击的标准回应模板",
       "source": "09_Supplementary/M_statistical/M21_pglmm_loso/M21_computation.py",
-      "added": "2026-10-14"
+      "added": "2026-10-14",
+      "last_reused": null,
+      "reuse_outcome": null
     },
     {
       "id": "METH-NUMBER-VERIFY-GATE",
@@ -168,7 +176,10 @@
       "verify": "冒烟：构造幻觉数字被 EXIT=5 拦截，真值 EXIT=0 放行",
       "reusable": "所有成员产出的 envelope 前置关卡",
       "source": "viral-evo-lab/scripts/verify_numbers.py",
-      "added": "2026-10-14"
+      "added": "2026-10-14",
+      "last_reused": null,
+      "reuse_outcome": null
     }
-  ]
+  ],
+  "schema_version": "1.1.0"
 }
