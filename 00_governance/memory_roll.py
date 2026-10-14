@@ -11,20 +11,22 @@ from datetime import datetime, timedelta
 
 WS = Path("/Users/biodog/Library/CloudStorage/OneDrive-Personal/GPT/WorkBuddy/2026-09-10-11-38-32")
 B = Path("/Users/biodog/Library/CloudStorage/OneDrive-Personal/Research/04_H5")
-THRESHOLD = int(sys.argv[1]) if len(sys.argv) > 1 else 30
+THRESHOLD = next((int(a) for a in sys.argv[1:] if a.isdigit()), 30)
 APPLY = "--apply" in sys.argv
 cutoff = datetime.now() - timedelta(days=THRESHOLD)
 print(f"=== R8 memory 滚动裁剪（THRESHOLD={THRESHOLD}d, cutoff={cutoff:%Y-%m-%d}）===")
 
 memory_roots = {
-    "ws": WS / ".workbuddy/memory",
-    "B":  B  / ".workbuddy/memory",
+    "ws": WS / ".workbuddy/memory",   # 本 thread 焦点：专家团工作空间
+    # B 仓 (04_H5/.workbuddy/memory) 显式排除：科研主线资产, 本 thread 不碰
+    # 历史蒸馏文已存 _memory_archive/B_*.md 作为占位, 不重复蒸馏
 }
 archive_root = WS / "research-ops/_memory_archive"
 archive_root.mkdir(parents=True, exist_ok=True)
 
 distilled_count = 0
 for label, mdir in memory_roots.items():
+    pass  # 显式只动 ws 范围
     if not mdir.exists():
         print(f"  [skip] {label}: {mdir} 不存在")
         continue
