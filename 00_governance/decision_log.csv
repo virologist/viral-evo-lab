@@ -1,2 +1,7 @@
 ts,actor,decision_type,decision,rationale,tier
 2026-10-15T08:00:00+08:00,lead,G2-waiver,M2 三处外部引文数字放行(40/60/24),arXiv:2506.12482 摘要转述+成员自标核验,通知档
+2026-10-14T22:39:15+08:00,lead,G2-waiver,T-20261021-D 外部引文 pct:79 放行+补标注,核为 arXiv:2503.06745 摘要转述(URL在侧/本地池管不到外部文献)——见 _harness_runs/T-20261021-D/T-20261021-D__checklist.json note,通知档
+2026-10-14T22:39:15+08:00,lead,process-fallback,T-20261021-D spawn gap 改用 general-purpose+装配 prompt 替代,实证成员ID不可直接作 subagent_type——见 T-20261021-D__checklist.json note,通知档
+2026-10-15T07:36:28+08:00,lead,rework-fix,T-20261015-M2 diag 双脚本审计抓 6 缺陷(2高2中2低)触发修复 H1/C1/C2/C3/H4/H2,缺陷清单与修复结论见 _harness_runs/T-20261015-M2/T-20261015-M2__checklist.json note(对应 v1.3.1),执行档
+2026-10-15T08:31:05+08:00,lead,spawn-dispatch,T-20261015-M2 双员并行派工(literature-scout+research-diagnostician),双员并行首测——见 _harness_runs/T-20261015-M2/spawn_manifest.jsonl 行1-2,通知档
+2026-10-15T08:36:56+08:00,lead,handoff-launch,T-20261015-M2H 串行 handoff 首测启动(hypothesis-officer 消费 scout 产出),R2-4 首测：3条可证伪假设采纳+spawn 装配产物缺失如实标记(traceability 生效)——见 _harness_runs/T-20261015-M2/T-20261015-M2H__checklist.json note,通知档
