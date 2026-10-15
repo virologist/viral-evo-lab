@@ -29,6 +29,7 @@
 3. 同任务 G2 waiver ≥ 3 处
 4. 全局重试预算（≤5）耗尽
 5. 门禁 FAIL 且无可用 waiver 覆盖
+6. T-A1 同类证伪 ≥ 2 处/任务（证据纪律子代理过度）—— actor=lead, decision_type=`evidence_escalation`, tier=强制升级
 
 管家节点缺席期间：挂起决策列队等待，**禁止降级放行**；自动档照常流转不阻塞。
 
