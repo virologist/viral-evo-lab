@@ -1,0 +1,4 @@
+{
+  "agent": "viral-evo-lab-team-lead",
+  "notes": "Team 型入口指向主理人 MD（不含 .md）。R3 收官时补齐（validate_expert 对 Team 型强制要求 settings.json）。"
+}
