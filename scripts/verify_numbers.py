@@ -76,6 +76,20 @@ def extract_numbers(text: str, min_digits: int):
             seen.add(key); uniq.append((k, v, n_))
     return uniq
 
+def float_candidates(val: str) -> set:
+    """R2-8（2026-10-15）：浮点候选集公共实现（仅补零扩展，禁截断——截断会造假阳性）。
+    三处消费方（verify_numbers/verify_member_output/check_gates）统一走这里，防精度规则漂移。
+    """
+    cands = {val}
+    try:
+        f = float(val)
+        cands |= ({f"{f:.2f}", f"{f:.3f}", f"{f:.4f}"} if f >= 1
+                  else {f"{f:.3f}", f"{f:.4f}", f"{f:.5f}"})
+    except ValueError:
+        pass
+    return cands
+
+
 def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False) -> str:
     """把权威源（csv/json/md/txt）读成一个大文本（grep 池）；exclude=**文件名**关键字黑名单。
 
@@ -130,13 +144,7 @@ def main() -> int:
     found, not_found = [], []
     for kind, val, _ in nums:
         # 归一化 grep：原值 与 保留形式都试
-        cands = {val}
-        try:
-            f = float(val)
-            # 只补零扩展精度（20.58 → 20.580/20.5800），禁止截断（:g/:1f 会造假阳性）
-            cands |= {f"{f:.2f}", f"{f:.3f}", f"{f:.4f}"} if f >= 1 else {f"{f:.3f}", f"{f:.4f}", f"{f:.5f}"}
-        except ValueError:
-            pass
+        cands = float_candidates(val)
         hit = any(c in pool for c in cands)
         (found if hit else not_found).append({"kind": kind, "value": val})
 

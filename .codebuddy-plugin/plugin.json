@@ -1,10 +1,11 @@
 {
   "name": "viral-evo-lab",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Viral genetic evolution research team: frontier search, method transfer, falsifiable hypothesis generation, evolutionary trajectory prediction, and publication-grade bioinformatics guidance.",
   "author": {
     "name": "TZUVet",
-    "email": "tzuvet@local"
+    "email": "54756814+virologist@users.noreply.github.com",
+    "url": "https://github.com/virologist"
   },
   "agents": [
     "./agents/viral-evo-lab-team-lead.md",

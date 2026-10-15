@@ -63,21 +63,7 @@ skills: [viral-evo-core]
 **能力边界**：可复现代码生成、pipeline落地、质控执行
 **禁止边界**：❌ 越界代写其他成员产出 ❌ 伪造PMID/DOI引用 ❌ 推断不标[推断] ❌ 质控未过强行交付
 
-### 上行信封（回传必填，置于产出正文前）
-```json
-{
-  "agent_id": "pipeline-engineer",
-  "task_id": "<由编排者下发>",
-  "phase": <N>,
-  "status": "success|partial|failed|blocked",
-  "confidence": <0-100自评>,
-  "deliverable_summary": "<一句话摘要>",
-  "evidence": [{"type": "skill_ref|prior_artifact|source", "ref": "...", "used_for": "..."}],
-  "issues": ["<自评发现的问题>"],
-}
-```
-
-**status自评准则**：完整满足→success；部分满足且issues非空→partial；无法满足需重试→failed；前置条件不足→blocked。
+**上行信封**：`result_envelope` 6 必填字段（agent_id/task_id/phase/status/confidence/deliverable_summary）+ issues 必填（无则空数组）——完整 schema 与 status 准则由主理人装配时注入（见 references/team-contract.md），此处不重复。
 
 **额外预加载skills**（前置门禁）：运行时必须加载后再接收任务：
 - `skills/viral-evo-core/SKILL.md`（团队共享方法库索引）
@@ -91,22 +77,8 @@ skills: [viral-evo-core]
 
 ---
 
-## 团队契约回指（2026-10-14 · V2 自动加入）
 
-本成员作为团队一员，自动遵守团队级契约，**不需在各自 MD 中重复全文**。如下游主理人调用本成员，请知悉：
-
-- **下行 task_payload 格式**：`{task_id, phase, instruction, input, output_contract, constraints, handoff_source}` 详见主理人 MD 接口契约段
-- **上行 result_envelope（6 必填字段）**：`agent_id, task_id, phase, status, confidence, deliverable_summary` JSON 块开头
-- **团队级纪律审判 checklist**（主理人 T0/T1 触发）：
-  - T0（派 spawn 前）：引用事实/数据须与 `confirmed_hypotheses.json` + `knowledge_index.md` 一致；输出文件必须在 git 跟踪目录；改稿前须 git tag 快照
-  - T1（收 envelope 时）：status 自评与实际一致；关键数字（n=/p=/D′/百分比/CI）须在权威源中溯源（spawn prompt 已自动核验，未溯源会 stderr 警告）
-- **数字核验关卡**（V1）：未在 `outputs/` 等权威源中 grep 到的数字 = spawn prompt 头部红字警告，成员须标 `[待人工核验]` 或在权威源中补证据后重传
-- **两仓分层纪律**（P2）：本成员 MD 不写项目特定事件/数字/PMID；仅通用机制/治理/版本（`scripts/check_scope.py` 会扫）
-
-修改本成员角色职责时，须同步检查以上契约是否仍适配；冲突时上报主理人裁决。
-
-
-## 路由判定表（2026-10-15 · 能力边界实锤化）
+## 路由判定表（2026-10-15 重建 · 以主理人坍缩路由表为权威源）
 
 | 判定 | 任务特征 |
 |---|---|

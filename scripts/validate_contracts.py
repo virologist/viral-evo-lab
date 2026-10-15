@@ -13,13 +13,23 @@ from pathlib import Path
 
 # 契约条款黑名单（仅团队契约——v1.2.3 体系；项目治理约束 R1-R9 不在此查）
 # 设计：每条仅需命中 1 个关键词即过；主理人 MD 自身不需含"团队契约回指"段
+# R2-5 重构（2026-10-15）：信封细节/纪律审判/知识态等全员同版内容已抽至
+# references/team-contract.md（装配时注入），成员层只查"指针+自身专属三件"
 CONTRACTS = {
-    "回传信封（上行）": r"result_envelope|上行信封|6 必填字段|agent_id.*task_id.*phase.*status",
-    "下行 task_payload": r"task_payload|下行|input.*output_contract",
-    "工具白名单（只读/写分清）": r"白名单|工具权限|只读.*分析|ANALYZER.*EXECUTOR",
-    "纪律审判（discipline-sentinel 痕迹）": r"纪律审判|discipline-sentinel|T0.*派 spawn|T1.*收 envelope",
-    "数字核验关卡（V1 引用）": r"verify_numbers|verify_member_output|数字核验|未溯源",
-    "知识态注入（hypotheses/knowledge_index）": r"confirmed_hypotheses|knowledge_index|RESEARCH_OPS_DIR|知识态",
+    "回传信封指针": r"result_envelope|上行信封",
+    "能力/禁止边界": r"能力边界|禁止边界",
+    "路由判定表": r"路由判定表",
+}
+
+# 团队契约正本（全员同版）必含条款——成员层抽走的 4 类内容在此验收
+TEAM_CONTRACT = {
+    "信封 schema 完整": r"result_envelope|agent_id.*task_id.*phase.*status|6 必填字段",
+    "status 自评准则": r"status自评准则|success.*partial.*failed",
+    "纪律审判时点": r"纪律审判|T0.*派 spawn|T1.*收 envelope",
+    "数字核验关卡": r"verify_numbers|verify_member_output|数字核验|未溯源",
+    "知识态/真源": r"confirmed_hypotheses|knowledge_index|RESEARCH_OPS_DIR|知识态",
+    "下行 task_payload": r"task_payload|下行",
+    "两仓分层纪律": r"两仓分层|GOVERNANCE_BOUNDARIES|check_scope",
 }
 
 # B（2026-10-14）：skills 层契约（SKILL.md 唯一入口须索引团队工具+核心铁律）
@@ -85,8 +95,11 @@ def main() -> int:
         total_missing += 1
         print(f"❌ manifest: {m['contract']}（{m['missing_pattern']}）")
 
-    # ① agents 层（9 员）
+    # ① agents 层（9 员；主理人 MD 是契约源头，套成员层模式无意义）
     for ag in sorted((base / "agents").glob("*.md")):
+        if ag.name == "viral-evo-lab-team-lead.md":
+            print("✅ agents/viral-evo-lab-team-lead.md（契约源头，豁免成员层检查）")
+            continue
         miss = check_agent(ag)
         if miss:
             total_missing += len(miss)
@@ -108,10 +121,26 @@ def main() -> int:
         else:
             print(f"✅ skills/SKILL.md（工具索引+铁律完整）")
 
+    # ③ 团队契约正本（R2-5：成员层抽走的全员同版内容在此验收）
+    tc = base / "skills/viral-evo-core/references/team-contract.md"
+    if tc.is_file():
+        tct = tc.read_text(encoding="utf-8")
+        miss = []
+        for name, pat in TEAM_CONTRACT.items():
+            if not re.search(pat, tct, re.M | re.I):
+                miss.append({"contract": name, "missing_pattern": pat})
+        if miss:
+            total_missing += len(miss)
+            print(f"❌ skills/team-contract.md: 缺 {len(miss)} 项正本条款")
+            for m in miss[:2]:
+                print(f"   - {m['contract']}（需匹配: /{m['missing_pattern'][:40]}/）")
+        else:
+            print("✅ skills/team-contract.md（正本 7 条款完整）")
+
     if total_missing:
         print(f"\n总计 {total_missing} 处契约缺失——影响层间一致性，建议补齐")
         return 5
-    print("\n✅ 全员契约完整（manifest 一致 + agents 9 + skills 1）")
+    print("\n✅ 全员契约完整（manifest 一致 + agents 9 + SKILL + 契约正本）")
     return 0
 
 

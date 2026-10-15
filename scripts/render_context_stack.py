@@ -136,8 +136,12 @@ def main() -> int:
             print(f"  ❌ {stem}: JSON 解析失败 {e}")
             rc = 3
             continue
-        mp.write_text(fn(d), encoding="utf-8")
-        print(f"  ✅ {stem}.md ← {stem}.json（{mp.stat().st_size}B）")
+        rendered = fn(d)
+        if mp.is_file() and mp.read_text(encoding="utf-8") == rendered:
+            print(f"  ⏭ {stem}.md 内容未变，跳过写入（防 OneDrive 写放大）")
+        else:
+            mp.write_text(rendered, encoding="utf-8")
+            print(f"  ✅ {stem}.md ← {stem}.json（{mp.stat().st_size}B）")
     print("\n纪律：md 由本脚本生成，禁手改；改 JSON → 重跑本脚本。")
     return rc
 

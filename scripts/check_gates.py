@@ -48,7 +48,7 @@ ENVELOPE_SKIP_CHARS = 2000  # C2 修复（审计 2026-10-15）：信封 summary 
 
 
 def check_envelope(art: Path) -> tuple[bool, str]:
-    """G1：artifact 头部找 JSON 信封，验 6 必填 + status 合法。"""
+    """G1：artifact 头部找 JSON 信封，验 6 必填 + status 合法；issues 字段一并消费（R2-10）。"""
     try:
         head = art.read_text(encoding="utf-8", errors="ignore")[:ENVELOPE_SKIP_CHARS]
     except OSError as e:
@@ -69,8 +69,27 @@ def check_envelope(art: Path) -> tuple[bool, str]:
             return False, f"信封缺字段: {missing}"
         if str(obj.get("status", "")).lower() not in VALID_STATUS:
             return False, f"status 非法: {obj.get('status')}"
-        return True, f"agent_id={obj.get('agent_id')} status={obj.get('status')} confidence={obj.get('confidence')}"
+        # R2-10：issues 消费——非空则浮出门禁详情（主理人 T1 逐条处置的输入）
+        issues = obj.get("issues") or []
+        issues_txt = f" | issues×{len(issues)}: {'; '.join(map(str, issues[:2]))}" if issues else ""
+        return True, (f"agent_id={obj.get('agent_id')} status={obj.get('status')} "
+                      f"confidence={obj.get('confidence')}{issues_txt}")
     return False, "头部 2000 字符内未找到含 agent_id 的 JSON 信封"
+
+
+def load_waivers(run_dir: Path, task_id: str) -> dict:
+    """R2-2（2026-10-15）：读 <task-id>__waivers.json（人工放行台账）。
+    格式：{"waivers": [{"gate": "G2", "value": "79", "reason": "外部引文 arXiv:...", "authorized_by": "..."}]}
+    授权规则见 docs/authorization_matrix.md——G2 放行须主理人署名，防自我授权。
+    """
+    wp = run_dir / f"{task_id}__waivers.json"
+    if not wp.is_file():
+        return {}
+    try:
+        data = json.loads(wp.read_text(encoding="utf-8"))
+        return {w.get("value"): w for w in data.get("waivers", []) if w.get("value")}
+    except (json.JSONDecodeError, OSError):
+        return {}
 
 
 def main() -> int:
@@ -118,20 +137,25 @@ def main() -> int:
     else:
         pool = vmo._vn.load_sources(sources, ["_trash", "_archive"])
         unverified_n = 0
+        waived_n = 0
+        unverified_detail = []
+        waivers = load_waivers(run_dir, args.task_id)
         for art in artifacts:
             text = art.read_text(encoding="utf-8", errors="ignore")
             for kind, val, _ in vmo._vn.extract_numbers(text, min_digits=2):
-                cands = {val}
-                try:
-                    f_ = float(val)
-                    cands |= ({f"{f_:.2f}", f"{f_:.3f}", f"{f_:.4f}"} if f_ >= 1
-                              else {f"{f_:.3f}", f"{f_:.4f}", f"{f_:.5f}"})
-                except ValueError:
-                    pass
+                cands = vmo._vn.float_candidates(val)
                 if not any(c in pool for c in cands):
-                    unverified_n += 1
+                    if val in waivers:
+                        waived_n += 1   # R2-2：人工放行台账内的数字不计 FAIL
+                    else:
+                        unverified_n += 1
+                        unverified_detail.append(f"{kind}:{val}")
         g2_ok = unverified_n == 0
-        record("G2 数字溯源", g2_ok, "全部溯源" if g2_ok else f"{unverified_n} 个未溯源（含外部引文数字时主理人人工核后放行并在 checklist 记录）")
+        detail = ("全部溯源" if g2_ok and waived_n == 0 else
+                  (f"{waived_n} 个经 waiver 人工放行（见 waivers.json）" if g2_ok
+                   else f"{unverified_n} 个未溯源: {', '.join(unverified_detail[:4])}"
+                        f"（外部引文数字可写 waivers.json 人工放行，见 authorization_matrix.md）"))
+        record("G2 数字溯源", g2_ok, detail)
 
     # G4 核验留痕（C1 修复：核对 artifact mtime 指纹，防核验后改动绕过）
     oc = run_dir / f"{args.task_id}__output-check.json"

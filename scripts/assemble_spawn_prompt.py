@@ -388,6 +388,15 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
     lines.append("=" * 20 + " 角色定义结束 " + "=" * 20)
     lines.append("")
 
+    # R2-5（2026-10-15）：团队契约全员同版注入（正本 references/team-contract.md，
+    # 成员 MD 已去重——9 份复制粘贴段收敛为单一事实源，每 spawn 省 ~1.2KB 重复）
+    tc = expert_dir / "skills/viral-evo-core/references/team-contract.md"
+    if tc.is_file():
+        lines.append("=" * 20 + " 团队契约（全员同版） " + "=" * 20)
+        lines.append(tc.read_text(encoding="utf-8").rstrip())
+        lines.append("=" * 20 + " 团队契约结束 " + "=" * 20)
+        lines.append("")
+
     lines.append("【专家包资源索引】（禁止全量阅读——先读 SKILL.md 索引表，按需取用）")
     lines.append(f"- {expert_dir}/skills/viral-evo-core/SKILL.md  ← 方法库入口（内含 references/ 场景索引 + 团队工具清单）")
     lines.append(f"- {expert_dir}/skills/viral-evo-core/references/  ← 9 份参考（按 SKILL.md 索引按需 Read）")

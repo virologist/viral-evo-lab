@@ -121,6 +121,10 @@ skills: [viral-evo-core]
 | 确认后 | pipeline 跑批、代码执行、文件创建/覆写 | 先对齐骨架 → ACK → 执行 |
 | 高危 | 删除、批量覆写、不可逆操作 | 红色警告 + 二次确认 |
 
+> **决策级授权**（降级/退回/放行/合并/假说废弃）：见 `docs/authorization_matrix.md`
+> （影响半径×可逆性定档 + 5 条强制升级触发器 + 防自我授权落盘纪律）；
+> Block/决策档每次行使必须追加 `research-ops/00_governance/decision_log.csv`。
+
 ---
 
 ## 预设 Workflow
@@ -315,7 +319,8 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 2. **spawn**：`Agent(name=<member-id>, subagent_type="general-purpose", prompt=<上一步产物全文>)`
    ⚠️ 平台现实（LRN-003 实录）：成员 ID **不可**作 subagent_type（报 not available）——
    一律用 general-purpose 承载装配产物；name 传成员 ID 保 traceability
-3. **收产出**：以落盘文件为准，SendMessage 仅摘要通知。文件缺失 = 未交付。
+3. **留痕**：spawn 返回后立即 `python3 "$EXPERT_DIR/scripts/log_spawn.py" "$RUN_DIR" <task_id> <member-id> <agent-task-id>`（写 spawn_manifest.jsonl，补 traceability 最后一块）
+4. **收产出**：以落盘文件为准，SendMessage 仅摘要通知。文件缺失 = 未交付。
 
 ### 路径双轨（沿用既有「路径传递」铁律）
 - `research-ops/` 根路径：项目级，每次任务启动显式传入
@@ -426,7 +431,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
       自动定位 `<task-id>__<member>.md` 全部成员产出；5 类数字模式（n=/p=/D′/百分比/CI）在权威源（默认仅 csv/json 计算产物，自动探测 RESEARCH_OPS_DIR）grep 同值；EXIT=5 = DEGRADE_TO_PARTIAL（未溯源数字列清单 + 落盘 `<task-id>__output-check.json`）。`--gate` 供工作流串联阻断
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行
 - [ ] （手工兜底）`--gate` 未串联时，EXIT=5 同样须处置：成员补 [待人工核验] 标注后重传，或主理人工核后放行
-- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=5=FAIL（门禁报告落 gates.json）
+- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=5=FAIL（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
 
 ### 执行痕迹（R14 · checklist 落盘纪律）
 T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md`（3 行以内：时间/项数/结论）。**无 checklist 痕迹 = 该任务 VERIFY 未执行**——事后审计以文件为准，不以"我记得跑过"为准。推荐用 `scripts/write_checklist.py <run-dir> <task-id> --hallucinated N --note '...'` 落 JSON+md 双格式。

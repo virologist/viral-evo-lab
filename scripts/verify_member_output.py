@@ -95,13 +95,7 @@ def main() -> int:
         nums = _vn.extract_numbers(text, min_digits=2)
         unverified = []
         for kind, val, _ in nums:
-            cands = {val}
-            try:
-                f = float(val)
-                cands |= ({f"{f:.2f}", f"{f:.3f}", f"{f:.4f}"} if f >= 1
-                          else {f"{f:.3f}", f"{f:.4f}", f"{f:.5f}"})
-            except ValueError:
-                pass
+            cands = _vn.float_candidates(val)
             if not any(c in pool for c in cands):
                 unverified.append({"kind": kind, "value": val})
         member = art.stem.split("__", 1)[1] if "__" in art.stem else art.stem
