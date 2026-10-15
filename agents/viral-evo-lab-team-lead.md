@@ -432,6 +432,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行
 - [ ] （手工兜底）`--gate` 未串联时，EXIT=5 同样须处置：成员补 [待人工核验] 标注后重传，或主理人工核后放行
 - [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=5=FAIL（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
+- [ ] **T-A1：子代理证据纪律门**（R3 2026-10-21 增补·LRN-006）：成员 / 子代理产出采信前主理人必须抽查 ≥2 条原稿上下文（`file:行号` + 原文 1-2 行摘录，Read/grep 抓取），抽查通过方可入报告 / `decision_log.csv` / `context_stack/*.json`；抽查未通过 = 视为未交付（与"文件缺失"同等待遇），主理人当场重发或换 agent 来源。同类证伪 ≥2 处/任务 → 触发决策级升级（见 `authorization_matrix.md`）。完整条款与反向 fixture 见 `CLAUDE.md §1`。
 
 ### 执行痕迹（R14 · checklist 落盘纪律）
 T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md`（3 行以内：时间/项数/结论）。**无 checklist 痕迹 = 该任务 VERIFY 未执行**——事后审计以文件为准，不以"我记得跑过"为准。推荐用 `scripts/write_checklist.py <run-dir> <task-id> --hallucinated N --note '...'` 落 JSON+md 双格式。
