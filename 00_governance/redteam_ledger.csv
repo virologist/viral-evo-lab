@@ -19,7 +19,7 @@ RT20260926,C-11,high,redteam-citation,审稿人Vijaykrishna-Duan拼接式幻觉�
 RT20260926,C-12,high,redteam-citation,审稿人Thao-Quyen-Nguyen不存在,WF3-重检索,19124c4,closed,2026-09-26,
 RT20260926,C-13,low,redteam-citation,PDB-4KTH元数据完全吻合,无需动作,,closed,2026-09-26,
 RT20260926,C-14,medium,redteam-citation,CDC-2025b无对应2025a+数据时效待投稿前人工核,人工核验,,open,,
-RT20260926,M-01,fatal,redteam-method,M9a-GLMM伪重复(2475当独立观测-哺乳类有效样本<20独立溢出),WF4-重跑,2a60eec(M21: CR ratio1.08/crossed RE差0.019→攻击未确证; PGLMM待R最终裁决),partial,2026-10-14,
+RT20260926,M-01,fatal,redteam-method,M9a-GLMM伪重复(2475当独立观测-哺乳类有效样本<20独立溢出),WF4-重跑,2a60eec(M21: CR ratio1.08/crossed RE差0.019→攻击未确证; PGLMM待R最终裁决),partial,,
 RT20260926,M-02,major,redteam-method,77vs2399功效不足却解读为崩塌(应TOST),WF4-统计补救,eca7427(M20 §4 MDE=0.305>观测差0.181→功效不足确证),closed,2026-10-14,K-HUMAN-SIGNAL-FRAGILITY
 RT20260926,M-03,major,redteam-method,Clade-Subtype-Phase-Year共线性无VIF报告,WF4-重跑,eca7427(M20 §1 VIF max=4.99→攻击不成立),closed,2026-10-14,
 RT20260926,M-04,major,redteam-method,Province单一截距RE可能过度吸收宿主信号,WF4-重跑,,open,,
@@ -36,7 +36,7 @@ RT20260926,E-04,medium,redteam-extrap,0.6Å放Method段赋予验证权重但两A
 RT20260926,E-05,medium,redteam-extrap,审稿人COI无5年无合作声明+数据重叠,WF3-重检索,19124c4,closed,2026-09-26,
 RT20260926,E-06,minor,redteam-extrap,单一案例→全RNA病毒报告标准降格,措辞修正,19124c4,closed,2026-09-26,
 RT20260926,E-07,minor,redteam-extrap,navian2399+nmammal77=2476-vs-M9a-2475差1(分母口径),人工核验,,open,,
-RT20260926,M-11,fatal,diagnostic-v2.0,"M9_a-MixedLM源码缺失(git全史无S140_bin实现,v5.1核心模型不可独立复现)",重建或接受M17反推实现,01cb45f(sequon核验二次git -S验证全史无先例)+M17反推实现(n=2476),partial,2026-09-30,K-M9A-SOURCE-ABSENT
+RT20260926,M-11,fatal,diagnostic-v2.0,"M9_a-MixedLM源码缺失(git全史无S140_bin实现,v5.1核心模型不可独立复现)",重建或接受M17反推实现,01cb45f(sequon核验二次git -S验证全史无先例)+M17反推实现(n=2476),partial,,K-M9A-SOURCE-ABSENT
 RT20260930,H-09,fatal,wf1-hypothesis,"Mammal复现值三源不一致(V1b严格-0.032 vs M9_a+0.073 vs 论文CSV列+0.065),提示主理人输入数据存在转述偏差,投稿稿口径必须强制声明",口径声明硬约束已写入H-S2 v1.1,"73251fe(重构)+verify-post验证跑(0.55置信度,2纪律全守)",closed,2026-09-30,K-M9A-SOURCE-ABSENT
 RT20260930,M-12,major,wf1-scout,"D'在freq(G140)=0.9706近乎单态位点退化(空单元→D'=±1精确值);同一D'=0.944对应r² 0.012~0.513(PMID18572214),D'几乎不携带关联强度信息","主统计量改r²+CI,D'降次要",未编号,open,,K-G140-CLADE-DIAGNOSTIC
 RT20260930,M-13,major,wf1-scout,"标准逻辑回归在系统发育相关下inflated Type I error(PMID20525617),clade固定效应只是粗粒度离散化,clade内相关仍在",列为Mammal ΔP塌缩第三候选解释(前founder混杂/功效不足),未编号,open,,K-HUMAN-SIGNAL-FRAGILITY

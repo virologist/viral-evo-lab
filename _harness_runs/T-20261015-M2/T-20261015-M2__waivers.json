@@ -1,0 +1,7 @@
+{
+  "waivers": [
+    {"gate": "G2", "value": "40", "reason": "TAO 医疗分诊准确率下限，转述 arXiv:2506.12482 摘要", "authorized_by": "lead(主理人), 2026-10-15"},
+    {"gate": "G2", "value": "60", "reason": "TAO 医疗分诊准确率上限（人参与验证时），同上", "authorized_by": "lead(主理人), 2026-10-15"},
+    {"gate": "G2", "value": "24", "reason": "错误吸收率，同上 arXiv 摘要", "authorized_by": "lead(主理人), 2026-10-15"}
+  ]
+}

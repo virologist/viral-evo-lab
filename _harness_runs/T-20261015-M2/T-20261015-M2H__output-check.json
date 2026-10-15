@@ -1,0 +1,41 @@
+{
+  "ts": "2026-10-15T08:40:13",
+  "task_id": "T-20261015-M2H",
+  "checked_artifacts": [
+    "T-20261015-M2H__hypothesis-officer.md"
+  ],
+  "artifact_mtimes": {
+    "T-20261015-M2H__hypothesis-officer.md": 1792024647
+  },
+  "unverified": [
+    {
+      "member": "hypothesis-officer",
+      "kind": "pct",
+      "value": "10"
+    },
+    {
+      "member": "hypothesis-officer",
+      "kind": "pct",
+      "value": "40"
+    },
+    {
+      "member": "hypothesis-officer",
+      "kind": "pct",
+      "value": "60"
+    },
+    {
+      "member": "hypothesis-officer",
+      "kind": "pct",
+      "value": "30"
+    },
+    {
+      "member": "hypothesis-officer",
+      "kind": "pct",
+      "value": "100"
+    }
+  ],
+  "verdict": "DEGRADE",
+  "sources_used": [
+    "/Users/biodog/Library/CloudStorage/OneDrive-Personal/GPT/WorkBuddy/2026-09-10-11-38-32/research-ops/outputs"
+  ]
+}
