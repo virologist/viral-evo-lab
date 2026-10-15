@@ -11,6 +11,7 @@ check_gates.py —— 团队级脚本化门禁（D2/M3 修复 · 2026-10-15）
 
 门禁清单（G1-G5，全部确定性）：
     G1 信封完整   artifact 首个 JSON 含 6 必填字段且 status ∈ {success,partial,failed,blocked}
+                  （T-B2 强化：phase:int / confidence:0-100 类型校验 + 期望 vs 实际字段对照输出）
     G2 数字溯源   关键数字（n=/p=/D′/百分比/CI）在权威源 grep 得到（复用 verify_member_output）
     G3 产出落盘   <task-id>__<member>.md 至少一份存在
     G4 核验留痕   output-check.json 已生成（G2 的落盘凭证）
@@ -48,7 +49,13 @@ ENVELOPE_SKIP_CHARS = 2000  # C2 修复（审计 2026-10-15）：信封 summary 
 
 
 def check_envelope(art: Path) -> tuple[bool, str]:
-    """G1：artifact 头部找 JSON 信封，验 6 必填 + status 合法；issues 字段一并消费（R2-10）。"""
+    """G1：artifact 头部找 JSON 信封，验 6 必填 + status 合法 + 类型校验；issues 一并消费（R2-10）。
+
+    T-B2 落地于 G1 强化（2026-10-15）：
+      1. detail 附"期望字段清单 vs 实际字段清单"对照一行（diff 一目了然）；
+      2. 补类型校验 phase:int / confidence:0-100（存在性 ≠ 合法性——
+         "88" 字符串、"high" 这类漂移值此前会静默通过）。
+    """
     try:
         head = art.read_text(encoding="utf-8", errors="ignore")[:ENVELOPE_SKIP_CHARS]
     except OSError as e:
@@ -65,15 +72,26 @@ def check_envelope(art: Path) -> tuple[bool, str]:
         if "agent_id" not in obj:
             continue
         missing = [k for k in REQUIRED_ENV if k not in obj or obj[k] in ("", None)]
+        actual = sorted(obj.keys())
+        # T-B2 对照行：期望 vs 实际（哪怕全过也输出，审计可 grep）
+        cmp_txt = (f"字段对照 期望{sorted(REQUIRED_ENV)} vs 实际{actual}"
+                   f"{' 缺' + str(missing) if missing else ' 无缺'}")
         if missing:
-            return False, f"信封缺字段: {missing}"
+            return False, cmp_txt
         if str(obj.get("status", "")).lower() not in VALID_STATUS:
-            return False, f"status 非法: {obj.get('status')}"
+            return False, f"status 非法: {obj.get('status')} | {cmp_txt}"
+        # T-B2 类型校验：phase 须为 int；confidence 须为 0-100 数值
+        phase = obj.get("phase")
+        if not isinstance(phase, int) or isinstance(phase, bool):
+            return False, f"phase 类型漂移（须 int，实为 {type(phase).__name__}:{phase!r}） | {cmp_txt}"
+        conf = obj.get("confidence")
+        if isinstance(conf, bool) or not isinstance(conf, (int, float)) or not (0 <= conf <= 100):
+            return False, f"confidence 越界/类型漂移（须 0-100 数值，实为 {conf!r}） | {cmp_txt}"
         # R2-10：issues 消费——非空则浮出门禁详情（主理人 T1 逐条处置的输入）
         issues = obj.get("issues") or []
         issues_txt = f" | issues×{len(issues)}: {'; '.join(map(str, issues[:2]))}" if issues else ""
         return True, (f"agent_id={obj.get('agent_id')} status={obj.get('status')} "
-                      f"confidence={obj.get('confidence')}{issues_txt}")
+                      f"confidence={obj.get('confidence')}{issues_txt} | {cmp_txt}")
     return False, "头部 2000 字符内未找到含 agent_id 的 JSON 信封"
 
 

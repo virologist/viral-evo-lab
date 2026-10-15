@@ -69,6 +69,17 @@ def main() -> int:
     if not isinstance(hyp.get("active_hypotheses"), list):
         print("❌ 假说池结构异常（active_hypotheses 非 list）", file=sys.stderr)
         return 3
+    # T-B3（2026-10-15）：字段漂移告警——条目缺 id/status/claim 任一关键字段时
+    # 发 warning 但不退出（结构可漂移≠不可用，处置权归 archivist）。
+    KEY_FIELDS = ("id", "status", "claim")
+    drift = [
+        (i, [k for k in KEY_FIELDS if k not in (h or {})])
+        for i, h in enumerate(hyp.get("active_hypotheses", []))
+        if not isinstance(h, dict) or any(k not in (h or {}) for k in KEY_FIELDS)
+    ]
+    for i, miss in drift:
+        print(f"⚠️  字段漂移: active_hypotheses[{i}] 缺 {miss}（建议 archivist 补齐或下架该条目）",
+              file=sys.stderr)
     hyp_updated = parse_dt(hyp.get("last_updated", ""))
     if hyp_updated is None:
         print("❌ 假说池 last_updated 无法解析", file=sys.stderr)
@@ -105,8 +116,9 @@ def main() -> int:
                 late_fatal.append(row)
 
     age_days = (datetime.now() - hyp_updated).days
-    active = [h for h in hyp.get("active_hypotheses", []) if h.get("status") != "deprecated"]
-    deprecated = [h for h in hyp.get("active_hypotheses", []) if h.get("status") == "deprecated"]
+    # T-B3 配套：漂移条目（含非 dict）已告警放行，此处须容错防 .get 崩溃
+    active = [h for h in hyp.get("active_hypotheses", []) if isinstance(h, dict) and h.get("status") != "deprecated"]
+    deprecated = [h for h in hyp.get("active_hypotheses", []) if isinstance(h, dict) and h.get("status") == "deprecated"]
 
     print(f"═══ 假说治理触发器 ═══")
     print(f"假说池更新: {hyp['last_updated']}（{age_days} 天前）")

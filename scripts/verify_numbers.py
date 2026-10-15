@@ -90,14 +90,26 @@ def float_candidates(val: str) -> set:
     return cands
 
 
-def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False) -> str:
+def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False,
+                 require_tag: bool = False) -> str:
     """把权威源（csv/json/md/txt）读成一个大文本（grep 池）；exclude=**文件名**关键字黑名单。
 
     2026-10-14 修：exclude 曾匹配完整路径（str(f)），导致父目录名含关键字时
     整个目录被误杀（如 /tmp/vmo_test/ 被 --exclude "_" 清空）。现仅匹配 f.name。
+
+    T-C4（2026-10-15，LRN-005 防线）：require_tag=True 时仅加载文件头部 3 行
+    含 `source_tag: authoritative` 的源——杜绝 smoke 演练的假数据混入权威池
+    （LRN-005 复发防线）。默认 False 向后兼容；生产环境建议开 True。
     """
     exclude = exclude or []
     chunks = []
+
+    def tagged(f: Path) -> bool:
+        try:
+            return "source_tag: authoritative" in "".join(f.read_text(encoding="utf-8", errors="ignore").splitlines()[:3])
+        except OSError:
+            return False
+
     for sp in paths:
         p = Path(sp)
         if p.is_dir():
@@ -106,6 +118,8 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
                     continue
                 ok_suffix = (".csv", ".json", ".md", ".txt") if allow_md else (".csv", ".json")
                 if f.suffix.lower() in ok_suffix and f.is_file():
+                    if require_tag and not tagged(f):
+                        continue
                     try:
                         chunks.append(f.read_text(encoding="utf-8", errors="ignore"))
                     except OSError:
@@ -115,6 +129,8 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
             if not (p.is_file() and p.suffix.lower() in ok_suffix2):
                 continue
             if any(x in p.name for x in exclude):
+                continue
+            if require_tag and not tagged(p):
                 continue
             chunks.append(p.read_text(encoding="utf-8", errors="ignore"))
     return "\n".join(chunks)

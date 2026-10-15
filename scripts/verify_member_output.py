@@ -20,6 +20,16 @@ verify_member_output.py —— 产出端数字核验关卡（A · 2026-10-14 V1 
     6. 默认写 <run-dir>/<task-id>__output-check.json（与 checklist 同 schema 风格）
 
 退出码：0 = 全过；3 = artifact 缺失；5 = 存在未溯源数字（--gate 时阻断）
+
+T-C2 决策记录（2026-10-15 · coder 拍板）：不实施 commit_hash 锚定。
+理由：
+    1. 防"核验后改动"已由 artifact_mtimes mtime 指纹（v1.3.1 C1 修复，
+       check_gates.py G4 消费）确定性覆盖——核验后任何写盘都会使指纹失配；
+    2. research-ops 为 OneDrive 目录、非 git 仓库，commit_hash 无从取值，
+       引入 hash 需先给研究目录建仓，运维成本与收益不成比例；
+    3. mtime 在正常工作流下不可伪造（OneDrive 同步保真），且已与 G4 门禁闭环。
+若未来 research-ops 纳入 git 管理，可重开此项：把 commit_hash 并入
+output-check.json 的 artifact_mtimes 同级字段即可。
 """
 import argparse
 import importlib.util
