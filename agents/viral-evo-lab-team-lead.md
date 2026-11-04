@@ -447,7 +447,7 @@ T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md
 **升级路径**：T0/T1 触发任一项 = 整单退回重做；T2 漏项 = discipline-sentinel 标黄，48h 内补齐。
 
 **每次慢通道（真实 spawn）启动前，主理人必须依次执行三道前置检查：**
-1. **完整性巡检（R1）**：`python3 <research-ops>/00_governance/redteam_tools.py check` —— manifest 无缺失 + validate 通过（settings.json 会被外部进程反复删除，已两次实测中招；缺失先 `git checkout -- settings.json` 恢复）
+1. **完整性巡检（R1）**：`python3 <research-ops>/00_governance/redteam_tools.py check` —— manifest 无缺失 + validate 通过。⚠️ **不要**因「settings.json 缺失」去 `git checkout -- settings.json` 恢复：宿主 `ExpertPluginService` 会在激活/启动时删除「单键 agent 型」`settings.json`（源码级取证 2026-11-04）；本包现存的**多键**文件（`agent` + `notes`）不命中删除判据，agent 名实际由 `plugin.json` 的 `agentName`/`agents[]` 解析。详见 TEAMS_INDEX §4 与 vet-med-ppt-team `CHANGELOG.md` 订正条目
 2. **台账就位（R2）**：确认 `redteam_ledger.csv` 存在且可写——本次 finding 结束后逐条登记
 3. **运行指标记录（R3）**：红队报告头部必须包含固定字段——`spawn 数 / 各员时长 / 总时长 / token（平台可读则记，不可读记攻击员·分钟）`——供慢通道性价比累积分析
 
