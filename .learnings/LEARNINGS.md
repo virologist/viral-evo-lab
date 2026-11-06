@@ -10,7 +10,7 @@ Corrections, insights, and knowledge gaps captured during development.
 
 **Logged**: 2026-10-14T21:08:00+08:00
 **Priority**: critical
-**Status**: pending
+**Status**: resolved
 **Area**: docs
 
 ### Summary
@@ -26,6 +26,11 @@ Corrections, insights, and knowledge gaps captured during development.
 - 任何"通用机制需要论据"时，使用：**①机制本身的设计目标** ②**通用 LLM 行为模式** ③**抽象的 bug 类型**——禁止使用具体项目事件/数字/PMID/具体仓库路径作为论据
 - 持久化资产（脚本 docstring、方法卡、变更日志）落盘前自检：用 `grep "<项目名>\|<具体位点>\|<具体PMID>" 文件` 验证无项目特定叙事
 - 跨 thread 划界：用户划界后，**任何"顺便提一下 X 项目"即越界**
+
+### Resolution
+- **Resolved**: 2026-11-07（B5 执行）
+- **Commit/PR**: 待本轮 A 组 commit hash（assemble_spawn_prompt.py :407 注释与 check_scope.py 黑名单位点模式已泛化/移除，check_scope 全仓 clean）
+- **Notes**: 包内最后一处项目叙事（装配器注释 + check_scope 位点断言）已清除；防复发机制 = check_scope.py 结构性黑名单 + spawn 时 R11 知识态注入
 
 ### Metadata
 - Source: user_feedback
@@ -66,7 +71,7 @@ Corrections, insights, and knowledge gaps captured during development.
 
 **Logged**: 2026-10-14T22:40:00+08:00
 **Priority**: high
-**Status**: pending
+**Status**: resolved
 **Area**: infra
 
 ### Summary
@@ -78,6 +83,11 @@ register_expert.py 注册的是专家包可见性（WorkBuddy 专家选择器）
 ### Suggested Action
 - 主理人 MD「调度成员」节补一行：subagent_type 用 `general-purpose`，name 用成员 ID，prompt=assemble 输出全文
 - 长期：向平台反馈成员注册为 agent 类型的需求；或在 assemble_spawn_prompt.py docstring 记录此回退模式
+
+### Resolution
+- **Resolved**: 2026-10-15（v1.3.0 M1 落实）
+- **Commit/PR**: db9bb02（LRN-003 回退模式写入装配 docstring + 主理人 MD 协作规则 5）
+- **Notes**: 回退模式已机制化——主理人 MD 协作规则 5 明文 + 装配器 docstring 记录；本次 A2 复查确认在位
 
 ### Metadata
 - Source: error
@@ -114,7 +124,7 @@ D 演练实录：成员简报中"约 79% 从业者"（转述 arXiv:2503.06745）
 
 **Logged**: 2026-10-15T06:20:00+08:00
 **Priority**: high
-**Status**: pending
+**Status**: resolved
 **Area**: tests
 
 ### Summary
@@ -128,6 +138,11 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - 规则固化：**冒烟测试的权威源必须用 /tmp 或独立 smoke 目录，禁止入项目权威源池**；verify 类脚本加 `--sources` 显式指向时，主理人须确认路径非 smoke
 - LRN-004（外部引文数字边界）的完整链条：关卡边界 = 本地池真伪 × 外部引文人判，两端都要人管
 
+### Resolution
+- **Resolved**: 2026-10-15（当日已删 + 3dbcbae 登记）
+- **Commit/PR**: 3dbcbae
+- **Notes**: 防复发规则固化入 outputs/README.md；2026-11-07 A6 复查确认无同类污染
+
 ### Metadata
 - Source: conversation
 - Tags: smoke-test, authoritative-pool, contamination
@@ -140,7 +155,7 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 
 **Logged**: 2026-10-15T06:50:00+08:00
 **Priority**: high
-**Status**: pending
+**Status**: resolved
 **Area**: tests
 
 ### Summary
@@ -153,6 +168,11 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - 诊断/审计类子代理回传后，**主理人必须抽查 ≥2 条要害证据**（grep 原文）才可采信进报告——本次已执行并当场纠正
 - 子代理 prompt 应要求："证据须给可复核的定位（文件:行号+原文摘录），不得只给结论"——本次 prompt 已含此要求但仍出现幻觉，说明要求不够，需加"摘录原文片段"
 - 团队 V 层哲学（确定性关卡+人判）对子代理产出同样适用
+
+### Resolution
+- **Resolved**: 2026-10-21（v1.5.0-rc1-tA1 机制化）
+- **Commit/PR**: 87db1c8（CLAUDE.md §1 子代理证据纪律 + 主理人 MD T-A1 门）
+- **Notes**: 抽查 ≥2 条含原文摘录已是强制门；2026-11-07 独立诊断中主审对 3 路子代理执行 10 项抽查（纠正 1 处 grep 假阴性），纪律有效
 
 ### Metadata
 - Source: conversation

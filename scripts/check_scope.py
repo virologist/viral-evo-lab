@@ -19,16 +19,17 @@ from pathlib import Path
 # 项目特定叙事黑名单（关键词式；命中即疑似污染）
 # 原则：禁"具体事件"（错案位点+具体数字+具体PMID+具体事故日）
 # 不禁"领域通用"（糖基化、亚型名、位点符号本身）
+# B5（2026-11-07）：移除单点事故的位点断言/短语模式（A156T*、编号映射错误、
+# G140 mapping error 等具体事件记忆）——黑名单只保留「结构性污染信号」
+# （具体 PMID/commit 片段/错误数值/草稿状态），位点级叙事防复发改由
+# spawn 时的知识态注入（R11）+ T1 审判关卡承担。具体事件史归工作空间 ledger。
 PATTERNS = [
     re.compile(r"PP\s*41034380"),                                # 具体 PMID
     re.compile(r"\.pre-[A-Za-z0-9_-]+"),                          # 特定事故的 backup 命名
     re.compile(r"1094\b"),                                        # commit hash 片段
-    re.compile(r"\bA156T?\s*=\s*"),                               # 事故位点的具体断言
     re.compile(r"20\.58%"),                                      # 事故具体错误值
     re.compile(r"0\.2058\b"),                                    # 事故具体错误值（裸数字）
     re.compile(r"\[39,40\]|\[40,39\]"),                          # 事故草稿引用号冲突
-    re.compile(r"A156[A-Z]?\b\s+幻觉"),                          # "A156X 幻觉"短语
-    re.compile(r"编号映射错误"),                                  # 事故根因描述
     re.compile(r"v6\.6\s*草稿"),                                 # 事故草稿状态
     re.compile(r"d211094"),                                      # 事故 commit
     re.compile(r"位置_?映射.*错"),                                # 事故类别

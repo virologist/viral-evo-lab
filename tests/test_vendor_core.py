@@ -5,8 +5,13 @@ shared-core 分发与防漂移门禁（v3.4.2 P0-1 配套，2026-10-15 适配至
 =====================================================================
 目的：修复「R9 联邦下沉后 git clone 直跑 shim 退出码 3」的可安装性回归，
       同时用哈希比对防止 vendor 兜底副本与联邦真源产生漂移。
-适配：自 smart-textbook-team/tests/test_vendor_core.py 复制，仅改
+适配：自 smart-textbook-team/tests/test_vendor_core.py 复制，改
       _INSTALL_DIR / MEMBER_IDS / V6 临时目录名三处包耦合。
+      [2026-11-07 A2 修正] _PKG_NAME 改本包名（原复制残留 triz-invention-team）；
+      V6 断言改为符合本包现实——scripts/assemble_spawn_prompt.py 是独立实现
+      （无 shim/vendor 回退机制），隔离目录冒烟只断言「退出码 0 + 全成员」；
+      补 pytest 可收集入口 test_vendor_core()（原文件无 test_* 函数，
+      pytest 收集 0 例，CI 静默零覆盖）。
 
 检查项：
   V1  vendor/shared-core/assemble_spawn_prompt.py 存在
@@ -32,7 +37,7 @@ import subprocess
 import sys
 import tempfile
 
-_PKG_NAME = "triz-invention-team"
+_PKG_NAME = "viral-evo-lab"
 _INSTALL_DIR = os.path.expanduser(
     "~/.workbuddy/plugins/marketplaces/my-experts/plugins/" + _PKG_NAME
 )
@@ -156,7 +161,7 @@ def run_checks(expert_dir):
         shutil.copytree(expert_dir, tmp_pkg,
                         ignore=shutil.ignore_patterns(".git"))
         if find_federal(tmp_pkg) is not None:
-            r.add("V6", "git-clone 态冒烟（隔离目录走 vendor 兜底）", "SKIP",
+            r.add("V6", "git-clone 态冒烟（隔离目录独立实现可用）", "SKIP",
                   "临时目录意外命中联邦 core，无法隔离")
         else:
             env = dict(os.environ, SHIM_DEBUG="1")
@@ -166,11 +171,12 @@ def run_checks(expert_dir):
                 capture_output=True, text=True, timeout=60, env=env)
             out = p.stdout + p.stderr
             missing = [m for m in MEMBER_IDS if m not in out]
-            used_vendor = "来源: vendor" in out
-            ok = p.returncode == 0 and not missing and used_vendor
-            r.add("V6", "git-clone 态冒烟（隔离目录走 vendor 兜底，退出码 0）",
+            # 本包 scripts/ 版是独立实现（无 shim/vendor 回退）：
+            # 隔离态验收 = 退出码 0 + 全部成员 ID 可列出
+            ok = p.returncode == 0 and not missing
+            r.add("V6", "git-clone 态冒烟（隔离目录退出码 0 且全成员）",
                   "PASS" if ok else "FAIL",
-                  "" if ok else f"exit={p.returncode} 缺失={missing} 走vendor={used_vendor} out={out[:250]}")
+                  "" if ok else f"exit={p.returncode} 缺失={missing} out={out[:250]}")
     except (OSError, subprocess.SubprocessError) as e:
         r.add("V6", "git-clone 态冒烟（隔离目录走 vendor 兜底）", "FAIL", str(e))
     finally:
@@ -196,7 +202,7 @@ def main():
                          ensure_ascii=False, indent=2))
     else:
         print("=" * 62)
-        print("shared-core 分发与防漂移门禁（triz-invention-team）")
+        print("shared-core 分发与防漂移门禁（viral-evo-lab）")
         print("=" * 62)
         for cid, desc, status, detail in r.items:
             mark = {"PASS": "✓", "FAIL": "✗", "SKIP": "-"}[status]
@@ -208,6 +214,14 @@ def main():
         print(f"检查项 {len(r.items)} | 通过 {n_pass} | 失败 {len(failed)}")
         print("=" * 62)
     return 0 if not failed else 1
+
+
+def test_vendor_core():
+    """pytest 可收集入口：断言全部检查项无 FAIL（SKIP 不算失败）。"""
+    r = run_checks(DEFAULT_EXPERT_DIR)
+    assert not r.failed, "防漂移门禁失败项: " + "; ".join(
+        f"[{cid}] {detail}" for cid, _, _, detail in r.failed
+    )
 
 
 if __name__ == "__main__":

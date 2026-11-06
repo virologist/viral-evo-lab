@@ -3,14 +3,18 @@
 """
 成员 spawn 人设装配器（viral-evo-lab 定制版 = shared-core 公共版 + V1 增量）
 ==========================================================================
-⚠ 来源声明（v3.4.1 R9，2026-10-14）：
-    本文件 = shared-core 公共版（plugins/shared-core/assemble_spawn_prompt.py，369 行）
+⚠ 来源声明（v3.4.1 R9，2026-10-14；B10 2026-11-07 刷新）：
+    本文件 = shared-core 公共版（联邦真源 plugins/shared-core/assemble_spawn_prompt.py）
     + 本包 V1 增量（约 105 行：git tag 版本探测 _detect_team_version /
     V1 关键数字模式 _V1_PATTERNS / _v1_extract / spawn 前自动核验 _auto_verify_payload）。
     其余 4 个无差异包已改为 shim 转调 shared-core；本包因有实质增量，**独立维护**。
     同步纪律：shared-core 公共逻辑演进时，须评估本包是否需要跟进（diff 公共版与本文件，
     公共段变更按需合并；V1 增量段保持私有）。合并记录写 CHANGELOG。
-    当前基线：shared-core 公共版 369 行（2026-10-14 下沉时快照）。
+    当前状态（2026-11-07）：联邦真源已升级至 B21（669 行，含 check_task_package_v5
+    结构化校验 + load_dynamic_members 动态成员层，vendor 镜像 hash 1809085d…）；
+    本文件 595 行，任务包校验已通过 _load_v5_checker 消费 vendor 版 V5（A1），
+    其余 V5 能力（动态成员层）暂未接入（v1.5.1 backlog）。
+    与 vendor 的行数差异属预期（双实现分叉，防漂移由 tests/test_vendor_core.py 门禁）。
 
 用途（公共能力）：把「成员 MD 人设 + 技能资源绝对路径 + task_payload + 输出契约」确定性地
 拼装成一份可直接作为 Agent 工具 prompt 的 spawn 文案，供主理人下发。
@@ -67,6 +71,58 @@ LOG_PREFIX = "[assemble_spawn_prompt]"
 # 任务包四要素（Anthropic 委派协议；缺一即补齐再 spawn）
 TASK_PACKAGE_FIELDS = ["objective", "output_format", "constraints", "task_boundary"]
 
+# ---------------------------------------------------------------- A1（2026-11-07）
+# vendor V5 结构化校验接入：优先 importlib 加载 vendor/shared-core 版的
+# check_task_package_v5（JSON 结构解析 + 五要素 + 三件套 + 占位值拒收）；
+# vendor 缺失时回退旧子串校验（_legacy_check_task_package）并告警。
+# 回退开关 --legacy-package-check 可强制走旧校验（回滚用）。
+_VENDOR_CORE_REL = Path("vendor") / "shared-core" / "assemble_spawn_prompt.py"
+
+
+def _load_v5_checker(expert_dir: Path):
+    """从 vendor 版装配器加载 check_task_package_v5；失败返回 None。"""
+    core = expert_dir / _VENDOR_CORE_REL
+    if not core.is_file():
+        return None
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_vendor_assemble_core", core)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        fn = getattr(mod, "check_task_package_v5", None)
+        if callable(fn):
+            return fn
+    except Exception as e:  # noqa: BLE001 — vendor 损坏不应炸装配主流程
+        log(f"⚠ vendor V5 加载失败（{e}），回退旧校验")
+    return None
+
+
+def _legacy_check_task_package(task_text: str) -> tuple[bool, list[str]]:
+    """旧子串包含校验（v1.5.x 前行为，仅作 vendor 缺失回退）。
+
+    已知缺陷（vendor B21 注释原文）：字段名出现在正文散文里也算已填——
+    只应在 --legacy-package-check 显式回退时使用。
+    """
+    low = task_text.lower()
+    missing = [f for f in TASK_PACKAGE_FIELDS if f not in low]
+    return (not missing), missing
+
+
+def check_task_package_auto(task_text: str, expert_dir: Path,
+                            force_legacy: bool = False) -> tuple[bool, list[str], str]:
+    """任务包校验统一入口。返回 (ok, problems, mode)；mode ∈ {v5, legacy, legacy-forced}。"""
+    if force_legacy:
+        ok, miss = _legacy_check_task_package(task_text)
+        return ok, miss, "legacy-forced"
+    fn = _load_v5_checker(expert_dir)
+    if fn is not None:
+        ok, problems = fn(task_text)
+        return ok, problems, "v5"
+    log("⚠ vendor V5 校验器缺失（vendor/shared-core/assemble_spawn_prompt.py 不在位），"
+        "回退旧子串校验——该模式可被散文糊弄，建议恢复 vendor 文件")
+    ok, miss = _legacy_check_task_package(task_text)
+    return ok, miss, "legacy"
+
 
 def log(msg: str) -> None:
     """统一日志输出到 stderr，避免污染 stdout 的 prompt 正文。"""
@@ -91,12 +147,13 @@ def _detect_team_version(expert_dir: Path) -> str | None:
         return None
 
 
-# V1 关键数字模式（与 verify_numbers.py 对齐；避免循环 import，直接内联）
+# V1 关键数字模式（B5 2026-11-07：与 verify_numbers.py PATTERNS 逐条同源——
+# dprime 统一为 D[′'] 单引号/双 prime 二选一口径；修改任一侧须同步另一侧）
 _V1_PATTERNS = [
     ("pct",    re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")),
     ("n_eq",   re.compile(r"\bn\s*=\s*(\d{2,6})\b", re.I)),
     ("p_val",  re.compile(r"\bp\s*=\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)", re.I)),
-    ("dprime", re.compile(r"D[\u2032\u2035]\s*=\s*([+-]?\d\.\d+)")),
+    ("dprime", re.compile(r"D[′']\s*=\s*([+-]?\d\.\d+)")),
     ("ci",     re.compile(r"CI\s*[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]")),
 ]
 _V1_EXCLUDE_YEAR = re.compile(r"^20[0-2]\d$")
@@ -404,7 +461,8 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
     lines.append("")
 
     # ---- R11（2026-10-14）：项目知识态注入（活跃/废弃假说 + 知识地图）----
-    # 目的：spawn 时刻拦截"引用已废弃结论/幻觉数字"（A156T 事故根治点）。
+    # 目的：spawn 时刻拦截"引用已废弃结论/幻觉数字"（B5 2026-11-07：注释去项目
+    # 叙事——机制为通用防线，具体事故记录归工作空间 research-ops 侧 ledger）。
     # 缺失时静默跳过（不阻塞装配），但打印 stderr 提醒。
     research_ops = os.environ.get("RESEARCH_OPS_DIR", "")
     if research_ops:
@@ -519,7 +577,10 @@ def main() -> int:
     ap.add_argument("--no-autodetect", action="store_true",
                     help="禁用 RESEARCH_OPS_DIR 自动探测（C1）")
     ap.add_argument("--check-task-package", action="store_true",
-                    help="校验任务包四要素齐全，缺则 exit 4")
+                    help="校验任务包（优先 vendor V5 结构化校验：JSON 五要素+三件套+占位值拒收；"
+                         "vendor 缺失回退旧子串校验并告警），缺则 exit 4")
+    ap.add_argument("--legacy-package-check", action="store_true",
+                    help="强制走旧子串包含校验（A1 回退开关；正常情况勿用）")
     ap.add_argument("--run-dir", default=None,
                     help="本轮运行目录；传入后会在 prompt 中注入「产出落盘契约」"
                          "（成员必须把产出写入 <run-dir>/<task_id>__<member-id>.md）")
@@ -563,11 +624,17 @@ def main() -> int:
         task_text = tf.read_text(encoding="utf-8")
 
         if args.check_task_package:
-            ok, missing = check_task_package(task_text)
+            ok, problems, mode = check_task_package_auto(
+                task_text, expert_dir, force_legacy=args.legacy_package_check)
             if not ok:
-                log(f"❌ 任务包缺要素：{missing}（四要素：{TASK_PACKAGE_FIELDS}）")
+                if mode == "v5":
+                    log(f"❌ 任务包 V5 结构化校验未通过（{len(problems)} 项）：")
+                    for p in problems[:10]:
+                        log(f"   - {p}")
+                else:
+                    log(f"❌ 任务包缺要素：{problems}（四要素：{TASK_PACKAGE_FIELDS}）")
                 return 4
-            log(f"✅ 任务包四要素齐全")
+            log(f"✅ 任务包校验通过（mode={mode}）")
 
     run_dir = None
     if args.run_dir:
