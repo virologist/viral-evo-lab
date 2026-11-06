@@ -46,7 +46,8 @@ PATTERNS = [
     ("ci",    re.compile(r"CI\s*[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]")),
 ]
 # 排除：年份 / 版本号（须带 v 前缀或多级 x.y.z，纯小数如 0.9441 不是版本）/ 纯小数序号
-YEAR = re.compile(r"^20[0-2]\d$")
+# C6（2026-11-07）：年份 ^20[0-2]\d$ → ^20\d{2}$（原实现 2030+ 失效）
+YEAR = re.compile(r"^20\d{2}$")
 VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
 
 def extract_numbers(text: str, min_digits: int):

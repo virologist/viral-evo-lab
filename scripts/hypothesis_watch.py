@@ -65,7 +65,12 @@ def main() -> int:
         print(f"❌ 缺文件: {hyp_p} / {led_p}", file=sys.stderr)
         return 3
 
-    hyp = json.loads(hyp_p.read_text(encoding="utf-8"))
+    try:
+        hyp = json.loads(hyp_p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        # C1（2026-11-07）：坏 JSON 走契约退出码 3（原实现直接 traceback，违反退出码契约）
+        print(f"❌ 假说池 JSON 不可解析: {hyp_p}\n   {e}", file=sys.stderr)
+        return 3
     if not isinstance(hyp.get("active_hypotheses"), list):
         print("❌ 假说池结构异常（active_hypotheses 非 list）", file=sys.stderr)
         return 3

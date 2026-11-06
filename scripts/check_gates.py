@@ -95,6 +95,17 @@ def check_envelope(art: Path) -> tuple[bool, str]:
     return False, "头部 2000 字符内未找到含 agent_id 的 JSON 信封"
 
 
+def _float_eq_str(num_str: str, waiver_str: str) -> bool:
+    """C7（2026-11-07）：数值等值容差比较——'0.79' vs '0.790' 视为同一放行条目。
+
+    双方均可解析为 float 时按数值比较；任一方不可解析返回 False（回退精确匹配语义）。
+    """
+    try:
+        return abs(float(num_str) - float(waiver_str)) < 1e-12
+    except (ValueError, TypeError):
+        return False
+
+
 def load_waivers(run_dir: Path, task_id: str) -> dict:
     """R2-2（2026-10-15）：读 <task-id>__waivers.json（人工放行台账）。
     格式：{"waivers": [{"gate": "G2", "value": "79", "reason": "外部引文 arXiv:...", "authorized_by": "..."}]}
@@ -163,7 +174,15 @@ def main() -> int:
             for kind, val, _ in vmo._vn.extract_numbers(text, min_digits=2):
                 cands = vmo._vn.float_candidates(val)
                 if not any(c in pool for c in cands):
-                    if val in waivers:
+                    # C7（2026-11-07）：waiver 匹配走 float_candidates 容差（原精确串匹配，
+                    # 0.79 与 0.790 等值浮点无法放行）；非数值 waiver 仍走精确匹配
+                    hit_waiver = any(
+                        w in waivers or any(str(fc) == str(w) or
+                                            _float_eq_str(fc, w)
+                                            for w in waivers)
+                        for fc in cands
+                    )
+                    if hit_waiver:
                         waived_n += 1   # R2-2：人工放行台账内的数字不计 FAIL
                     else:
                         unverified_n += 1

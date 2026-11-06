@@ -1,18 +1,18 @@
 {
- "generated": "2026-11-07T07:04:03",
- "file_count": 65,
+ "generated": "2026-11-07T07:18:33",
+ "file_count": 66,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "87fc956f1bb586d6",
-   "bytes": 713
+   "sha16": "51630bc68cc9fbc2",
+   "bytes": 703
   },
   ".claude-plugin/plugin.json": {
    "sha16": "3abaa958a41ba7c0",
    "bytes": 6691
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "3ce7286d20e54159",
-   "bytes": 6444
+   "sha16": "9b93aedc16715ddb",
+   "bytes": 6720
   },
   ".gitignore": {
    "sha16": "837a094d5778ac69",
@@ -35,8 +35,8 @@
    "bytes": 8295
   },
   "CLAUDE.md": {
-   "sha16": "41415aedee981b7a",
-   "bytes": 10490
+   "sha16": "a9a5022af5d76dcd",
+   "bytes": 10983
   },
   "CONTRIBUTING.md": {
    "sha16": "57102d910bc66799",
@@ -51,16 +51,16 @@
    "bytes": 11303
   },
   "README.md": {
-   "sha16": "aa6b90e9a7e83e20",
-   "bytes": 2642
+   "sha16": "2e4b34960a4ea8eb",
+   "bytes": 3124
   },
   "agents/archivist.md": {
    "sha16": "23170e1cb43d37a5",
    "bytes": 10071
   },
   "agents/hypothesis-officer.md": {
-   "sha16": "5ffccbcf4dc4f6e4",
-   "bytes": 5635
+   "sha16": "79b45ddd6ebd255c",
+   "bytes": 5659
   },
   "agents/literature-scout.md": {
    "sha16": "4b2c0217f785c2af",
@@ -83,16 +83,16 @@
    "bytes": 5600
   },
   "agents/research-diagnostician.md": {
-   "sha16": "2c2a4040e8e8d291",
-   "bytes": 8379
+   "sha16": "c254544673ea93a4",
+   "bytes": 8491
   },
   "agents/structural-virologist.md": {
    "sha16": "19c990b31e9dd4fa",
    "bytes": 5255
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "05f50574f787c49b",
-   "bytes": 33230
+   "sha16": "898f6781445d9425",
+   "bytes": 33826
   },
   "avatars/.gitkeep": {
    "sha16": "e3b0c44298fc1c14",
@@ -143,32 +143,36 @@
    "bytes": 70795
   },
   "docs/P4_monitoring_design.md": {
-   "sha16": "344dd8f596a9f531",
-   "bytes": 6702
+   "sha16": "8e0d813db24a26ea",
+   "bytes": 6907
   },
   "docs/authorization_matrix.md": {
-   "sha16": "f47e2d124a4a7bce",
-   "bytes": 2719
+   "sha16": "f3eea5920914643a",
+   "bytes": 3917
   },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "db11865e00451659",
-   "bytes": 31033
+   "sha16": "69b6ba0ddf590863",
+   "bytes": 31110
   },
   "scripts/check_gates.py": {
-   "sha16": "21fbbe75b967dc19",
-   "bytes": 10317
+   "sha16": "3895b5f2210b8dea",
+   "bytes": 11238
   },
   "scripts/check_scope.py": {
-   "sha16": "9c05b2b8c1933697",
-   "bytes": 4526
+   "sha16": "ceef1f53da27b57f",
+   "bytes": 4925
   },
   "scripts/find_knowledge.py": {
-   "sha16": "d2024f9b927c06e6",
-   "bytes": 3487
+   "sha16": "3d341d539f6c954e",
+   "bytes": 4007
+  },
+  "scripts/gen_integrity_manifest.py": {
+   "sha16": "0ef1643e6e9eaea4",
+   "bytes": 3141
   },
   "scripts/hypothesis_watch.py": {
-   "sha16": "f5d72b7fd26763f0",
-   "bytes": 6865
+   "sha16": "69e5e2621f393257",
+   "bytes": 7144
   },
   "scripts/log_spawn.py": {
    "sha16": "9d9380888676e6f3",
@@ -179,20 +183,20 @@
    "bytes": 4005
   },
   "scripts/render_context_stack.py": {
-   "sha16": "7e2ac5ad644aebfd",
-   "bytes": 6275
+   "sha16": "e380326bcecd3506",
+   "bytes": 6271
   },
   "scripts/validate_contracts.py": {
-   "sha16": "0d67c40a5ad673f3",
-   "bytes": 6535
+   "sha16": "e423289fe02d5929",
+   "bytes": 6928
   },
   "scripts/verify_member_output.py": {
-   "sha16": "ca7339946ea1cc11",
-   "bytes": 6637
+   "sha16": "c24989b2823beb46",
+   "bytes": 6954
   },
   "scripts/verify_numbers.py": {
-   "sha16": "9713d4b1b0ca99b1",
-   "bytes": 8181
+   "sha16": "7a482525759c5276",
+   "bytes": 8263
   },
   "scripts/write_checklist.py": {
    "sha16": "5f7a28b620ddbf27",
@@ -203,8 +207,8 @@
    "bytes": 188
   },
   "skills/viral-evo-core/SKILL.md": {
-   "sha16": "ca8c78d06623b0a3",
-   "bytes": 3426
+   "sha16": "7d0b7c8a40d927e7",
+   "bytes": 3626
   },
   "skills/viral-evo-core/references/code-standards.md": {
    "sha16": "12c748105ab051e3",
@@ -227,8 +231,8 @@
    "bytes": 2129
   },
   "skills/viral-evo-core/references/lead-ops.md": {
-   "sha16": "3a7bdd7daa793ba9",
-   "bytes": 2045
+   "sha16": "e6fa9175fa3a8aed",
+   "bytes": 2284
   },
   "skills/viral-evo-core/references/medical-vet-bridge.md": {
    "sha16": "78cb84d251239409",
@@ -239,8 +243,8 @@
    "bytes": 1246
   },
   "skills/viral-evo-core/references/quality-gates.md": {
-   "sha16": "266961593646ef7c",
-   "bytes": 3311
+   "sha16": "5ead6c78ddde4a09",
+   "bytes": 3388
   },
   "skills/viral-evo-core/references/search-sources.md": {
    "sha16": "64efeee7f32156a7",

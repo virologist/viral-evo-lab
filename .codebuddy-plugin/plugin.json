@@ -7,6 +7,16 @@
     "email": "54756814+virologist@users.noreply.github.com",
     "url": "https://github.com/virologist"
   },
+  "homepage": "https://github.com/virologist/viral-evo-lab",
+  "repository": "https://github.com/virologist/viral-evo-lab",
+  "license": "Apache-2.0",
+  "keywords": [
+    "virology",
+    "evolution",
+    "bioinformatics",
+    "research-team",
+    "hypothesis-generation"
+  ],
   "agents": [
     "./agents/viral-evo-lab-team-lead.md",
     "./agents/hypothesis-officer.md",
@@ -24,20 +34,6 @@
   ],
   "expertType": "team",
   "agentName": "viral-evo-lab-team-lead",
-  "teamInfo": {
-    "leadAgent": "viral-evo-lab-team-lead",
-    "memberAgents": [
-      "hypothesis-officer",
-      "phylo-analyst",
-      "popgen-modeler",
-      "predictive-virologist",
-      "structural-virologist",
-      "literature-scout",
-      "pipeline-engineer",
-      "research-diagnostician",
-      "archivist"
-    ]
-  },
   "displayName": {
     "en": "Viral Evolution Lab",
     "zh": "病毒演化研究院"
@@ -50,13 +46,12 @@
     "en": "Viral genetic evolution research team: frontier literature search, method transfer, falsifiable hypothesis generation, evolutionary prediction, and full-pipeline bioinformatics guidance driving high-impact publications.",
     "zh": "病毒遗传进化研究专家团：前沿检索、方法迁移、假说生成与演化预测，指导生信分析，驱动高水平论文产出。"
   },
-  "avatar": "avatars/team.jpg",
   "categoryId": "04-DataAI",
+  "avatar": "avatars/team.jpg",
   "defaultInitPrompt": {
     "zh": "基于这组病毒序列的变异模式，生成可证伪的演化假说并给出验证路径",
     "en": "Generate falsifiable evolutionary hypotheses from the variation patterns in this set of viral sequences, with a validation roadmap"
   },
-  "plugin": "viral-evo-lab",
   "tags": [
     {
       "en": "Viral Evolution",
@@ -216,5 +211,20 @@
       "avatar": "avatars/archivist.jpg",
       "role": "member"
     }
-  ]
+  ],
+  "teamInfo": {
+    "leadAgent": "viral-evo-lab-team-lead",
+    "memberAgents": [
+      "hypothesis-officer",
+      "phylo-analyst",
+      "popgen-modeler",
+      "predictive-virologist",
+      "structural-virologist",
+      "literature-scout",
+      "pipeline-engineer",
+      "research-diagnostician",
+      "archivist"
+    ]
+  },
+  "plugin": "viral-evo-lab"
 }

@@ -20,6 +20,8 @@ description: 病毒演化研究院共享方法库。当执行病毒遗传进化�
 | 研究诊断审视（方法/数据/管线协同） | `references/diagnostic-protocol.md` |
 | 上下文接近阈值/长会话/需要压缩时 | `references/context-compaction.md` |
 | 需要跨编号系统换算/从比对取残基 | `references/coordinate-mapping.md` |
+| 主理人低频运维（JSON 真源细则/同步器/压缩策略） | `references/lead-ops.md` |
+| 团队契约速查（信封 schema/status 准则/协作要点） | `references/team-contract.md` |
 
 ## 团队工具与契约（v1.2.3+ · 2026-10-14 补）
 

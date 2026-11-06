@@ -84,7 +84,12 @@ def main() -> int:
         print(f"❌ run-dir 不存在: {run_dir}", file=sys.stderr)
         return 3
 
-    artifacts = sorted(run_dir.glob(f"{args.task_id}__*.md"))
+    artifacts = sorted(
+        a for a in run_dir.glob(f"{args.task_id}__*.md")
+        # C3（2026-11-07）：排除元文件——与 check_gates.py LEAD_SUFFIXES 口径对齐，
+        # 防止 checklist/output-check 等主理人侧文件被当作成员 artifact 参与数字核验
+        if not any(s in a.stem for s in ("__checklist", "__output-check", "__gates"))
+    )
     if not artifacts:
         print(f"❌ 未找到 artifact: {run_dir}/{args.task_id}__*.md", file=sys.stderr)
         return 3

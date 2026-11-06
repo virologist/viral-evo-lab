@@ -3,7 +3,7 @@
 病毒遗传进化研究 Team 型专家团：前沿检索、方法迁移、假说生成与演化预测，指导生信分析，驱动高水平论文产出。
 
 ## 类型
-Team 型（多角色协作团队，主理人调度 8 名专业团员）
+Team 型（多角色协作团队，主理人调度 9 名专业团员）
 
 ## 团队阵容
 
@@ -15,16 +15,19 @@ Team 型（多角色协作团队，主理人调度 8 名专业团员）
 | popgen-modeler | 权衍生 | 群体遗传：FUBAR/PAML M7M8/重组/Ne 动态 |
 | predictive-virologist | 喻高瞻 | 升维节点：DMS 景观/蛋白 LM 抗原预测 |
 | structural-virologist | 付尔德 | 结构：AlphaFold3/Foldseek/糖基化解读 |
-| literature-scout | 文溯源 | 文献（γ核心）：4R 检索/PMID 核验/方法迁移 |
+| literature-scout | 文溯源 | 文献（γ核心）：4R 检索/PMID 核验/方法迁移/跨域迁移坍缩态 |
 | pipeline-engineer | 柯力行 | 工程：可复现 Jupyter/质控/Debug |
+| research-diagnostician | 裴慎思 | 研究诊断官：勘探审计/方法学诊断/纪律审判（discipline-sentinel） |
 | archivist | 史治文 | 档案：research-ops 治理/CONTEXT_STACK/论文素材 |
 
-## 标准工作流（5 条预设 Workflow）
+## 标准工作流（7 条预设 Workflow）
 - WF1 假说生成与验证（假说/机制/为什么/预测）
 - WF2 方法迁移与硅基复现（附件/借鉴/参考某方法）
 - WF3 前沿追踪（最新/前沿/数据库版本）
 - WF4 分析执行（序列/代码/pipeline/数据）
 - WF5 投稿前红队审查（审查/critique/投稿前）
+- WF6 研究勘探与诊断（勘探/诊断/审视/审计/改进方案）
+- WF7 跨域方法迁移（借鉴医学/HIV·SARS-CoV-2·流感经验/方法学类比）
 
 ## 文档系统（research-ops）
 团队依赖工作空间内 `research-ops/` 六层目录（00_governance / 10_hypotheses / 20_methods / 30_results / 40_manuscript_assets / context_stack）。
@@ -43,10 +46,9 @@ Team 型（多角色协作团队，主理人调度 8 名专业团员）
 ```
 ~/.workbuddy/plugins/marketplaces/my-experts/plugins/viral-evo-lab/
 ```
-然后注册使其可见：
-```bash
-python3 scripts/register_expert.py <expert-dir>
-```
+然后通过专家中心「我的专家」确认可见（B1 2026-11-07 订正：原引用的
+`scripts/register_expert.py` 不在本包——注册走平台专家管理器或
+expert-manager skill 的 register_expert.py，见其 SKILL.md §一·第六步）。
 
 ## 打包分享
 ```bash

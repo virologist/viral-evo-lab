@@ -156,7 +156,7 @@ _V1_PATTERNS = [
     ("dprime", re.compile(r"D[′']\s*=\s*([+-]?\d\.\d+)")),
     ("ci",     re.compile(r"CI\s*[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]")),
 ]
-_V1_EXCLUDE_YEAR = re.compile(r"^20[0-2]\d$")
+_V1_EXCLUDE_YEAR = re.compile(r"^20\d{2}$")  # C6（2026-11-07）：与 verify_numbers.py YEAR 同步，2030+ 不再失效
 _V1_EXCLUDE_VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
 
 

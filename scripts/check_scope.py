@@ -60,9 +60,15 @@ def check_file(p: Path) -> list:
 
 
 def main() -> int:
+    # C5（2026-11-07）：--help 支持（argparse 接管路径参数，默认全仓）
+    import argparse
+    ap = argparse.ArgumentParser(
+        description="专家包落盘前自检：检查 .md/.py 是否含项目特定叙事（两仓分层纪律，详见 GOVERNANCE_BOUNDARIES.md）")
+    ap.add_argument("paths", nargs="*", help="待检路径（默认全仓 .md/.py）")
+    args = ap.parse_args()
     base = Path(__file__).resolve().parent.parent
-    if len(sys.argv) > 1:
-        targets = [Path(a) for a in sys.argv[1:]]
+    if args.paths:
+        targets = [Path(a) for a in args.paths]
     else:
         targets = [p for p in base.rglob("*") if p.is_file() and p.suffix.lower() in (".md", ".py")]
     # 自检豁免：本脚本自身 + 纪律契约 + .learnings/（本身记录具体事件）

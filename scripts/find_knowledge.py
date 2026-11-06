@@ -8,18 +8,32 @@ find_knowledge.py —— 跨三仓知识入口（S1 · 2026-10-14）
 边界：仅做"机械跨仓 grep"（确定性），不判断"这是什么含义"（语义，LLM 范畴）
 """
 import argparse
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-REPOS = {
+# C4（2026-11-07）：默认值保留本机布局，但全部可被环境变量覆盖（换机/换用户不失效）
+#   FIND_KNOWLEDGE_H5 / FIND_KNOWLEDGE_ROPS / FIND_KNOWLEDGE_PKG
+_REPOS_DEFAULT = {
     "04_H5": "/Users/biodog/Library/CloudStorage/OneDrive-Personal/Research/04_H5",
     "research-ops": "/Users/biodog/Library/CloudStorage/OneDrive-Personal/GPT/WorkBuddy/2026-09-10-11-38-32/research-ops",
     "expert": "/Users/biodog/.workbuddy/plugins/marketplaces/my-experts/plugins/viral-evo-lab",
 }
+_ENV_MAP = {
+    "04_H5": "FIND_KNOWLEDGE_H5",
+    "research-ops": "FIND_KNOWLEDGE_ROPS",
+    "expert": "FIND_KNOWLEDGE_PKG",
+}
 
-# 优先 rg（绝对路径探测，PATH 不依赖）
+
+def get_repos() -> dict[str, str]:
+    return {k: os.environ.get(v, d) for k, (d, v) in
+            ((k, (_REPOS_DEFAULT[k], _ENV_MAP[k])) for k in _REPOS_DEFAULT)}
+
+
+# rg 路径：PATH 探测优先，最后回退 homebrew 常见位置
 RG = shutil.which("rg") or "/opt/homebrew/bin/rg"
 
 
@@ -65,7 +79,7 @@ def main() -> int:
     args = ap.parse_args()
 
     all_hits: list[dict] = []
-    for name, root in REPOS.items():
+    for name, root in get_repos().items():
         all_hits.extend(grep_repo(name, root, args.query, args.type, args.limit))
 
     if not all_hits:

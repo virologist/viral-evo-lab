@@ -14,7 +14,7 @@
   - **纯检索轮**（WF3 简报型任务，零新发现）：不动 context_stack，避免写放大
   - 用户明确修正某项 → 立即覆盖写入 JSON
   - **修改纪律**：禁止"先改 .md 再让 archivist 同步 JSON"——直接编辑 JSON，archivist 重新渲染 .md
-- **权威源唯一性**：阈值/前沿锚点/检索源优先级以 `skills/viral-evo-core/references/` 内文件为权威源；`context_stack/` 仅记录项目级快照/锚点/确认假说
+- **权威源两层结构**（B4 2026-11-07 统一措辞，与 quality-gates.md 对齐）：阈值/前沿锚点/检索源的**跨项目默认权威**在 `skills/viral-evo-core/references/` 内文件；`context_stack/quality_gates.md` 是**项目级覆盖层**（用户任务对齐阶段调整后任务内生效，无覆盖时回退 references/ 默认值）；`context_stack/` 其余文件记录项目级快照/锚点/确认假说
 - **压缩（P1-6 2026-09-18，详见 skills/viral-evo-core/references/context-compaction.md）**：
   - 单轮 context > 85% → 触发压缩：清旧工具结果，保留结论+指针，日志先落盘
   - 单 JSON 条目 > 15 条 → archivist 语义摘要压缩 + schema_version bump

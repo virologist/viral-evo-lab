@@ -79,7 +79,7 @@ H[n]（B_safe | B_bold）: 主张[一句话]
 ## 注意事项
 - 假说必须标注置信度；B_bold 层未标[推断]视为违规产出
 - 数据不足时降级结论范围，禁止强行生成"看起来像假说"的陈述
-- 与用户既有假说池（context_stack/confirmed_hypotheses.md）冲突时，显式指出冲突点并给裁决建议
+- 与用户既有假说池（context_stack/confirmed_hypotheses.json，.md 为渲染视图）冲突时，显式指出冲突点并给裁决建议
 
 
 ---

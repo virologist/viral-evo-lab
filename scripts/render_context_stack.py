@@ -16,6 +16,7 @@ confirmed_hypotheses 各 26 天）。本脚本 = 一条命令从 JSON 真源重�
 """
 import argparse
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -147,5 +148,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    import os
     sys.exit(main())
