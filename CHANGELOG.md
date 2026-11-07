@@ -25,7 +25,7 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 - **并发冲突处置**：10:13–10:14 另一工作线以旧基线覆盖 `tests/test_vendor_core.py` 致 A2 回退，本轮从已推送 commit `0b3bed1` 恢复；其 vendor v2.6.0（685 行，修 vendor 兜底态包根反推）升级**予以保留**
 
 ### Changed
-- `vendor/shared-core/assemble_spawn_prompt.py` 669 → 685 行，`VENDOR.json` sha256/lines 同步；联邦真源 / vendor 副本 / 清单三方哈希实测一致
+- `vendor/shared-core/assemble_spawn_prompt.py` 随联邦真源两轮升级（最终状态以 `VENDOR.json` 的 `lines` / `sha256` 为准，本文档不再硬编码行数）；联邦真源 / vendor 副本 / 清单三方哈希实测一致
 - `integrity_manifest.json` 重建为全量清单（覆盖 `git ls-files` 全部文件，条目数见 `file_count`；此前 55 项漂移 + 25 文件未覆盖，防篡改能力失能）
 
 ### Fixed（P3 第 2 轮交叉验证，2026-11-07）
@@ -48,8 +48,14 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 - **低**：取消 CHANGELOG 中 manifest 文件数的硬编码（新增 fuzz 测试后条目数会变）
 - **流程约束**：`gen_integrity_manifest.py` 以 `git ls-files` 为清单源，新增文件须先 `git add` 再重生成，否则静默漏收（本轮新增 fuzz 测试时实测命中）
 
+### Fixed（P3.2 收敛终检与第二次并发处置，2026-11-07）
+- **P3.2 收敛终检**：全新只读子代理 + 主理人独立静态复核双路并行，**重要级（高/中）新 finding = 0**，按 D2 判据收敛；P3 共 3 轮交叉验证 + 2 轮收敛重测（P3.1 / P3.2），逐轮产出并修复 R1 fatal、R2 高 1 中 3、R3 中 3、P3.1 中 2
+- **第二次并发写入（17:43）**：联邦分发再次以旧基线 `e651ded` 覆盖 `tests/test_vendor_core.py`（A2 二次回退：包名变回 `triz-invention-team`、pytest 入口消失、CI 静默 0 覆盖），同时把 vendor 升到 694 行（注入「路由落盘提醒」，修 D2-1）并修正 `VENDOR.json` 的 `synced_at`。处置：从已推送 `d0bbf1e` 恢复 A2、保留合法升级（三方 sha256 实测一致）、不删除任何并发成果
+- **防复发守卫**：新增 `tests/test_contract_guard.py`，把「每次手工救火」升级为常态自动判定——四项校验（A2 存活 / 四处 version / manifest 与磁盘及 `git ls-files` 一致 / vendor 三方哈希），每项独立异常兜底（守卫自身不因畸形输入崩溃），污染态实测正确报 2 FAIL，修复态全 PASS；纳入 pytest 自动回归
+- **中**：`### Changed` 段硬编码的 `669 → 685 行` 随第二次升级再度漂移，改为指向 `VENDOR.json` 权威字段（与装配器行数硬编码同构的根治）
+- **Known Issues 收敛**：`VENDOR.json` 的 `synced_at` 已由并发工作线回填为 `2026-11-07T17:43:24`，与 hash 自洽，原残留项销项
+
 ### Known Issues（残留，不阻塞）
-- `VENDOR.json` 的 `synced_at=2026-10-15` / `synced_by=P0-S4-1 5包vendor分发v2` 为并发工作线回填的旧元数据，与 11-07 的 hash 不自洽；未擅改，交管家节点裁决
 - 本轮未升 version；如需发版，须同步 4 处版本号并重跑 `gen_integrity_manifest.py`
 - `vendor/shared-core/assemble_spawn_prompt.py:544` 仍向 spawn prompt 注入 E1 已废弃的 `next_agent_hint` 字段规范（包内 `scripts/` 版已订正）。同属联邦真源镜像，**须在联邦真源层修复后重新分发**，本轮未擅改
 - `vendor/shared-core/assemble_spawn_prompt.py:122` 命中首个 `vendor/shared-core` 段后 `break`（而非 `continue`），多层同名嵌套路径下会放弃扫描更内层真包根（隔离实测 EXIT 3）。该文件是联邦真源镜像，改包内副本会破坏 V3/V4 哈希门禁与「vendor 零改动」修改禁区，**须在联邦真源层修复后重新分发**；本轮未擅改

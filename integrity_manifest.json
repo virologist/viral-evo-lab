@@ -1,6 +1,6 @@
 {
- "generated": "2026-11-07T17:28:01",
- "file_count": 67,
+ "generated": "2026-11-07T18:04:38",
+ "file_count": 68,
  "files": {
   ".claude-plugin/marketplace.json": {
    "sha16": "51630bc68cc9fbc2",
@@ -31,8 +31,8 @@
    "bytes": 9265
   },
   "CHANGELOG.md": {
-   "sha16": "21438d25e44b1a5d",
-   "bytes": 16162
+   "sha16": "9c1fe7107ca85474",
+   "bytes": 17595
   },
   "CLAUDE.md": {
    "sha16": "89ad0c0eebe24fce",
@@ -254,6 +254,10 @@
    "sha16": "a038700b5117ceff",
    "bytes": 2043
   },
+  "tests/test_contract_guard.py": {
+   "sha16": "846267d936d6bc8d",
+   "bytes": 7442
+  },
   "tests/test_gate_fuzz.py": {
    "sha16": "2924ac7624448536",
    "bytes": 6638
@@ -263,12 +267,12 @@
    "bytes": 9566
   },
   "vendor/shared-core/VENDOR.json": {
-   "sha16": "b5ff3f6103c62f50",
-   "bytes": 1044
+   "sha16": "ab3df020b0f07ed8",
+   "bytes": 1150
   },
   "vendor/shared-core/assemble_spawn_prompt.py": {
-   "sha16": "f2ced4c20bf2ba3e",
-   "bytes": 31023
+   "sha16": "3c3648f17cedf1df",
+   "bytes": 31902
   }
  }
 }
