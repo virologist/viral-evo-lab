@@ -31,7 +31,7 @@ Team 型（多角色协作团队，主理人调度 9 名专业团员）
 
 ## 文档系统（research-ops）
 团队依赖工作空间内 `research-ops/` 六层目录（00_governance / 10_hypotheses / 20_methods / 30_results / 40_manuscript_assets / context_stack）。
-**注意**：CONTEXT_STACK 锚点数据（H5Nx/H10/H1N1 战线）是项目级状态，**不随专家包跨工作空间迁移**；换工作空间时由 archivist 自动重建空结构，需手动复制旧 context_stack 五文件以延续锚点。
+**注意**：CONTEXT_STACK 锚点数据（H5Nx/H10/H1N1 战线）是项目级状态，**不随专家包跨工作空间迁移**；换工作空间时由 archivist 自动重建空结构，需手动复制旧 `context_stack/` 全部文件（现行 = 4 JSON 真源 + 4 .md 渲染 + 3 协议 .md）以延续锚点。
 
 ## 使用示例
 - 基于这组病毒序列的变异模式，生成可证伪的演化假说并给出验证路径

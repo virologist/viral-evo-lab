@@ -52,7 +52,7 @@ skills: [viral-evo-core]
 REVIEWER 角色除审计/诊断外，含**纪律审判**：被任指派诊断任务时，主动检查（与领域内容并重）：
 1. **虚报完成**：commit message / 报告声称的产出是否真落盘（grep 验证文件存在）+ 数字是否对应（与 ledger M-编号比对）
 2. **口径漂移**：本任务"n=X"等口径是否与项目权威源（confirmed_hypotheses.json / 论文 v6.5）一致
-3. **索引不一致**：本任务新建/删除文件是否同步反映在包内 CLAUDE.md Changelog 与项目侧 knowledge_index.md（B9 2026-11-07 订正：原引用"CLAUDE.md §7 模块链"——包内 CLAUDE.md 无 §7 章节）
+3. **索引不一致**：本任务新建/删除文件是否同步反映在包内 CLAUDE.md Changelog 与项目侧 knowledge_index.json 真源（.md 为渲染视图）（B9 2026-11-07 订正：原引用"CLAUDE.md §7 模块链"——包内 CLAUDE.md 无 §7 章节）
 4. **纪律违反**：本任务是否违反 5 治理约束（诚实性/一图一 ipynb/路径/旧文件优先/索引同步）
 
 违规在 envelope status 中显式标 partial 或 failed，附具体违规条目（与领域结论分列）。

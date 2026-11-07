@@ -1,6 +1,6 @@
 {
- "generated": "2026-11-07T16:59:07",
- "file_count": 66,
+ "generated": "2026-11-07T17:28:01",
+ "file_count": 67,
  "files": {
   ".claude-plugin/marketplace.json": {
    "sha16": "51630bc68cc9fbc2",
@@ -31,8 +31,8 @@
    "bytes": 9265
   },
   "CHANGELOG.md": {
-   "sha16": "330c7633cebd400d",
-   "bytes": 14844
+   "sha16": "21438d25e44b1a5d",
+   "bytes": 16162
   },
   "CLAUDE.md": {
    "sha16": "89ad0c0eebe24fce",
@@ -51,12 +51,12 @@
    "bytes": 11303
   },
   "README.md": {
-   "sha16": "2e4b34960a4ea8eb",
-   "bytes": 3124
+   "sha16": "3f8134572c3d7380",
+   "bytes": 3188
   },
   "agents/archivist.md": {
-   "sha16": "23170e1cb43d37a5",
-   "bytes": 10071
+   "sha16": "5f68f82f505c0576",
+   "bytes": 10102
   },
   "agents/hypothesis-officer.md": {
    "sha16": "79b45ddd6ebd255c",
@@ -83,16 +83,16 @@
    "bytes": 5600
   },
   "agents/research-diagnostician.md": {
-   "sha16": "c254544673ea93a4",
-   "bytes": 8491
+   "sha16": "77b2cafd44ba98ae",
+   "bytes": 8525
   },
   "agents/structural-virologist.md": {
    "sha16": "19c990b31e9dd4fa",
    "bytes": 5255
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "cbd5d8ead50d3411",
-   "bytes": 34003
+   "sha16": "191cf73fa99b2bf0",
+   "bytes": 34272
   },
   "avatars/.gitkeep": {
    "sha16": "e3b0c44298fc1c14",
@@ -155,8 +155,8 @@
    "bytes": 31170
   },
   "scripts/check_gates.py": {
-   "sha16": "3d2de521456dccec",
-   "bytes": 12532
+   "sha16": "f89beb50f25d935c",
+   "bytes": 13274
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
@@ -251,8 +251,12 @@
    "bytes": 1383
   },
   "skills/viral-evo-core/references/team-contract.md": {
-   "sha16": "63f9aedc420ecd70",
-   "bytes": 1891
+   "sha16": "a038700b5117ceff",
+   "bytes": 2043
+  },
+  "tests/test_gate_fuzz.py": {
+   "sha16": "2924ac7624448536",
+   "bytes": 6638
   },
   "tests/test_vendor_core.py": {
    "sha16": "a3715171990c5340",

@@ -69,6 +69,9 @@ def check_envelope(art: Path) -> tuple[bool, str]:
             obj = json.loads(line)
         except json.JSONDecodeError:
             continue
+        # P3-R4：行首 '{' 前缀检查已挡住多数非对象，此处补显式判定作防御性兜底
+        if not isinstance(obj, dict):
+            continue
         if "agent_id" not in obj:
             continue
         missing = [k for k in REQUIRED_ENV if k not in obj or obj[k] in ("", None)]
@@ -88,7 +91,13 @@ def check_envelope(art: Path) -> tuple[bool, str]:
         if isinstance(conf, bool) or not isinstance(conf, (int, float)) or not (0 <= conf <= 100):
             return False, f"confidence 越界/类型漂移（须 0-100 数值，实为 {conf!r}） | {cmp_txt}"
         # R2-10：issues 消费——非空则浮出门禁详情（主理人 T1 逐条处置的输入）
-        issues = obj.get("issues") or []
+        issues = obj.get("issues")
+        if issues is None:
+            issues = []
+        elif not isinstance(issues, list):
+            # P3-R4：非数组值会令 len()/切片抛 TypeError → EXIT=1、gates.json
+            # 不落盘、G1-G5 全体失效。畸形值明确判 FAIL，而非让门禁消失。
+            return False, f"issues 须为数组（实为 {type(issues).__name__}） | {cmp_txt}"
         issues_txt = f" | issues×{len(issues)}: {'; '.join(map(str, issues[:2]))}" if issues else ""
         return True, (f"agent_id={obj.get('agent_id')} status={obj.get('status')} "
                       f"confidence={obj.get('confidence')}{issues_txt} | {cmp_txt}")
@@ -161,7 +170,10 @@ def main() -> int:
     # G1 信封（逐 artifact）
     env_ok, env_detail = True, []
     for art in artifacts:
-        ok, detail = check_envelope(art)
+        try:
+            ok, detail = check_envelope(art)
+        except Exception as e:  # P3-R4：任何未预料的解析异常都转成 G1 FAIL
+            ok, detail = False, f"信封解析异常（已拦截）: {type(e).__name__}: {e}"
         env_ok = env_ok and ok
         env_detail.append(f"{art.stem.split('__',1)[-1]}: {detail}")
     record("G1 信封完整", env_ok, " | ".join(env_detail)[:180])

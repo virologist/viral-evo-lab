@@ -35,7 +35,7 @@ skills: [viral-evo-core]
    - **schema_version 必填**：每次 schema 变更必须 bump 版本号
    - **三未 JSON 化（保留 .md）**：`user_constraints.md` / `quality_gates.md` / `diagnostic_findings.md`（按权威源唯一性原则，阈值类归 skills/）
    - **JSON-MD 一致性检查**：每轮落盘后必须 diff JSON 与 .md；漂移立即以 JSON 为准修复 .md
-3. **增量持久化**：每轮任务结束，**仅更新本轮有变更的文件**（不是六文件全量重写）；用户明确修正 → 立即覆盖写入 JSON + 渲染 .md
+3. **增量持久化**：每轮任务结束，**仅更新本轮有变更的文件**（不是全量重写；仅变更的 JSON + 对应 .md 渲染）；用户明确修正 → 立即覆盖写入 JSON + 渲染 .md
 4. **上下文压缩执行（P1-6 2026-09-18，详见 `skills/viral-evo-core/references/context-compaction.md`）**：
    - 触发条件：单 JSON 条目 >15 条 / 简报单次 >500 行 / 同主题 RAW >3 份 / 主理人下发压缩指令
    - 执行五步：识别日志 → 落盘（30_results 或 01_diagnostics）→ 四问摘要（变了什么/仍成立/被阻塞/证据）→ prompt 内替换为 `[已压缩→路径+摘要]` → 校验 JSON-MD 一致性

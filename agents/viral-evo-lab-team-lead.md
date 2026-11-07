@@ -40,7 +40,7 @@ skills: [viral-evo-core]
 
 - 专家包注册于用户级（`~/.workbuddy/plugins/marketplaces/my-experts/plugins/`），跨项目可用
 - CONTEXT_STACK 锚点（H5Nx/H10/H1N1）是**项目级状态**，**不随专家包跨工作空间迁移**
-- 换工作空间时：archivist 在该工作空间自动建空 `research-ops/` 结构，用户手动复制旧 `context_stack/` 五文件以延续锚点；此约束已在 README 标注
+- 换工作空间时：archivist 在该工作空间自动建空 `research-ops/` 结构，用户手动复制旧 `context_stack/` 全部文件以延续锚点（现行 = 4 JSON 真源 + 4 .md 渲染 + 3 协议 .md）；此约束已在 README 标注
 
 ---
 
@@ -64,7 +64,7 @@ skills: [viral-evo-core]
    - 审查/投稿前/critique → WF5（红队审查）
    - 混合信号 → 按 B>C>A 权重并联，分层输出
 4. **信息熵评估**：隐含假设密度 + 歧义量 + 缺失参数 → 置信度(0-100%)
-5. **CONTEXT_STACK 读取**：检索当前工作空间 `research-ops/context_stack/` 五文件，相关度 >70% 的条目前缀注入。若当前工作空间无 research-ops/，先委托 archivist 按其目录协议建立。
+5. **CONTEXT_STACK 读取**：检索当前工作空间 `research-ops/context_stack/` 四 JSON 真源（`render_context_stack.py` RENDERERS 定义）+ 四 .md 渲染视图 + 三协议 .md，相关度 >70% 的条目前缀注入。若当前工作空间无 research-ops/，先委托 archivist 按其目录协议建立。
 
 ---
 
@@ -376,13 +376,13 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 }
 ```
 
-**你在VERIFY阶段必须校验信封完整性**——缺字段/JSON不可解析 → 直接判 `partial` 并触发补充重试。契约正本 = `skills/viral-evo-core/references/team-contract.md`（6 必填 + 可选 `issues`；E1 已删 `evidence`/`next_agent_hint`/`metrics`，不得再要求成员填写）。信封 6 必填字段与产出正文断言的来源（PMID/DOI）一并核验（无来源断言 = 违规产出）。
+**你在VERIFY阶段必须校验信封完整性**——缺字段/JSON不可解析 → 直接判 `partial` 并触发补充重试。契约正本 = `skills/viral-evo-core/references/team-contract.md`（6 必填 + `issues` 成员侧必填、无则空数组、G1 不强校验；E1 已删 `evidence`/`next_agent_hint`/`metrics`，不得再要求成员填写）。信封 6 必填字段与产出正文断言的来源（PMID/DOI）一并核验（无来源断言 = 违规产出）。
 
 ### 门禁（Gate）
 | 门禁 | 校验点 | 违规处理 |
 |------|-------|---------|
 | VG1 | 信封6必填完整 | 缺失→退回补充 |
-| VG2 | evidence含PMID/DOI（涉及文献断言时） | 无来源→退回 |
+| VG2 | 产出正文断言附 PMID/DOI（涉及文献断言时；E1 已删 `evidence` 字段） | 无来源→退回 |
 | VG3 | 质量门控阈值通过（quality-gates.md定义） | 未过→禁止进pipeline |
 | VG4 | [推断]标注完整 | 缺失→退回 |
 
@@ -417,7 +417,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 **不新增角色**——以主理人常态化检查 + 复用 research-diagnostician（已含纪律审判扩展职责）实现。三个时点触发：
 
 ### T0 · 派 spawn 前（主理人执行，10 秒）
-- [ ] 本任务引用的事实/数据/编号，是否与历史 confirmed_hypotheses.json + knowledge_index.md 一致？（防虚报完成）
+- [ ] 本任务引用的事实/数据/编号，是否与历史 confirmed_hypotheses.json + knowledge_index.json 一致（.md 仅为渲染视图）？（防虚报完成）
 - [ ] 输出文件路径是否在 git 已跟踪目录中（非 scratch/）？（防临时文件膨胀）
 - [ ] 若涉及改稿：是否已 git tag 当前 commit 作快照锚点？（防 .bak 回归）
 

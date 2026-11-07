@@ -18,6 +18,8 @@
 
 **status自评准则**：完整满足→success；部分满足且issues非空→partial；无法满足需重试→failed；前置条件不足→blocked。
 
+**issues 定性**：成员侧必填（无则空数组）；G1 仅强校验 6 必填字段，`issues` 缺失不判 FAIL，但类型非数组判 FAIL。
+
 ## 团队级契约要点
 
 - **下行 task_payload 格式**：`{task_id, phase, instruction, input, output_contract, constraints, handoff_source}`，详见主理人 MD 接口契约段

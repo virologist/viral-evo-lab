@@ -26,7 +26,7 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 ### Changed
 - `vendor/shared-core/assemble_spawn_prompt.py` 669 → 685 行，`VENDOR.json` sha256/lines 同步；联邦真源 / vendor 副本 / 清单三方哈希实测一致
-- `integrity_manifest.json` 重建为 66 文件全量清单（此前 55 项漂移 + 25 文件未覆盖，防篡改能力失能）
+- `integrity_manifest.json` 重建为全量清单（覆盖 `git ls-files` 全部文件，条目数见 `file_count`；此前 55 项漂移 + 25 文件未覆盖，防篡改能力失能）
 
 ### Fixed（P3 第 2 轮交叉验证，2026-11-07）
 - **高**：`check_gates.py` `load_waivers` 对 `value` 为 list/dict 的非法 waiver 抛 `unhashable TypeError` → G1–G5 全体失效；改为仅接受可哈希标量 + 异常类型扩充
@@ -40,6 +40,13 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 - **中 F1**：主理人 MD 上行信封示例仍含 E1 已删的 `evidence` / `next_agent_hint` / `metrics`，与契约正本 6 必填 + `issues` 冲突（`validate_contracts.py` 对主理人 MD 有豁免，门禁抓不到）；示例与 VERIFY 说明对齐正本，装配器侧注释同步
 - **中 F2**：CONTEXT_STACK 的 `knowledge_index` 真源口径在 lead-ops / CLAUDE.md / 主理人 MD / team-contract 四处不统一（三/四/五/六 混用，T2 仍指令手改 `.md`）；统一为「四 JSON 真源（以 `render_context_stack.py` RENDERERS 为权威源）+ 四 .md 渲染视图 + 三协议 .md」，T2 改写入 `.json` 后重渲染
 - **低**：装配器 docstring 取消「本文件 N 行」硬编码（每改一次必漂移，R2→R3 连漂两次，改为指向 `wc -l` 实测）；`vendor B21` 代号刷新；`quality-gates.md` 与主理人 MD 补 `EXIT=3`；P3-R2 的 waiver 措辞订正（带单位值属设计边界，非回归）
+
+### Fixed（P3.1 收敛重测，2026-11-07）
+- **中**：`check_envelope()` 消费信封 `issues` 无类型判定，dict/int/bool 值 → 未捕获 TypeError、EXIT=1、gates.json 不落盘（同构模式第三次：R2 waivers → R3 output-check → P3.1 issues）；补类型判定，畸形值明确判 G1 FAIL
+- **根治**：`check_gates.py` 增信封顶层 isinstance 防御 + main 调用处异常兜底（门禁脚本永不因单个畸形输入崩溃）；新增 `tests/test_gate_fuzz.py`（覆盖信封/waivers/output-check 全畸形形态，断言退出码 ∈ {0,3,5}、无 Traceback、gates.json 必落盘），纳入 pytest 自动回归——把逐点打补丁升级为同类缺陷自动拦截
+- **中**：F2 CONTEXT_STACK 口径残留 6 处（主理人 MD 的 WF 读取步骤/迁移说明/T0 核验、research-diagnostician、README、archivist）全清；VG2 停用 E1 废弃的 `evidence` 字段名；`issues` 必填/可选口径在契约正本统一
+- **低**：取消 CHANGELOG 中 manifest 文件数的硬编码（新增 fuzz 测试后条目数会变）
+- **流程约束**：`gen_integrity_manifest.py` 以 `git ls-files` 为清单源，新增文件须先 `git add` 再重生成，否则静默漏收（本轮新增 fuzz 测试时实测命中）
 
 ### Known Issues（残留，不阻塞）
 - `VENDOR.json` 的 `synced_at=2026-10-15` / `synced_by=P0-S4-1 5包vendor分发v2` 为并发工作线回填的旧元数据，与 11-07 的 hash 不自洽；未擅改，交管家节点裁决
