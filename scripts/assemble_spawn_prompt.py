@@ -373,16 +373,8 @@ def resolve_shared_refs(expert_dir: Path) -> list[str]:
 
 
 # ---------------------------------------------------------------- 任务包校验
-
-def check_task_package(task_text: str) -> tuple[bool, list[str]]:
-    """
-    校验任务包四要素是否齐全（objective / output_format / constraints / task_boundary）。
-    这是**结构性校验**（字段存在性），属确定性范畴；内容质量由主理人判断。
-    """
-    low = task_text.lower()
-    missing = [f for f in TASK_PACKAGE_FIELDS if f not in low]
-    return (not missing), missing
-
+# （P3-R1 2026-11-07：原 check_task_package 子串实现已删——被
+#   check_task_package_auto（V5 优先/legacy 回退）完全替代，旧函数无调用方）
 
 # ---------------------------------------------------------------- 装配
 
@@ -456,8 +448,8 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
 
     lines.append("【专家包资源索引】（禁止全量阅读——先读 SKILL.md 索引表，按需取用）")
     lines.append(f"- {expert_dir}/skills/viral-evo-core/SKILL.md  ← 方法库入口（内含 references/ 场景索引 + 团队工具清单）")
-    lines.append(f"- {expert_dir}/skills/viral-evo-core/references/  ← 9 份参考（按 SKILL.md 索引按需 Read）")
-    lines.append(f"- {expert_dir}/scripts/  ← 团队工具 8 个（清单与用途见 SKILL.md「团队工具与契约」节）")
+    lines.append(f"- {expert_dir}/skills/viral-evo-core/references/  ← 11 份参考（按 SKILL.md 索引按需 Read）")
+    lines.append(f"- {expert_dir}/scripts/  ← 团队工具（清单与用途见 SKILL.md「团队工具与契约」节）")
     lines.append("")
 
     # ---- R11（2026-10-14）：项目知识态注入（活跃/废弃假说 + 知识地图）----

@@ -175,12 +175,11 @@ def main() -> int:
                 cands = vmo._vn.float_candidates(val)
                 if not any(c in pool for c in cands):
                     # C7（2026-11-07）：waiver 匹配走 float_candidates 容差（原精确串匹配，
-                    # 0.79 与 0.790 等值浮点无法放行）；非数值 waiver 仍走精确匹配
+                    # 0.79 与 0.790 等值浮点无法放行）。
+                    # P3-R1 修复（2026-11-07）：原嵌套 genexpr 误用外层未定义的 w → NameError
+                    # （对抗性复查抓出，fatal）。正确逻辑：候选值对每个 waiver value 做容差比较。
                     hit_waiver = any(
-                        w in waivers or any(str(fc) == str(w) or
-                                            _float_eq_str(fc, w)
-                                            for w in waivers)
-                        for fc in cands
+                        _float_eq_str(fc, wv) for fc in cands for wv in waivers
                     )
                     if hit_waiver:
                         waived_n += 1   # R2-2：人工放行台账内的数字不计 FAIL

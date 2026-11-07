@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-07T07:18:33",
+ "generated": "2026-11-07T16:21:24",
  "file_count": 66,
  "files": {
   ".claude-plugin/marketplace.json": {
@@ -31,8 +31,8 @@
    "bytes": 9265
   },
   "CHANGELOG.md": {
-   "sha16": "13df96ff5324022f",
-   "bytes": 8295
+   "sha16": "a8e298cd1240c8b4",
+   "bytes": 11717
   },
   "CLAUDE.md": {
    "sha16": "a9a5022af5d76dcd",
@@ -151,12 +151,12 @@
    "bytes": 3917
   },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "69b6ba0ddf590863",
-   "bytes": 31110
+   "sha16": "5673ed367f3acc12",
+   "bytes": 30854
   },
   "scripts/check_gates.py": {
-   "sha16": "3895b5f2210b8dea",
-   "bytes": 11238
+   "sha16": "0a3b6d3ae8d9926b",
+   "bytes": 11289
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
@@ -259,12 +259,12 @@
    "bytes": 9522
   },
   "vendor/shared-core/VENDOR.json": {
-   "sha16": "a4b647bb2a4f0659",
-   "bytes": 1203
+   "sha16": "b5ff3f6103c62f50",
+   "bytes": 1044
   },
   "vendor/shared-core/assemble_spawn_prompt.py": {
-   "sha16": "1809085da349ab33",
-   "bytes": 29946
+   "sha16": "f2ced4c20bf2ba3e",
+   "bytes": 31023
   }
  }
 }

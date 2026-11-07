@@ -4,6 +4,34 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [Unreleased] - 2026-11-07（独立诊断 P1–P3 修复，尚未发版）
+
+> **版本口径**：本轮为诊断驱动的结构修复，`plugin.json` / `marketplace.json` 的 `version` 仍为 **1.5.0**，未擅自升版。是否发版为 1.5.1 由管家节点裁决。
+
+### Added
+- **A1**：`scripts/assemble_spawn_prompt.py` 经 importlib 消费 vendor 版 `check_task_package_v5`（JSON 五要素 + 验收三件套 + 占位值拒收）；新增 `--legacy-package-check` 回退开关；vendor 缺失时回退旧子串校验并输出显式告警
+- **A3**：`scripts/gen_integrity_manifest.py`（`git ls-files` 全量清单，sha16 + bytes，`--check` 幂等校验）
+- **A5**：主理人 MD「撞限与断点续跑协议」（成员落盘标注 partial / 主理人三步判定 / 续跑 2 轮仍撞限上报管家节点）
+- **D2/D3**：Evaluator 收敛判据（连续 2 轮无重要级新 finding 即止）+ `docs/authorization_matrix.md` §五 分歧解决协议（数据仲裁 → 管家节点裁决 → decision_log 记录）
+- **C2/C5**：`render_context_stack.py` import 前置修复；`validate_contracts.py` / `check_scope.py` 补 `--help`
+
+### Fixed
+- **A2**：`tests/test_vendor_core.py` 从 triz 复制残留订正（`_PKG_NAME`）、V6 恒假断言改为符合本包独立实现现实、补 pytest 可收集入口（此前收集 0 例 = CI 静默零覆盖）
+- **A4**：CHANGELOG 补记 v1.1.1 / v1.2.1–1.2.6 / v1.3.0–1.3.2 / v1.4.0 / v1.5.0，逐条附 commit hash 溯源，排列改为最新在上
+- **A6**：`.learnings/LEARNINGS.md` LRN-001/003/005/006 置 resolved（附 Resolution + commit）
+- **B1–B10**：README 8→9 团员 + WF 5→7 条 + 悬空 `register_expert.py` 引用订正；`confirmed_hypotheses` 真源口径统一；maxTurns 唯一口径；权威源两层结构；CLAUDE.md 时间线订正；元数据三件套 version 统一 1.5.0；SKILL.md 索引 11 份 references 全覆盖；悬空引用与 P4 backlog 状态刷新；装配器 D′ 正则同源化；项目特定叙事从黑名单泛化为结构性信号
+- **C1/C3/C4/C6/C7**：`hypothesis_watch` JSON 异常处理；`verify_member_output` artifact glob 排除元文件；`find_knowledge` 三仓路径环境变量可覆盖；年份正则 `20[0-2]\d` → `20\d{2}`；`check_gates` waiver 浮点容差匹配
+- **P3-R1 fatal**：C7 引入的 `NameError`（未溯源数字 + 权威源存在时 G2 分支崩溃）已根治；装配器硬编码「9 份参考 / 8 个工具」计数漂移订正；旧 `check_task_package` 死代码清除
+- **并发冲突处置**：10:13–10:14 另一工作线以旧基线覆盖 `tests/test_vendor_core.py` 致 A2 回退，本轮从已推送 commit `0b3bed1` 恢复；其 vendor v2.6.0（685 行，修 vendor 兜底态包根反推）升级**予以保留**
+
+### Changed
+- `vendor/shared-core/assemble_spawn_prompt.py` 669 → 685 行，`VENDOR.json` sha256/lines 同步；联邦真源 / vendor 副本 / 清单三方哈希实测一致
+- `integrity_manifest.json` 重建为 66 文件全量清单（此前 55 项漂移 + 25 文件未覆盖，防篡改能力失能）
+
+### Known Issues（残留，不阻塞）
+- `VENDOR.json` 的 `synced_at=2026-10-15` / `synced_by=P0-S4-1 5包vendor分发v2` 为并发工作线回填的旧元数据，与 11-07 的 hash 不自洽；未擅改，交管家节点裁决
+- 本轮未升 version；如需发版，须同步 4 处版本号并重跑 `gen_integrity_manifest.py`
+
 ## [1.5.0] - 2026-10-15
 
 ### Added（补记，溯源 bc89fa1 / d03b08b / 431aca7）
