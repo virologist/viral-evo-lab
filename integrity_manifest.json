@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-07T16:36:27",
+ "generated": "2026-11-07T16:59:07",
  "file_count": 66,
  "files": {
   ".claude-plugin/marketplace.json": {
@@ -31,12 +31,12 @@
    "bytes": 9265
   },
   "CHANGELOG.md": {
-   "sha16": "103448d857d402ff",
-   "bytes": 13185
+   "sha16": "330c7633cebd400d",
+   "bytes": 14844
   },
   "CLAUDE.md": {
-   "sha16": "0781e773cfa37f3e",
-   "bytes": 10992
+   "sha16": "89ad0c0eebe24fce",
+   "bytes": 11063
   },
   "CONTRIBUTING.md": {
    "sha16": "57102d910bc66799",
@@ -91,8 +91,8 @@
    "bytes": 5255
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "5e644c7586d580c0",
-   "bytes": 33826
+   "sha16": "cbd5d8ead50d3411",
+   "bytes": 34003
   },
   "avatars/.gitkeep": {
    "sha16": "e3b0c44298fc1c14",
@@ -151,12 +151,12 @@
    "bytes": 3917
   },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "a43fed2118bf10cd",
-   "bytes": 30946
+   "sha16": "72085ae3764d9834",
+   "bytes": 31170
   },
   "scripts/check_gates.py": {
-   "sha16": "02cd1687e034e713",
-   "bytes": 12063
+   "sha16": "3d2de521456dccec",
+   "bytes": 12532
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
@@ -231,8 +231,8 @@
    "bytes": 2129
   },
   "skills/viral-evo-core/references/lead-ops.md": {
-   "sha16": "e6fa9175fa3a8aed",
-   "bytes": 2284
+   "sha16": "8bdb1fffbbd889f7",
+   "bytes": 2381
   },
   "skills/viral-evo-core/references/medical-vet-bridge.md": {
    "sha16": "78cb84d251239409",
@@ -243,16 +243,16 @@
    "bytes": 1246
   },
   "skills/viral-evo-core/references/quality-gates.md": {
-   "sha16": "ab79596d26b73742",
-   "bytes": 3508
+   "sha16": "cc51c5b7dc698826",
+   "bytes": 3538
   },
   "skills/viral-evo-core/references/search-sources.md": {
    "sha16": "64efeee7f32156a7",
    "bytes": 1383
   },
   "skills/viral-evo-core/references/team-contract.md": {
-   "sha16": "2e0912fdd6d26eb4",
-   "bytes": 1847
+   "sha16": "63f9aedc420ecd70",
+   "bytes": 1891
   },
   "tests/test_vendor_core.py": {
    "sha16": "a3715171990c5340",

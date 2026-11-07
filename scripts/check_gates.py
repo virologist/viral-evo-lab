@@ -213,7 +213,13 @@ def main() -> int:
     else:
         try:
             oc_data = json.loads(oc.read_text(encoding="utf-8"))
+            # P3-R3（2026-11-07）：顶层非对象（数组/标量/null）与 artifact_mtimes
+            # 非对象都会令 .get 抛 AttributeError，导致 EXIT=1 且 G5/gates.json 不落盘。
+            if not isinstance(oc_data, dict):
+                raise ValueError("output-check.json 顶层须为对象")
             mtimes = oc_data.get("artifact_mtimes", {})
+            if not isinstance(mtimes, dict):
+                raise ValueError("artifact_mtimes 须为对象")
             tampered = [
                 a.name for a in artifacts
                 if a.name in mtimes and int(a.stat().st_mtime) != mtimes[a.name]
@@ -223,7 +229,7 @@ def main() -> int:
                        f"artifact 在核验后被修改（mtime 不符）: {tampered}——须重跑 verify_member_output")
             else:
                 record("G4 核验留痕", True, f"{oc.name}（mtime 指纹一致）")
-        except (json.JSONDecodeError, OSError) as e:
+        except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError) as e:
             record("G4 核验留痕", False, f"output-check.json 解析失败: {e}")
 
     # G5 审判留痕

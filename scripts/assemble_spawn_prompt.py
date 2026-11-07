@@ -13,7 +13,8 @@
     当前状态（2026-11-07，P3-R2 订正）：联邦真源已升级至 v2.6.0 Batch5A（685 行，
     含 check_task_package_v5 结构化校验 + load_dynamic_members 动态成员层 +
     vendor 兜底态包根反推，vendor 镜像 hash f2ced4c2…，与联邦真源字节一致）；
-    本文件 654 行，任务包校验已通过 _load_v5_checker 消费 vendor 版 V5（A1），
+    本文件为定制版（行数随迭代变化，禁在文档内硬编码，以 wc -l 实测为准），
+    任务包校验已通过 _load_v5_checker 消费 vendor 版 V5（A1），
     其余 V5 能力（动态成员层）暂未接入（v1.5.1 backlog）。
     与 vendor 的行数差异属预期（双实现分叉，防漂移由 tests/test_vendor_core.py 门禁）。
 
@@ -101,7 +102,7 @@ def _load_v5_checker(expert_dir: Path):
 def _legacy_check_task_package(task_text: str) -> tuple[bool, list[str]]:
     """旧子串包含校验（v1.5.x 前行为，仅作 vendor 缺失回退）。
 
-    已知缺陷（vendor B21 注释原文）：字段名出现在正文散文里也算已填——
+    已知缺陷（vendor v2.6.0 注释原文）：字段名出现在正文散文里也算已填——
     只应在 --legacy-package-check 显式回退时使用。
     """
     low = task_text.lower()
@@ -460,6 +461,7 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
     research_ops = os.environ.get("RESEARCH_OPS_DIR", "")
     if research_ops:
         hyp = Path(research_ops) / "context_stack/confirmed_hypotheses.json"
+        # 注入给模型看的是 .md 渲染视图；真源为 knowledge_index.json（禁直编）
         kidx = Path(research_ops) / "context_stack/knowledge_index.md"
         inj: list[str] = []
         if hyp.is_file():
@@ -507,7 +509,7 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
         lines.append("- task_boundary: <做什么/不做什么/输入是什么>")
         lines.append("")
 
-    # 合法下游白名单：防止成员在 next_agent_hint 里编造不存在的成员
+    # 合法下游白名单：防止成员在产出中建议不存在的下游成员（E1 已删 next_agent_hint 字段）
     # （实测出现成员建议 solution-architect / prior-art / ip-strategist 等本团没有的角色）
     lines.append("【本团合法成员名单】（主理人路由专用；成员无路由权，勿自创成员名）")
     for m in member_ids:

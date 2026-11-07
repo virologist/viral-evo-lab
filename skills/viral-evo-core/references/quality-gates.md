@@ -38,4 +38,4 @@ last_updated: 2026-10-14
 | 契约完整 | manifest 一致 + agents 9 + skills 1 契约条款在位 | `scripts/validate_contracts.py` |
 | 叙事边界 | 包内无项目特定事件污染 | `scripts/check_scope.py` |
 
-全部门禁 **EXIT=0 过 / 5 FAIL**，可串联 CI；报告落 `<run-dir>/<task-id>__gates.json`。
+全部门禁 **EXIT=0 全过 / 3 artifact 缺失 / 5 门禁 FAIL**，可串联 CI；报告落 `<run-dir>/<task-id>__gates.json`。

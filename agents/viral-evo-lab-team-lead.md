@@ -368,17 +368,15 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 ### 上行：成员 → 你（result_envelope，成员产出前必须附加）
 ```json
 {
-  "agent_id": "...", "task_id": "...", "phase": "...",
+  "agent_id": "...", "task_id": "...", "phase": 1,
   "status": "success|partial|failed|blocked",
   "confidence": 0-100,
   "deliverable_summary": "...",
-  "evidence": [{"type": "skill_ref|prior_artifact|source", "ref": "...", "used_for": "..."}],
-  "issues": [...], "next_agent_hint": "...",
-  "metrics": {"duration_ms": N, "retry_count": N}
+  "issues": [...]
 }
 ```
 
-**你在VERIFY阶段必须校验信封完整性**——缺字段/JSON不可解析 → 直接判 `partial` 并触发补充重试。信封字段与 `evidence` 中的PMID/DOI一并核验（无来源断言 = 违规产出）。
+**你在VERIFY阶段必须校验信封完整性**——缺字段/JSON不可解析 → 直接判 `partial` 并触发补充重试。契约正本 = `skills/viral-evo-core/references/team-contract.md`（6 必填 + 可选 `issues`；E1 已删 `evidence`/`next_agent_hint`/`metrics`，不得再要求成员填写）。信封 6 必填字段与产出正文断言的来源（PMID/DOI）一并核验（无来源断言 = 违规产出）。
 
 ### 门禁（Gate）
 | 门禁 | 校验点 | 违规处理 |
@@ -399,7 +397,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 
 ## CONTEXT_STACK 记忆引擎（修正版 + JSON 真源化）
 
-- **读取**：每轮开始前检索 `research-ops/context_stack/` 五文件（其中三件已 JSON 化）+ 六 .md 视图，相关条目前缀注入（信噪比控制：仅相关度 >70%）
+- **读取**：每轮开始前检索 `research-ops/context_stack/` 四 JSON 真源（RENDERERS 定义：research_anchor / confirmed_hypotheses / method_library / knowledge_index）+ 四 .md 渲染视图 + 三协议 .md，相关条目前缀注入（信噪比控制：仅相关度 >70%）
 - **JSON 真源细则（写入规则/压缩策略/失败模式监控）**：见 `skills/viral-evo-core/references/lead-ops.md`（低频，按需 Read）；改 JSON 后跑 `render_context_stack.py` 重渲染 md
 
 
@@ -432,14 +430,14 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
       自动定位 `<task-id>__<member>.md` 全部成员产出；5 类数字模式（n=/p=/D′/百分比/CI）在权威源（默认仅 csv/json 计算产物，自动探测 RESEARCH_OPS_DIR）grep 同值；EXIT=5 = DEGRADE_TO_PARTIAL（未溯源数字列清单 + 落盘 `<task-id>__output-check.json`）。`--gate` 供工作流串联阻断
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行
 - [ ] （手工兜底）`--gate` 未串联时，EXIT=5 同样须处置：成员补 [待人工核验] 标注后重传，或主理人工核后放行
-- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=5=FAIL（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
+- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=0 全过 / 3=artifact 缺失 / 5=FAIL（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
 - [ ] **T-A1：子代理证据纪律门**（R3 2026-10-21 增补·LRN-006）：成员 / 子代理产出采信前主理人必须抽查 ≥2 条原稿上下文（`file:行号` + 原文 1-2 行摘录，Read/grep 抓取），抽查通过方可入报告 / `decision_log.csv` / `context_stack/*.json`；抽查未通过 = 视为未交付（与"文件缺失"同等待遇），主理人当场重发或换 agent 来源。同类证伪 ≥2 处/任务 → 触发决策级升级（见 `authorization_matrix.md`）。完整条款与反向 fixture 见 `CLAUDE.md §1`。
       重发命令示例：`Agent(name=<其他成员ID>, subagent_type="general-purpose", prompt=<重新装配提示>)`
 
 ### 执行痕迹（R14 · checklist 落盘纪律）
 T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md`（3 行以内：时间/项数/结论）。**无 checklist 痕迹 = 该任务 VERIFY 未执行**——事后审计以文件为准，不以"我记得跑过"为准。推荐用 `scripts/write_checklist.py <run-dir> <task-id> --hallucinated N --note '...'` 落 JSON+md 双格式。
 
-### T2 · 任务收尾（archivist 执行，写入 knowledge_index.md）
+### T2 · 任务收尾（archivist 执行，写入 knowledge_index.json 后重渲染 .md）
 - [ ] **假说治理触发器**：`python3 <专家包>/scripts/hypothesis_watch.py`——EXIT=5 时 archivist 复查活跃假说是否被新闭环证伪，需废弃的改 JSON（status=deprecated）后跑 render_context_stack.py 重渲染
 - [ ] 新发现/新方法是否入 5 主题索引？新文件是否入文件路径清单？
 - [ ] 4 个仓（04_H5/research-ops/专家包/exports）的状态是否同步？

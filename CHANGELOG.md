@@ -30,14 +30,21 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 ### Fixed（P3 第 2 轮交叉验证，2026-11-07）
 - **高**：`check_gates.py` `load_waivers` 对 `value` 为 list/dict 的非法 waiver 抛 `unhashable TypeError` → G1–G5 全体失效；改为仅接受可哈希标量 + 异常类型扩充
-- **中**：C7 重写时遗失「非数值/带单位 waiver 精确匹配」→ G2 合法放行条目静默失效；恢复精确匹配、候选值匹配、浮点容差三路并存
-- **中**：装配器 docstring 的 `669 行` / `1809085d` / `595 行` 未随 vendor v2.6.0 升级回改（实况 `685` / `f2ced4c2` / `654`）
+- **中**：C7 重写时遗失「原始串/候选值精确匹配」→ 不可 float 化的合法放行条目静默失效；恢复精确匹配、候选值匹配、浮点容差三路并存（带单位值仍不放行，属设计边界）
+- **中**：装配器 docstring 的 `669 行` / `1809085d` / `595 行` 未随 vendor v2.6.0 升级回改（实况 vendor `685` / `f2ced4c2`；本文件行数改由实测，不再硬编码）
 - **中**：授权矩阵触发器计数 5 → 6（CHANGELOG 与主理人 MD 两处）；`quality-gates.md` 的 `git checkout` 指引与主理人 MD 的 settings.json 禁令互斥 → 补类型前置判定
 - **低**：`verify_member_output` 元文件排除后缀补 `spawn_prompt`（对齐 LEAD_SUFFIXES 4 项）；tests 复制来源叙述自相矛盾；CLAUDE.md Changelog 区排列注释改为「非严格时间序」；A4 补记措辞订正
+
+### Fixed（P3 第 3 轮交叉验证，2026-11-07）
+- **中**：`check_gates.py` G4 消费 `output-check.json` 未做类型判定，顶层为数组/标量/null 时 `AttributeError` → EXIT=1、G5 与 gates.json 均不落盘（与 R2 修复的 load_waivers 崩溃同构，实测 4/4 崩）；补顶层/字段双重 isinstance + 异常类型扩充
+- **中 F1**：主理人 MD 上行信封示例仍含 E1 已删的 `evidence` / `next_agent_hint` / `metrics`，与契约正本 6 必填 + `issues` 冲突（`validate_contracts.py` 对主理人 MD 有豁免，门禁抓不到）；示例与 VERIFY 说明对齐正本，装配器侧注释同步
+- **中 F2**：CONTEXT_STACK 的 `knowledge_index` 真源口径在 lead-ops / CLAUDE.md / 主理人 MD / team-contract 四处不统一（三/四/五/六 混用，T2 仍指令手改 `.md`）；统一为「四 JSON 真源（以 `render_context_stack.py` RENDERERS 为权威源）+ 四 .md 渲染视图 + 三协议 .md」，T2 改写入 `.json` 后重渲染
+- **低**：装配器 docstring 取消「本文件 N 行」硬编码（每改一次必漂移，R2→R3 连漂两次，改为指向 `wc -l` 实测）；`vendor B21` 代号刷新；`quality-gates.md` 与主理人 MD 补 `EXIT=3`；P3-R2 的 waiver 措辞订正（带单位值属设计边界，非回归）
 
 ### Known Issues（残留，不阻塞）
 - `VENDOR.json` 的 `synced_at=2026-10-15` / `synced_by=P0-S4-1 5包vendor分发v2` 为并发工作线回填的旧元数据，与 11-07 的 hash 不自洽；未擅改，交管家节点裁决
 - 本轮未升 version；如需发版，须同步 4 处版本号并重跑 `gen_integrity_manifest.py`
+- `vendor/shared-core/assemble_spawn_prompt.py:544` 仍向 spawn prompt 注入 E1 已废弃的 `next_agent_hint` 字段规范（包内 `scripts/` 版已订正）。同属联邦真源镜像，**须在联邦真源层修复后重新分发**，本轮未擅改
 - `vendor/shared-core/assemble_spawn_prompt.py:122` 命中首个 `vendor/shared-core` 段后 `break`（而非 `continue`），多层同名嵌套路径下会放弃扫描更内层真包根（隔离实测 EXIT 3）。该文件是联邦真源镜像，改包内副本会破坏 V3/V4 哈希门禁与「vendor 零改动」修改禁区，**须在联邦真源层修复后重新分发**；本轮未擅改
 
 ## [1.5.0] - 2026-10-15

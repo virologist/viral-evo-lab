@@ -66,7 +66,7 @@
 
 ## 上下文接力协议（接棒规则）
 1. **接收方第一步**：读 `research-ops/CLAUDE.md`（项目快照/战线/方法栈/待办/接手建议/Changelog）
-2. **接收方第二步**：按相关度读 `context_stack/` **三 JSON 真源**（research_anchor / confirmed_hypotheses / method_library）+ 三 .md 渲染视图 + 三协议 .md（user_constraints / quality_gates / diagnostic_findings）
+2. **接收方第二步**：按相关度读 `context_stack/` **四 JSON 真源**（research_anchor / confirmed_hypotheses / method_library / knowledge_index，以 `render_context_stack.py` 的 RENDERERS 为准）+ 四 .md 渲染视图 + 三协议 .md（user_constraints / quality_gates / diagnostic_findings）
 3. **接收方第三步**：执行用户原任务；落盘走 archivist（JSON 编辑 → .md 渲染）
 4. **handoff 失败处理**：若发现链路有断层，立即回主理人由主理人调度修复
 

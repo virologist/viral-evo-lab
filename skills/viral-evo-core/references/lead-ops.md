@@ -7,8 +7,8 @@
 - **JSON 真源优先级（Anthropic feature_list.json 模式，P0-1 2026-09-18 落盘）**：
   - **机器读取**：必须从 `.json` 读取（严格 schema 防 model 改坏）
   - **人类视图**：`.md` 是渲染输出，可读可编辑但需走 archivist 同步 JSON
-  - **已 JSON 化的真源**：`confirmed_hypotheses.json` / `method_library.json` / `research_anchor.json`
-  - **未 JSON 化（保留 .md）**：`user_constraints.md` / `quality_gates.md`（按权威源唯一性原则保留在 skills/ 中）
+  - **已 JSON 化的真源（4 件，以 `scripts/render_context_stack.py` 的 RENDERERS 为权威源）**：`confirmed_hypotheses.json` / `knowledge_index.json` / `method_library.json` / `research_anchor.json`
+  - **未 JSON 化（保留 .md，3 件协议/记录）**：`user_constraints.md` / `quality_gates.md` / `diagnostic_findings.md`
 - **写入规则（增量）**：
   - **仅在有新增/变更条目时**由 archivist 写入对应 JSON + 渲染 .md
   - **纯检索轮**（WF3 简报型任务，零新发现）：不动 context_stack，避免写放大
