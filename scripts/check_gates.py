@@ -116,8 +116,17 @@ def load_waivers(run_dir: Path, task_id: str) -> dict:
         return {}
     try:
         data = json.loads(wp.read_text(encoding="utf-8"))
-        return {w.get("value"): w for w in data.get("waivers", []) if w.get("value")}
-    except (json.JSONDecodeError, OSError):
+        out = {}
+        for w in data.get("waivers", []) or []:
+            if not isinstance(w, dict):
+                continue
+            v = w.get("value")
+            # P3-R2（2026-11-07）：value 仅接受可哈希标量。list/dict 作 key 会抛
+            # unhashable TypeError，令 G1-G5 整体失效（对抗性复查抓出，高严重度）。
+            if isinstance(v, (str, int, float)) and not isinstance(v, bool):
+                out[str(v)] = w
+        return out
+    except (json.JSONDecodeError, OSError, TypeError, ValueError, AttributeError):
         return {}
 
 
@@ -178,8 +187,12 @@ def main() -> int:
                     # 0.79 与 0.790 等值浮点无法放行）。
                     # P3-R1 修复（2026-11-07）：原嵌套 genexpr 误用外层未定义的 w → NameError
                     # （对抗性复查抓出，fatal）。正确逻辑：候选值对每个 waiver value 做容差比较。
-                    hit_waiver = any(
-                        _float_eq_str(fc, wv) for fc in cands for wv in waivers
+                    # P3-R2：补回非数值/带单位 waiver 的精确匹配（C7 重写时遗失），
+                    # 与候选值精确匹配、浮点容差三路并存，避免合法放行条目静默失效。
+                    hit_waiver = (
+                        val in waivers
+                        or any(str(c) in waivers for c in cands)
+                        or any(_float_eq_str(fc, wv) for fc in cands for wv in waivers)
                     )
                     if hit_waiver:
                         waived_n += 1   # R2-2：人工放行台账内的数字不计 FAIL

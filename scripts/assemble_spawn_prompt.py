@@ -10,9 +10,10 @@
     其余 4 个无差异包已改为 shim 转调 shared-core；本包因有实质增量，**独立维护**。
     同步纪律：shared-core 公共逻辑演进时，须评估本包是否需要跟进（diff 公共版与本文件，
     公共段变更按需合并；V1 增量段保持私有）。合并记录写 CHANGELOG。
-    当前状态（2026-11-07）：联邦真源已升级至 B21（669 行，含 check_task_package_v5
-    结构化校验 + load_dynamic_members 动态成员层，vendor 镜像 hash 1809085d…）；
-    本文件 595 行，任务包校验已通过 _load_v5_checker 消费 vendor 版 V5（A1），
+    当前状态（2026-11-07，P3-R2 订正）：联邦真源已升级至 v2.6.0 Batch5A（685 行，
+    含 check_task_package_v5 结构化校验 + load_dynamic_members 动态成员层 +
+    vendor 兜底态包根反推，vendor 镜像 hash f2ced4c2…，与联邦真源字节一致）；
+    本文件 654 行，任务包校验已通过 _load_v5_checker 消费 vendor 版 V5（A1），
     其余 V5 能力（动态成员层）暂未接入（v1.5.1 backlog）。
     与 vendor 的行数差异属预期（双实现分叉，防漂移由 tests/test_vendor_core.py 门禁）。
 

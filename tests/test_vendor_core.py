@@ -5,8 +5,8 @@ shared-core 分发与防漂移门禁（v3.4.2 P0-1 配套，2026-10-15 适配至
 =====================================================================
 目的：修复「R9 联邦下沉后 git clone 直跑 shim 退出码 3」的可安装性回归，
       同时用哈希比对防止 vendor 兜底副本与联邦真源产生漂移。
-适配：自 smart-textbook-team/tests/test_vendor_core.py 复制，改
-      _INSTALL_DIR / MEMBER_IDS / V6 临时目录名三处包耦合。
+适配：多包共用门禁模板（同源模板曾流经 smart-textbook-team / triz-invention-team）；
+      本包改 _INSTALL_DIR / MEMBER_IDS / V6 临时目录名三处包耦合。
       [2026-11-07 A2 修正] _PKG_NAME 改本包名（原复制残留 triz-invention-team）；
       V6 断言改为符合本包现实——scripts/assemble_spawn_prompt.py 是独立实现
       （无 shim/vendor 回退机制），隔离目录冒烟只断言「退出码 0 + 全成员」；

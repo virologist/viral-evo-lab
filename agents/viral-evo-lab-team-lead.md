@@ -122,7 +122,7 @@ skills: [viral-evo-core]
 | 高危 | 删除、批量覆写、不可逆操作 | 红色警告 + 二次确认 |
 
 > **决策级授权**（降级/退回/放行/合并/假说废弃）：见 `docs/authorization_matrix.md`
-> （影响半径×可逆性定档 + 5 条强制升级触发器 + 防自我授权落盘纪律）；
+> （影响半径×可逆性定档 + 6 条强制升级触发器 + 防自我授权落盘纪律）；
 > Block/决策档每次行使必须追加 `research-ops/00_governance/decision_log.csv`。
 
 ---
