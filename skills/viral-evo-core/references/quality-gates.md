@@ -29,13 +29,19 @@ last_updated: 2026-10-14
 
 | 门 | 检查内容 | 执行方式 |
 |---|---|---|
-| G1 信封完整 | artifact 头部 JSON 含 6 必填字段 + status 合法 | `scripts/check_gates.py <run-dir> <task-id>` |
+| G1 信封完整 | artifact 头部 JSON 含 6 必填字段 + status 合法；分析类任务（`workflow` 归一为 WF4）另须含 `hypothesis_anchor` 三要素 | `scripts/check_gates.py <run-dir> <task-id>` |
 | G2 数字溯源 | 关键数字在权威源 grep 得到（外部引文数字由主理人人工核 URL 后放行） | 同上（或 verify_member_output.py 单独跑） |
 | G3 产出落盘 | `<task-id>__<member>.md` 存在 | 同上 |
-| G4 核验留痕 | output-check.json 已生成 | 同上 |
+| G4 核验留痕 | output-check.json 已生成；`gate_mode=block` 且 verdict≠PASS 时判 FAIL，须由 waivers.json 人工放行 | 同上 |
 | G5 审判留痕 | checklist.json 已生成（T0/T1 凭证） | 同上 |
 | 假说治理 | 活跃假说无"晚于池更新的 fatal/severe 证伪"积压 | `scripts/hypothesis_watch.py`（T2 必跑） |
 | 契约完整 | manifest 一致 + agents 9 + skills 1 契约条款在位 | `scripts/validate_contracts.py` |
 | 叙事边界 | 包内无项目特定事件污染 | `scripts/check_scope.py` |
 
 全部门禁 **EXIT=0 全过 / 3 artifact 缺失 / 5 门禁 FAIL**，可串联 CI；报告落 `<run-dir>/<task-id>__gates.json`。
+
+**waiver 放行口径（L3 · 2026-11-09）**：G2 与 G4 共用 `<task-id>__waivers.json`；每条须 `value` + `reason` + `authorized_by` 三项齐全，缺任一项不放行（防自我授权/空口放行）。G4 阻断态须 waiver 覆盖**全部**未溯源数字才放行，部分覆盖不解除阻断。行使须落 `decision_log.csv`。
+
+**workflow 交叉核验（A-1 · 2026-11-09）**：G1 的分析类判定**以主理人下发声明为权威源**——`assemble_spawn_prompt.py --workflow <值>` 落 sidecar `<run-dir>/<task-id>__workflow.json`；成员信封的 `workflow` 只用于**类别级比对**（`analysis` / `other`）。不一致即 G1 FAIL（回传缺失 / 擅自降级 / 擅自升级均拦）。表述差异（`WF4 分析执行` vs `WF4` vs `analysis`）属同一类别，不拦。无 sidecar 的存量链路退回「只信信封」旧行为，不误阻断存量产出。
+
+**假说治理处置门禁**：`hypothesis_watch.py --check-disposition` 为只读验收，EXIT=0（无需处置/处置完整）/ 6（可裁决但处置不合规）/ 3（无法裁决）。判别原则：区别不是「哪个文件坏了」，而是**坏掉后还能不能算出裁决**——证据源（假说池 / redteam_ledger.csv）畸形 → 无法算出 late_fatal → EXIT=3；处置记录（hypothesis_watch_state.json）畸形 → 证据源完好，保守按未处置 → EXIT=6。无待处置项且池未超期时判 PASS，不误阻断存量项目。

@@ -4,7 +4,44 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.3] - 2026-11-09（L3 独立盲检回补 · 门禁诚实性收敛）
+
+> 版本口径：v1.5.2 已提交推送（tag `v1.5.2`），但 L3 独立盲检发现 **2 个严重代码缺陷** + 3 项高危契约缺口，故 v1.5.2 **不视为真正收敛**。本版为**补丁级**回补发版，不新增内容生产环节，全部改动为「修复 / 接线 / 口径统一」。
+
+### Fixed
+- **严重 1 · `hypothesis_watch.py` 畸形输入崩溃**：三处 JSON 消费点直接 `.get()`/构造 `set`，畸形输入（顶层 list/str/null、非字符串元素、不可哈希元素）抛未捕获异常 → EXIT=1（契约只允许 0/3/5/6）、门禁静默失效。统一走 `load_json_obj()` / `extract_handled_ids()` / `_row_str()` 安全入口。
+- **严重 2 · G4 声称可 waiver 放行但实际不读 waiver**：此前 G4 的提示与文档均声称「主理人核 URL 后写 waivers.json 放行」，实现**完全不读 waiver**——实测写好 waivers.json 后 G4 仍判 FAIL，文档承诺与代码行为背离，主理人只剩违反诚实性红线的「人工裁量跳过」。现 G4 消费同一 `<task-id>__waivers.json`：须 `value`+`reason`+`authorized_by` 三项齐全，且**覆盖全部未溯源数字**才放行（部分覆盖不解除阻断）。G2 同口径补授权校验。
+- **高危 A-3 · G4 阻断态遮蔽 mtime 篡改检测**：原实现以 `if/elif` 组织，阻断态分支**短路**了 mtime 检测——实测「篡改 artifact + 写 waiver」可让全门禁 EXIT=0（击穿诚实性红线）。改为**两个独立判定**（篡改 / 阻断态），互不遮蔽。
+- **高危 A-1 · `workflow` 字段无生产者 + 成员可自报规避**：`workflow` 全包无任何生产者 → G1 假说锚定校验在真实链路上是**死代码**；更深一层，成员自报 `WF1` 即可合法绕过 WF4 锚定强制（自报 = 自证清白）。按四段链路闭合：① `assemble_spawn_prompt.py --workflow` 新增参数（注入 spawn prompt + 落 sidecar `<run-dir>/<task_id>__workflow.json`）② 契约正本要求成员原样回传 ③ 门禁以 sidecar 类别（`analysis`/`other`）为判定权威源 ④ 双向交叉核验（缺失 / 降级 / 升级均 FAIL，表述差异不拦，**无 sidecar 的存量链路不误阻断**）。
+- **高危 A-2 · workflow 归一化漏 11+ 变体**：`normalize_workflow()` 改为子串包含 + 正则判定，`wf4` / `WF4/analysis` / `WF4 分析执行` / `analysis` / `数据WF4` / `WF_4` 等全部触发；`no_hypothesis_justification` 允许并列写在信封顶层（与契约正本一致）。
+- **中危 A-4 · 浮点候选集 G2/G4 分歧**：`verify_numbers.float_candidates` 提为单一事实源，两侧同口径。
+- **中危 A-5 · `[待人工核验]` 处置路径只有文案无解析逻辑**：此前标注了也照样判 FAIL，主理人只剩文档明令禁止的「人工裁量跳过」。现逐数字解析放行（未标注的数字照常 FAIL，不整份免检）。
+- **中危 A-6 · verdict 缺失在 block 态静默 PASS**：截断 output-check.json 即可绕过阻断。现 verdict 缺失视为未通过。
+- **中危 A-7 · G5 只判文件存在不看判罚状态**：空壳 checklist（`{}` 或 `hallucinated>0`）与合规 checklist 等价。现须 `verdict=PASS`（缺失视为未通过）。
+- **误阻断 · `--check-disposition` 拦死存量项目**：无任何待处置项的干净项目也因「台账文件不存在」返回 EXIT=6。现区分「无待处置项 + 池未超期 = 无需台账」（EXIT=0）与「确有未处置项/例行复核缺失」（EXIT=6）。
+- **口径 A-8 · 退出码 3 与 6 的判别原则**：原「3 = 文件缺失或结构畸形」过于笼统，与「台账畸形按未处置计 → EXIT=6」矛盾。统一为**「坏掉后还能不能算出裁决」**：证据源（假说池 / ledger）畸形 → 无法算 late_fatal → EXIT=3；处置记录（state）畸形 → 证据源完好、保守按未处置 → EXIT=6。
+- **口径 A-10 · 两类门控混列**：team-lead「质量门控」段把领域分析门与团队协作门并列，读者会误以为数据质控 = 数字溯源。拆为 ① 领域分析门（任务内成员自查）/ ② 团队协作门（回传后主理人跑脚本），并明确数字溯源属 T1 收产出环节、**不是** WF4 Phase 1 数据质控。
+- **口径 A-11 · 退出码跨脚本套用风险**：team-lead T1 段（`check_gates.py` 0/3/5）与 T2 段（`hypothesis_watch.py` 0/5/6/3）相邻并列易被误读为同一套契约。显式声明不可互换、不可合并解读，两处各补本脚本完整退出码表。
+
+### Changed
+- `CLAUDE.md` 追加两节「当前口径订正」（v1.5.3 · L3 盲检回补 + A-1 链路闭合与文档口径统一），不改写任何历史条目。
+- `team-contract.md` 信封 schema 增 `workflow` 字段 + 「workflow 回传规则」与「交叉核验为何必须以主理人下发声明为准」；`quality-gates.md` G1 行与文末增 workflow 交叉核验口径。
+- 主理人 MD：装配命令增 `--workflow`、下行 task_payload 增 `workflow`、上行信封增 `workflow`、WF4 Phase 0 增 A-1 强制条款、T1 增 workflow 交叉核验条目、quality-gates 段拆两类门控、T1/T2 退出码表分列。
+- `validate_contracts.py` 的 `--help` 文案改为动态读取条款数（原写死「7 条款」实为 8）。
+- 四处 version 1.5.2 → 1.5.3；`integrity_manifest.json` 重生成（68 文件）。
+
+### Verification
+- pytest **7 passed**｜fuzz **48/48**（45 用例 + 3 行为级）｜guard **7/7**（新增第 7 项 A-1 存活守卫 9 锚点）｜contracts / scope / compileall / 13 脚本 `--help` 全绿
+- L2 沙箱 **8/8** 全绿（真实链路：装配 → spawn 产物 → 成员产出 → 门禁）；新增 `sandbox/l2_a1_workflow.py`
+- 实测复现并验证：A-3（篡改 + waiver → G4 FAIL）、A-6（verdict 缺失 + block → FAIL）、A-2（13 变体全触发 / 5 非分析类不误触发）、A-5（标注场景解除 / 未标注仍 FAIL）、A-1（10 场景矩阵全对）
+
+### Known Issues（本轮新增，不阻塞）
+- `--workflow` 未传时 sidecar 不落，G1 退回「只信信封」旧行为（成员自报可规避）——**依赖主理人执行纪律**，脚本无法从技术上强制「必须声明」。已写入主理人 MD 与 team-contract 强制条款。
+- 存量 run_dir 无 sidecar，一律走旧行为（向后兼容优先）；如需回溯加固，须对存量 artifact 重跑装配流程。
+- `hypothesis_watch.py --check-disposition` 对真实项目侧实测 EXIT=6（处置台账缺失）——**属 Loop B 项目数据侧，专家包不可代写**，需 archivist 落盘后复验。
+
 ## [1.5.2] - 2026-11-08（元层审计第 1 轮 · 洞察引擎闭环补丁）
+
 
 > 版本口径：以 `purpose_charter`（假说优先 B>C>A / 科学真实性优先 / 诚实性红线 / 使命链完整 / 单一用户）重排施工优先级后的**补丁级**发版。施工前补 `v1.5.1` tag 锚点；A 桶 18 项已闭合机制一律未重新设计，全部改动为「接线 / 字段 / 前置条款 / 只读验收」。
 

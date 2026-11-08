@@ -50,6 +50,10 @@
     # 5. 写到文件（长 prompt 建议落盘后再由主理人粘贴/引用）
     python3 assemble_spawn_prompt.py --member contradiction-analyst --out /tmp/spawn.md
 
+    # 6. 声明工作流（WF4 等分析类必用；落 sidecar 供门禁交叉核验）
+    python3 assemble_spawn_prompt.py --member phylo-analyst --workflow WF4 \
+        --task-id T-20261109-001 --run-dir <run-dir> --out <run-dir>/spawn__phylo-analyst.md
+
 退出码：
     0 = 成功；2 = 成员 ID 不在白名单；3 = 文件缺失；4 = 任务包要素缺失
 
@@ -380,11 +384,49 @@ def resolve_shared_refs(expert_dir: Path) -> list[str]:
 
 # ---------------------------------------------------------------- 装配
 
+def _write_workflow_sidecar(run_dir: str | None, task_id: str | None,
+                            member_id: str, workflow: str) -> str:
+    """L3（2026-11-09 · A-1 修复）：落工作流声明 sidecar。
+
+    背景：A-1 审计发现 `workflow` 字段**全包无任何生产者**——G1 的假说锚定
+    校验（WF4 必带 hypothesis_anchor）在真实链路上是**死代码**。
+    更隐蔽的是：即便成员愿意写，成员也可自报 `WF1` 规避锚定校验
+    （自报不可信 = 自证清白）。
+
+    本函数把「主理人下发时声明的 workflow」落为机器可读 sidecar：
+        <run-dir>/<task_id>__workflow.json
+    门禁（G1）据此做**双向交叉核验**：
+        信封自报 workflow  ↔  sidecar 权威声明
+    - 两者一致 → 以 sidecar 为准执行锚定校验（成员无法降级规避）
+    - 两者不一致 → G1 FAIL（成员擅自改写任务性质）
+    - 无 sidecar（存量链路）→ 退回「只信信封」旧行为，不误阻断存量产出
+
+    声明值只做**形态规范化**（去空白、转大写），不做语义判断——
+    语义判定归 check_gates.py 的 normalize_workflow（单一事实源）。
+
+    返回 sidecar 路径；未落盘条件（无 run_dir / 无 task_id / 无 workflow）返回空串。
+    """
+    if not (run_dir and task_id and workflow):
+        return ""
+    wf_norm = " ".join(workflow.split())   # 折叠内部多余空白
+    payload = {
+        "task_id": task_id,
+        "member": member_id,
+        "workflow": wf_norm,
+        "declared_by": "team-lead",
+        "source": "assemble_spawn_prompt.py --workflow",
+    }
+    out = Path(run_dir).expanduser() / f"{task_id}__workflow.json"
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return str(out)
+
+
 def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
              task_text: str | None, phase: int | None,
              task_id: str | None, run_dir: str | None,
              member_ids: list[str] | None = None,
-             research_ops: str = "") -> str:
+             research_ops: str = "",
+             workflow: str = "") -> str:
     """拼装最终 spawn prompt。结构固定，便于审计与 diff。"""
     skills = fm.get("skills") or []
     skill_paths = resolve_skill_paths(expert_dir, skills)
@@ -496,6 +538,22 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
             lines.append(f"- phase: {phase}")
         lines.append("")
 
+    # L3（2026-11-09 · A-1 修复）：工作流声明注入——让 workflow 有真实生产者。
+    # 此前 workflow 全包无生产者 → G1 假说锚定校验是死代码；且成员自报
+    # workflow 可降级规避。此处由主理人在装配时声明（权威），成员回传时
+    # 原样带入信封，门禁再做双向交叉核验。
+    if workflow:
+        wf_norm = " ".join(workflow.split())
+        lines.append("【工作流声明】")
+        lines.append(f"- workflow: {wf_norm}")
+        if "WF4" in wf_norm.upper() or "ANALYSIS" in wf_norm.upper() or "分析" in wf_norm:
+            lines.append("- ⚠️ 本任务属**分析类（WF4）**：上行信封**必须**含 `hypothesis_anchor` 对象，"
+                         "字段为 `hypothesis_id`（或 `no_hypothesis_justification`）、"
+                         "`biological_question`、`falsification_condition`；缺失或空值一律判 FAIL 打回。")
+        lines.append("- 回传时须把上述 `workflow` 值**原样**写入上行信封顶层字段 `workflow`（不得改写、不得省略）"
+                     "——门禁会与主理人下发声明做双向比对，改写即判 FAIL。")
+        lines.append("")
+
     if task_text:
         lines.append("=" * 20 + " 任务包（task_payload） " + "=" * 20)
         lines.append(task_text.strip())
@@ -579,6 +637,9 @@ def main() -> int:
     ap.add_argument("--run-dir", default=None,
                     help="本轮运行目录；传入后会在 prompt 中注入「产出落盘契约」"
                          "（成员必须把产出写入 <run-dir>/<task_id>__<member-id>.md）")
+    ap.add_argument("--workflow", default="",
+                    help="工作流声明（如 WF1..WF7 / analysis）。A-1 修复："
+                         "WF4 等分析类任务必填——注入 prompt 并落 sidecar 供门禁交叉核验")
     ap.add_argument("--list-members", action="store_true",
                     help="列出白名单成员 ID 后退出")
     args = ap.parse_args()
@@ -640,7 +701,17 @@ def main() -> int:
 
     prompt = assemble(expert_dir, args.member, fm, body,
                       task_text, args.phase, args.task_id, run_dir, member_ids,
-                      research_ops=os.environ.get("RESEARCH_OPS_DIR", ""))
+                      research_ops=os.environ.get("RESEARCH_OPS_DIR", ""),
+                      workflow=args.workflow)
+
+    # L3（2026-11-09 · A-1 修复）：落工作流声明 sidecar（门禁交叉核验的权威源）
+    if args.workflow:
+        sc = _write_workflow_sidecar(run_dir, args.task_id, args.member, args.workflow)
+        if sc:
+            log(f"✅ 工作流声明 sidecar：{sc}")
+        else:
+            log("⚠️  已声明 workflow 但未落 sidecar（缺 --run-dir 或 --task-id）"
+                "——门禁将退回「只信信封」旧行为")
 
     if args.out:
         Path(args.out).expanduser().write_text(prompt, encoding="utf-8")

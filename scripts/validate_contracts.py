@@ -149,6 +149,7 @@ if __name__ == "__main__":
     # C5（2026-11-07）：补 --help（原实现无 argparse，--help 被忽略直接跑全仓扫描）
     import argparse
     _ap = argparse.ArgumentParser(
-        description="契约完整性检查：双 manifest 版本一致 + agents 9 员条款 + SKILL 工具索引 + team-contract 正本 7 条款")
+        description="契约完整性检查：双 manifest 版本一致 + agents 9 员条款 + SKILL 工具索引 "
+                    f"+ team-contract 正本 {len(TEAM_CONTRACT)} 条款")
     _ap.parse_args()  # 仅消费 --help；无其他参数，检查范围固定全仓
     sys.exit(main())

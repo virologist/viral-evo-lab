@@ -244,3 +244,135 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - See Also: LRN-20261015-006
 
 ---
+
+## [LRN-20261109-009] insight
+
+**Logged**: 2026-11-09T00:00:00+08:00
+**Priority**: critical
+**Status**: resolved
+**Area**: contract
+
+### Summary
+「分支遮蔽」（branch shadowing）是本轮 L3 盲检反复抓到的系统性根因模式：`if/elif` 组织使新加的路径**短路**旧防线，缺陷单点看不出口、组合起来才致命。
+
+### Details
+- 实例一：`check_gates.py` G4 用 `if/elif` 组织，「阻断态 DEGRADE 未处置」分支**短路**了 mtime 篡改检测。实测「篡改 artifact + 写 waiver」可让全门禁 EXIT=0——击穿诚实性红线。
+- 实例二：`waivers` 变量原本定义在 G2 分支内，G4 段取不到 → 文档承诺的 waiver 放行路径是死路（成员/主理人只剩违反红线的「人工裁量跳过」）。
+- 实例三：`workflow` 字段全包无生产者，G1 锚定校验是死代码；且成员自报可降级规避（**自报 = 自证清白**）。
+- 共性：单条测试都能过，**只有组合场景的对抗性测试才暴露**。这解释了为何前几轮自测全绿仍留此多缺陷。
+
+### Suggested Action
+- 写分支时先问「这条新路径会不会让另一条防线失效」；**判定彼此独立**的检查项，一律用两个独立 `if` + 独立的结果容器（阻断原因 / 解除说明分离），禁止 `elif`。
+- 变量作用域按「最宽需求」定义，不按「当前分支需要」定义。
+- 契约字段必须同时具备：**生产者 → 传递 → 消费者 → 判定权威源**四要素，缺一即死代码；且权威源不得是被审计方自报。
+- 新增断言必须含**组合场景**（篡改+放行、谎报+缺失），不能只测单变量。
+
+### Resolution
+- **Resolved**: 2026-11-09（v1.5.3）
+- **Notes**: G4 拆为两个独立判定（`problems` / `resolved`）；`waivers` 提到外层；A-1 按「生产者 → 传递 → 判定权威源 → 交叉核验」四段链路闭合；新增 fuzz 11 例 + L2 沙箱 8 场景（真实链路）全绿。
+
+### Metadata
+- Source: conversation
+- Tags: branch-shadowing, dead-code, contract-gap, independent-checks
+- Recurrence-Count: 3
+- See Also: LRN-20261108-007
+
+---
+
+## [LRN-20261109-010] insight
+
+**Logged**: 2026-11-09T00:00:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: testing
+
+### Summary
+断言「不崩溃」的回归套件抓不到**静默失效**——门禁恒判 PASS 或恒判 FAIL 都过得去。本轮 fuzz 套件从「只断言不崩溃」升级为「断言期望行为」才暴露 A-1/A-3/A-6/A-7。
+
+### Details
+- 原套件断言：退出码 ∈ {0,3,5}、无 Traceback、gates.json 已落盘。这三条对「G1 恒判 FAIL」同样成立。
+- 本轮增「行为断言层」：CASES 可声明期望门禁结果（G1/G2/G4 ok 布尔）+ 期望退出码，逐项断言。
+- 配套增 `_read_gates()`：gates.json 里 gate 名是展示文案（如 `G1 信封完整`），按 `name.split()[0]` 归一——**原实现假设键名为 `G1`，导致 11 个用例假失败**（验证工具缺陷被误读为被测对象缺陷，同 LRN-20261108-008）。
+
+### Suggested Action
+- 门禁类回归必须断言**期望裁决**，不只断言「没崩」。
+- 断言依赖被测对象的具体存储格式时，先读实现确认真实键名，不要按直觉假设。
+- 出现「大批用例同时失败」时，先怀疑验证脚本自身，再改被测代码。
+
+### Resolution
+- **Resolved**: 2026-11-09（v1.5.3）
+- **Notes**: fuzz 用例 27 → 45，行为用例 3 个，合计 48/48；guard 增第 7 项存活守卫防修复被静默回退。
+
+### Metadata
+- Source: conversation
+- Tags: behavioral-test, silent-failure, regression
+- Recurrence-Count: 2
+- See Also: LRN-20261108-008
+
+---
+
+## [LRN-20261109-011] correction
+
+**Logged**: 2026-11-09T00:00:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: docs
+
+### Summary
+文档写「3 = 结构畸形」而代码对台账畸形返回 6——**行为与承诺背离**，且这类矛盾不会被任何自动化测试抓到（测试只断言行为，从不读 docstring）。
+
+### Details
+- 根因不是「代码错」而是**判别原则没写清**：`3` 与 `6` 的区别不是「哪个文件坏了」，而是**坏掉后还能不能算出裁决**。
+  - 证据源（假说池 / redteam_ledger.csv）畸形 → late_fatal 算不出来 → 无法裁决 → 3。
+  - 处置记录（state）畸形 → 证据源完好、裁决可算，保守按未处置 → 6。
+- 同类：A-10（领域分析门 vs 团队协作门混列）、A-11（两套脚本退出码相邻并列易误读）。
+
+### Suggested Action
+- 退出码契约**按脚本分节**，每节显式声明「本脚本的退出码表」并加「勿跨脚本套用」警示。
+- 文档改动后须**回读 docstring 与实现**，做一次「承诺 vs 行为」逐条对照（本轮靠人工交叉审阅发现，A 级自动化难覆盖）。
+- 分类判别原则写进文档本身，不要只存在于实现者脑子里。
+
+### Resolution
+- **Resolved**: 2026-11-09（v1.5.3）
+- **Notes**: 已同步 hypothesis_watch.py docstring / team-contract / quality-gates / team-lead T1+T2 四处。
+
+### Metadata
+- Source: conversation
+- Tags: doc-code-drift, exit-code-contract, taxonomy
+- Recurrence-Count: 2
+- See Also: LRN-20261109-009
+
+---
+
+## [LRN-20261109-012] correction
+
+**Logged**: 2026-11-09T00:00:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: tooling
+
+### Summary
+为验证存量兼容性，直接在 `research-ops/_archive/` 原地跑 `check_gates.py`——该脚本会把门禁报告**写回 run_dir**，覆写了历史快照文件 `T-20261021-D__gates.json`。**Loop B 只读区被写入**，违反双环隔离纪律。
+
+### Details
+- `check_gates.py` 无 `--dry-run` / `--no-write`，报告落盘是硬编码行为（`<run-dir>/<task-id>__gates.json`）——这是**设计如此**（门禁报告须落盘供审计），但调用方极易忽略。
+- 归档目录里的 `gates.json` 是**历史快照**（ts=2026-10-15），被新一轮运行覆写即丢失历史证据。
+- 已用 `git checkout --` 回退单文件，`research-ops` 恢复干净（`git status` 无输出）；复验改用 `/tmp` 副本，G1 PASS 确认存量不误阻断。
+
+### Suggested Action
+- **在只读区/归档区跑任何会写盘的脚本，一律先 `cp -r` 到 `/tmp` 再跑**；验证兼容性必须用副本。
+- 对只读区的写操作，事后立即 `git status` 核对（research-ops 是 git 仓，回退成本低）。
+- 脚本「会落盘」这一行为须在调用方视角显式记账——门禁/核验类脚本的报告落盘是设计意图，不是副作用。
+- 归档快照类文件（`*__gates.json` / `*__output-check.json`）视为**证据**，不可被重跑覆盖。
+
+### Resolution
+- **Resolved**: 2026-11-09（已回退 + 改副本复验）
+- **Notes**: 单文件回退完成；复验结论 G1 PASS（存量 6 字段信封 + 无 sidecar → 不误阻断）。
+
+### Metadata
+- Source: conversation
+- Tags: read-only-violation, side-effect, evidence-overwrite, dual-loop-isolation
+- Recurrence-Count: 1
+- See Also: LRN-20261109-009
+
+---

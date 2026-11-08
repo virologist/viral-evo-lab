@@ -123,7 +123,41 @@
 
 - **`require_tag` 闸**：v1.5.0 条目所载「闸」在本版才完成三点接线（`verify_numbers.py` / `verify_member_output.py` / `check_gates.py`），且**默认关闭**以保持向后兼容；严审任务须显式传 `--require-tag`。未标记权威源在默认态仍可入池，属已知残余风险（见 CHANGELOG Known Issues）。
 - **`--gate`**：不再是未串联的死参数。`verify_member_output.py --gate` 把 `gate_mode=block` 写入 `output-check.json`，`check_gates.py` 的 G4 读到 DEGRADE 未处置即判 FAIL；处置路径仅「补 [待人工核验] 重传」或「waivers.json 放行」两条。
-- **契约正本**：`skills/viral-evo-core/references/team-contract.md` 现为 8 条款（新增 `hypothesis_anchor`，仅 `workflow ∈ {WF4, ANALYSIS}` 触发）；`validate_contracts.py` 的条款数文案已动态化。
+- **契约正本**：`skills/viral-evo-core/references/team-contract.md` 现为 8 条款（新增 `hypothesis_anchor`，分析类 workflow 触发）；`validate_contracts.py` 的条款数文案已动态化。
 - **CONTEXT_STACK 口径**：四份 JSON 为机器真源（confirmed_hypotheses / knowledge_index / method_library / research_anchor），`.md` 仅为人类可读渲染视图，禁直编；历史条目中的「三 JSON」表述以本节为准。
 - **P4 监控**：B-1/B-2/B-3 已随 v1.5.0 落地；B-4/B-5 未排期。`docs/P4_monitoring_design.md` 末尾过期排期句已订正。
 - **假说治理触发器**：新增 `--check-disposition` 纯只读验收（EXIT=6 = 处置台账缺失或不完整）；处置台账由项目侧 archivist 落盘，专家包脚本不代写。
+
+---
+
+## 当前口径订正（v1.5.3 · 2026-11-09 · L3 盲检回补）
+
+> 本节为**追加订正**，不改写上方任何历史条目（守本文件第 4 行「禁止改写历史」）。
+
+- **`workflow` 归一化**：`hypothesis_anchor` 的触发判定不再只认精确 `WF4`/`ANALYSIS`。`check_gates.py` 新增 `normalize_workflow()`——按 `/ - _ · | 空格` 及中文标点切 token，任一 token 命中 `WF4`/`ANALYSIS`/`分析`/`分析执行` 即触发校验。故 `wf4`、`WF4/analysis`、`WF4 分析执行`、`analysis` 等变体**不得绕过**；`no_hypothesis_justification` 允许并列写在信封顶层（与契约正本一致）。
+- **G4 waiver 放行路径已接线**：此前 G4 的提示与文档均声称「主理人核 URL 后写 waivers.json 放行」，但实现**完全不读 waiver**——实测写好 waivers.json 后 G4 仍判 FAIL，文档承诺与代码行为背离，主理人只剩违反诚实性红线的「人工裁量跳过」。现 G4 消费同一 `<task-id>__waivers.json`：须 `value`+`reason`+`authorized_by` 三项齐全，且**覆盖全部未溯源数字**才放行（部分覆盖不解除阻断）。G2 同口径补授权校验。
+- **`hypothesis_watch.py` 退出码契约修复**：三处 JSON 消费点此前直接 `.get()`/构造 `set`，畸形输入（顶层 list/str/null、非字符串元素、不可哈希元素）抛未捕获异常 → EXIT=1（契约只允许 0/3/5/6）、门禁静默失效。现统一走 `load_json_obj()`/`extract_handled_ids()`/`_row_str()` 安全入口，畸形一律转契约退出码 3；台账畸形按「未处置」保守计（宁可多提醒，不可漏提醒）。
+- **`--check-disposition` 不再误阻断存量项目**：此前无任何待处置项的干净项目也因「台账文件不存在」返回 EXIT=6。现区分「无待处置项 + 池未超期 = 无需台账」（EXIT=0）与「确有未处置项/例行复核缺失」（EXIT=6）。
+- **WF4 数据质控不再错误绑定数字溯源**：Phase 1 数据质控的门控依据是 `quality-gates.md`「数据质控」行（覆盖度报告 + 异常序列标注），此前 team-lead 误将其绑到 `verify_member_output.py --gate`（数字溯源，属 T1 收产出环节）——两环节不同，已订正。
+- **回归基线升级**：fuzz 用例 27 → 34（含 workflow 归一化族 5 例 + 顶层 justification 1 例），另增 3 个**行为级**用例（G4 waiver 放行五路径 / gate_mode 阻断传导 / 处置门禁畸形与误阻断）；`test_contract_guard.py` 增第 6 项「L3 修复存活守卫」（6 个锚点），防本轮修复被静默回退。
+
+---
+
+## 当前口径订正（v1.5.3 追加 · 2026-11-09 · A-1 链路闭合 + 文档口径统一）
+
+> 本节为**追加订正**，不改写上方任何历史条目（守本文件第 4 行「禁止改写历史」）。
+
+- **`workflow` 字段有了生产者与强制力（A-1 闭合）**：`workflow` 此前**全包无任何生产者**（装配脚本 0 处、9 份成员 MD 0 处、信封 schema 无此字段）→ G1 的假说锚定校验在真实链路上是**死代码**。且更深一层：即便成员愿意写，成员也可自报 `WF1` 规避锚定校验（**自报 = 自证清白**）。现按四段链路闭合：
+  1. **生产者**：`assemble_spawn_prompt.py --workflow <值>` 新增参数 → 注入 spawn prompt「【工作流声明】」段 + 落 sidecar `<run-dir>/<task_id>__workflow.json`；
+  2. **传递**：契约正本要求成员回传时把 `workflow` **原样**写入信封顶层；
+  3. **判定权威源**：门禁 G1 以 sidecar 类别（`analysis`/`other`）为准，信封自报仅用于**比对**；
+  4. **交叉核验**：下发与回传类别不符（缺失 / 降级 / 升级）即 G1 FAIL；表述差异（`WF4 分析执行` vs `WF4` vs `analysis`）属同一类别不拦；**无 sidecar 的存量链路退回「只信信封」旧行为，不误阻断存量产出**。
+  主理人侧强制：**派 spawn 必须带 `--workflow`**，否则 sidecar 不落、强制失效。
+- **退出码 3 与 6 的判别原则（A-8 口径统一）**：`hypothesis_watch.py` 的 `3 = 文件缺失或结构畸形` 过于笼统，与「台账畸形按未处置计 → EXIT=6」相矛盾。统一为**「坏掉后还能不能算出裁决」**：
+  - **EXIT=3（无法裁决）**：证据源（假说池 / `redteam_ledger.csv`）畸形或缺失 → late_fatal 根本算不出来，无任何可交付判定；
+  - **EXIT=6（可裁决但不合规）**：处置记录（`hypothesis_watch_state.json`）畸形 → 证据源完好、裁决可算，保守按「未处置」计。
+  已同步 `hypothesis_watch.py` docstring、team-contract、quality-gates、team-lead T2 条目。
+- **两类门控分开（A-10 口径统一）**：team-lead「质量门控」段此前把**领域分析门**（数据质控/时间树/ML 树/正选择/引用）与**团队协作门**（G1–G5 脚本化）并列于同一清单，读者会误以为数据质控 = 数字溯源。现拆为 ① 领域分析门（任务内成员自查）/ ② 团队协作门（回传后主理人跑脚本），并明确数字溯源属 T1 收产出环节、**不是** WF4 Phase 1 的数据质控，两者互不替代。
+- **退出码勿跨脚本套用（A-11 口径统一）**：team-lead T1 段列的是 `check_gates.py` 退出码（0/3/5），T2 段列的是 `hypothesis_watch.py` 退出码（0/5/6/3），相邻两段并列易被误读为同一套契约。现显式声明两套退出码**不可互换、不可合并解读**，并在 T1/T2 两处各补本脚本的完整退出码表。
+- **回归基线再升级**：fuzz 用例 34 → **45**（新增 A-1 交叉核验族 11 例：谎报规避 / 漏回传 / 漏 anchor / 表述差异 / 存量链路 / 伪造升级 / sidecar 畸形），另加 3 个行为级用例，合计 **48/48 全绿**；`test_contract_guard.py` 增第 **7** 项「A-1 修复存活守卫」（生产链路 9 个锚点：装配参数 / sidecar 落盘 / 门禁读取 / 交叉比对 / 契约同步 / 主理人 MD 同步 / 回归用例）；L2 沙箱新增**真实链路**演练 8/8 全绿（装配 → spawn 产物 → 成员产出 → 门禁）。
+

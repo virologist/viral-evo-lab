@@ -9,7 +9,7 @@
       手工救火两次后，本守卫把「分发后的包是否仍处于正确状态」变成常态
       自动判定：任一不符即 FAIL，并给出恢复命令。
 
-校验五项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
+校验七项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
   1. test_vendor_core.py 的包名与 pytest 入口  → 抓 A2 回退
   2. 四处 version 一致性                        → 抓版本叙事漂移
   3. integrity_manifest.json 与磁盘 + git ls-files 一致
@@ -17,6 +17,10 @@
   4. 联邦真源 / vendor 副本 / VENDOR.json 三方 sha256 一致
                                                → 抓分发不同步
   5. require_tag 闸三点接线存活                → 抓产出端核验被静默摘除
+  6. L3 修复存活守卫（2026-11-09）             → 抓本轮高严重度修复被静默回退
+     （hypothesis_watch 安全 JSON 入口 / G4 waiver 放行 / workflow 归一化 / 三个行为回归）
+  7. A-1 修复存活守卫（2026-11-09）             → 抓 workflow 生产与防规避链路被静默摘除
+     （装配 --workflow / sidecar 落盘 / 门禁交叉核验 / 契约与主理人 MD 同步 / 回归用例）
 
 运行：python3 tests/test_contract_guard.py  或  pytest tests/ -q
 """
@@ -158,6 +162,76 @@ def _checks() -> list[tuple[bool, str]]:
         out.append((not bad, "require_tag 闸三点接线存活" if not bad else "; ".join(bad)))
     except (OSError, UnicodeError) as e:
         out.append((False, f"require_tag 闸：校验失败 {type(e).__name__}: {e}"))
+
+    # 6. L3 修复存活守卫（2026-11-09）------------------------------------
+    # 逐条对应 L3 盲检抓出的高严重度缺陷，防被静默回退：
+    #   6.1 hypothesis_watch 的 JSON 消费点须走安全入口（不直接 .get）
+    #   6.2 check_gates 的 G4 须消费 waivers（放行路径真实存在）
+    #   6.3 workflow 变体归一化函数须存在并被调用
+    #   6.4 三个行为级回归用例须在测试套件中
+    try:
+        bad = []
+        hw = (PKG / "scripts" / "hypothesis_watch.py").read_text(encoding="utf-8")
+        for needle in ("def load_json_obj", "def extract_handled_ids", "def _row_str"):
+            if needle not in hw:
+                bad.append(f"hypothesis_watch.py 缺 {needle}")
+        if "load_json_obj(hyp_p)" not in hw:
+            bad.append("hypothesis_watch.py 假说池未走 load_json_obj")
+        cg = (PKG / "scripts" / "check_gates.py").read_text(encoding="utf-8")
+        for needle in ("def _g4_waiver_hit", "def _waiver_authorized", "def normalize_workflow"):
+            if needle not in cg:
+                bad.append(f"check_gates.py 缺 {needle}")
+        if "_g4_waiver_hit(unverified, waivers)" not in cg:
+            bad.append("check_gates.py 的 G4 未消费 waivers")
+        # L3（2026-11-09 · A-1）：G1 的 workflow 消费点已改为双路径
+        # （信封自报 + sidecar 权威源），锚点随之更新。
+        if "normalize_workflow(env_wf)" not in cg:
+            bad.append("check_gates.py 的 G1 未用 normalize_workflow(env_wf)")
+        fuzz = (PKG / "tests" / "test_gate_fuzz.py").read_text(encoding="utf-8")
+        for needle in ("def test_g4_waiver_release", "def test_gate_mode_blocks",
+                       "def test_disposition_gate"):
+            if needle not in fuzz:
+                bad.append(f"test_gate_fuzz.py 缺 {needle}")
+        out.append((not bad, "L3 修复存活守卫（6 项锚点）" if not bad else "; ".join(bad)))
+    except (OSError, UnicodeError) as e:
+        out.append((False, f"L3 修复存活守卫：校验失败 {type(e).__name__}: {e}"))
+
+    # 7. A-1 修复存活守卫（2026-11-09）------------------------------------
+    # A-1 实为「workflow 字段无生产者 + 成员自报可规避锚定校验」。
+    # 逐条锚定生产链路的四个环节，任一被摘除即 FAIL：
+    #   7.1 装配脚本有 --workflow 参数（生产者）
+    #   7.2 装配脚本落 sidecar（权威源落盘）
+    #   7.3 门禁读 sidecar 并做类别级比对（防规避）
+    #   7.4 契约正本与主理人 MD 同步声明（防文档漂移）
+    try:
+        bad = []
+        asm = (PKG / "scripts" / "assemble_spawn_prompt.py").read_text(encoding="utf-8")
+        for needle in ("def _write_workflow_sidecar", '"--workflow"'):
+            if needle not in asm:
+                bad.append(f"assemble_spawn_prompt.py 缺 {needle}")
+        if "_write_workflow_sidecar(run_dir, args.task_id, args.member, args.workflow)" not in asm:
+            bad.append("assemble_spawn_prompt.py 未调用 sidecar 落盘")
+        cg = (PKG / "scripts" / "check_gates.py").read_text(encoding="utf-8")
+        for needle in ("def load_workflow_sidecar", "def workflow_class"):
+            if needle not in cg:
+                bad.append(f"check_gates.py 缺 {needle}")
+        if "load_workflow_sidecar(run_dir, args.task_id)" not in cg:
+            bad.append("check_gates.py 的 G1 未读 workflow sidecar")
+        if "check_envelope(art, sidecar_wf=sidecar_wf)" not in cg:
+            bad.append("check_gates.py 的 G1 未把 sidecar 传入 check_envelope")
+        tc = (PKG / "skills/viral-evo-core/references/team-contract.md").read_text(encoding="utf-8")
+        if "workflow.json" not in tc:
+            bad.append("team-contract.md 未声明 workflow sidecar")
+        lead = (PKG / "agents/viral-evo-lab-team-lead.md").read_text(encoding="utf-8")
+        if "--workflow" not in lead:
+            bad.append("主理人 MD 装配命令未含 --workflow")
+        fuzz = (PKG / "tests" / "test_gate_fuzz.py").read_text(encoding="utf-8")
+        if "A1 下发WF4+回传WF1（谎报规避，应 G1 FAIL）" not in fuzz:
+            bad.append("test_gate_fuzz.py 缺 A-1 交叉核验回归用例")
+        out.append((not bad, "A-1 修复存活守卫（workflow 生产与防规避链路）"
+                    if not bad else "; ".join(bad)))
+    except (OSError, UnicodeError) as e:
+        out.append((False, f"A-1 修复存活守卫：校验失败 {type(e).__name__}: {e}"))
 
     return out
 

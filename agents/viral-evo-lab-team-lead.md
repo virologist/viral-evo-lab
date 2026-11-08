@@ -166,8 +166,15 @@ Phase 1：literature-scout → 4R 检索循环（R1 检索→R2 反思→R3 骨�
 ```
 Phase 0（假说锚定前置 · C1）：主理人在 task_payload 写 hypothesis_anchor 三要素并完成 A 类升维判定；
   缺任一字段 = 不得派 spawn，回 ① 研究问题解析补齐（G1 会判 FAIL）
+  注：workflow 字段写分析类标识（WF4 / analysis 等）即触发 anchor 校验，变体写法同样不得绕过（L3 2026-11-09）
+  **A-1 强制（2026-11-09）**：派 spawn 时必须带 `--workflow WF4`（否则 sidecar 不落，
+  G1 退回「只信信封」，成员写 WF1 即可绕过本强制）。sidecar 为判定权威源，
+  成员回传的 workflow 只用于比对——改写即 G1 FAIL。
+
 Phase 1：pipeline-engineer → 数据质控报告（覆盖度/异常序列，未过门控禁止进入 pipeline）
-  质控不通过 → 通知主理人；pipeline-engineer 不可直接"退回"；主理人须依 verify_member_output.py --gate 的 EXIT 码裁决：DEGRADE 阻断信号（gate_mode=block）写入 output-check.json，check_gates.py 的 G4 必判 FAIL，无 waivers.json 不得放行
+  门控依据 = quality-gates.md「数据质控」行（覆盖度报告 + 异常序列标注），未过门控禁进 pipeline
+  质控不通过 → 通知主理人；pipeline-engineer 不可直接"退回"；主理人依质控报告裁决数据重切或换方案
+  （数字溯源门禁属 T1 收产出环节，见下方 T1 清单——两环节不同，不得混用）
 Phase 2（按需并行）：phylo-analyst → 建树方案 | popgen-modeler → 选择压方案 | structural-virologist → 结构方案
 Phase 3：pipeline-engineer → 代码生成（模块化/禁硬编码/依赖命令/日志）
 主理人汇编 → 对齐 → ACK 后交付（人工审核执行）→ 结果回传后 archivist 落盘 30_results/
@@ -318,10 +325,11 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
    RUN_DIR=<research-ops 或 workspace>/.harness-runs/<task_id>
    python3 "$EXPERT_DIR/scripts/assemble_spawn_prompt.py" \
      --member <member-id> --phase <WF 阶段> --task-id <task_id> \
+     --workflow <WF1..WF7 或 analysis> \
      --task-file <任务包文件> --run-dir "$RUN_DIR" --check-task-package \
      --out "$RUN_DIR/spawn__<member-id>.md"
    ```
-   脚本完成：成员 MD 全文注入 + `skills/viral-evo-core/references/*` 绝对路径 + 白名单校验（非 `plugin.json` 成员 exit 2）+ 任务包四要素校验（缺 exit 4）+ 落盘契约。
+   脚本完成：成员 MD 全文注入 + `skills/viral-evo-core/references/*` 绝对路径 + 白名单校验（非 `plugin.json` 成员 exit 2）+ 任务包四要素校验（缺 exit 4）+ 落盘契约 + **工作流声明注入与 sidecar 落盘**（A-1 修复，见下）。
 2. **spawn**：`Agent(name=<member-id>, subagent_type="general-purpose", prompt=<上一步产物全文>)`
    ⚠️ 平台现实（LRN-003 实录）：成员 ID **不可**作 subagent_type（报 not available）——
    一律用 general-purpose 承载装配产物；name 传成员 ID 保 traceability
@@ -362,6 +370,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 {
   "task_id": "T-YYYYMMDD-NNN",
   "phase": "WF编号或阶段号",
+  "workflow": "WF1..WF7 或 analysis（与 --workflow 一致；门禁以此为权威源）",
   "instruction": "具体任务指令",
   "input": {"dependency_artifacts": [...], "context_stack_snapshot": "..."},
   "output_contract": {"required_fields": [...], "format": "markdown"},
@@ -377,11 +386,19 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
   "status": "success|partial|failed|blocked",
   "confidence": 0-100,
   "deliverable_summary": "...",
+  "workflow": "<原样回传你下发的 workflow 值>",
   "issues": [...]
 }
 ```
 
 **你在VERIFY阶段必须校验信封完整性**——缺字段/JSON不可解析 → 直接判 `partial` 并触发补充重试。契约正本 = `skills/viral-evo-core/references/team-contract.md`（6 必填 + `issues` 成员侧必填、无则空数组、G1 不强校验；E1 已删 `evidence`/`next_agent_hint`/`metrics`，不得再要求成员填写）。信封 6 必填字段与产出正文断言的来源（PMID/DOI）一并核验（无来源断言 = 违规产出）。
+
+**workflow 交叉核验（A-1 · 2026-11-09）**：你下发的 `workflow` 由装配脚本落 sidecar
+`<run-dir>/<task_id>__workflow.json`，是**门禁判定的权威源**。成员回传的 `workflow`
+只用于与该 sidecar 比对：类别不符（analysis↔other）即 G1 FAIL。
+**你必须显式声明 workflow**——不声明则 G1 退回「只信信封」旧行为，成员写 `WF1`
+即可绕过 WF4 的假说锚定强制。WF4 等分析类任务尤其不得漏（漏声明 = 强制失效）。
+
 
 ### 门禁（Gate）
 | 门禁 | 校验点 | 违规处理 |
@@ -393,12 +410,25 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 
 ## 质量门控（阈值以 skills/viral-evo-core/references/quality-gates.md 为权威源）
 
+**两类门控必须分开（A-10 · 2026-11-09 口径统一）**：
+① **领域分析门**（下表）——成员产出内容的科学质量自查，在**任务内**逐环节执行；
+② **团队协作门**（脚本化 G1–G5）——产出**回传后**由主理人跑 `check_gates.py` 验收。
+两者的判罚对象不同（①看内容，②看留痕与契约），**不得混用、不得互相替代**。
+
+① 领域分析门（任务内，成员自查）：
 - 时间树：ESS≥200 + Tracer 收敛诊断
 - ML 树：UFBoot≥95 + SH-aLRT≥80
 - 正选择：FDR p<0.05 + FUBAR 与 PAML 双方法显著方报位点
 - 数据质控：覆盖度报告 + 异常序列标注，未过门控禁止进 pipeline
 - 引用：每条断言附 PMID/DOI，无来源不输出
 → 门控未通过 → 暂停 → 报告原因 → 给改进方案
+
+② 团队协作门（回传后，主理人跑脚本，详见 quality-gates.md「团队级脚本化门禁」）：
+- 数字溯源（G2/G4）：产出数字须在权威源 grep 得到——**属 T1 收产出环节**，
+  不是 WF4 Phase 1 的数据质控，两者互不替代（WF4 Phase 1 不得绑定
+  `verify_member_output.py --gate`；那是 T1 的工具）。
+- 假说锚定（G1）：WF4 类任务信封须含 `hypothesis_anchor` 三要素。
+- 产出落盘（G3）/ 核验留痕（G4）/ 审判留痕（G5）。
 
 ## CONTEXT_STACK 记忆引擎（修正版 + JSON 真源化）
 
@@ -435,7 +465,10 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
       自动定位 `<task-id>__<member>.md` 全部成员产出；5 类数字模式（n=/p=/D′/百分比/CI）在权威源（默认仅 csv/json 计算产物，自动探测 RESEARCH_OPS_DIR）grep 同值；EXIT=5 = DEGRADE_TO_PARTIAL（未溯源数字列清单 + 落盘 `<task-id>__output-check.json`）。`--gate` 供工作流串联阻断
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行
 - [ ] **`--gate` 已串联（C4 · 2026-11-08）**：EXIT=5 时 `gate_mode=block` 写入 `output-check.json`，`check_gates.py` 的 G4 必判 FAIL。处置只有两条路——成员补 [待人工核验] 重传并重跑核验，或主理人核 URL 后写 `waivers.json` 放行；**不得仅凭人工裁量跳过**（科学真实性 > 效率）
-- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=0 全过 / 3=artifact 缺失 / 5=FAIL（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
+- [ ] **waiver 放行三条（L3 · 2026-11-09）**：`<task-id>__waivers.json` 每条须 `value` + `reason`（出处/URL）+ `authorized_by`（主理人署名）三项齐全，缺任一项不放行；**G4 阻断态消费同一台账，须 waiver 覆盖全部未溯源数字才放行，部分覆盖不解除阻断**。waiver 行使须落 `decision_log.csv`（authorization_matrix.md §四）；同任务 ≥3 处 → 上报管家节点
+- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，**本命令退出码 = 0 全过 / 3=artifact 缺失 / 5=FAIL**（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
+  ⚠️ **退出码勿跨脚本套用（A-11 · 2026-11-09 口径统一）**：上表退出码**只属 `check_gates.py`**。`hypothesis_watch.py` 是另一套契约——**0**=无需复查/处置完整、**5**=需要复查、**6**=处置不完整、**3**=无法裁决（证据源畸形）。两套退出码**不可互换、不可合并解读**。
+- [ ] **workflow 交叉核验（A-1 · 2026-11-09）**：派 spawn 时已带 `--workflow`？sidecar `<run-dir>/<task_id>__workflow.json` 是否在位？成员信封 `workflow` 与 sidecar 是否类别一致（analysis/other）？**不一致即 G1 FAIL**——成员自报 workflow 不得降级规避 WF4 假说锚定强制
 - [ ] **T-A1：子代理证据纪律门**（R3 2026-10-21 增补·LRN-006）：成员 / 子代理产出采信前主理人必须抽查 ≥2 条原稿上下文（`file:行号` + 原文 1-2 行摘录，Read/grep 抓取），抽查通过方可入报告 / `decision_log.csv` / `context_stack/*.json`；抽查未通过 = 视为未交付（与"文件缺失"同等待遇），主理人当场重发或换 agent 来源。同类证伪 ≥2 处/任务 → 触发决策级升级（见 `authorization_matrix.md`）。完整条款与反向 fixture 见 `CLAUDE.md §1`。
       重发命令示例：`Agent(name=<其他成员ID>, subagent_type="general-purpose", prompt=<重新装配提示>)`
 
@@ -444,7 +477,9 @@ T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md
 
 ### T2 · 任务收尾（archivist 执行，写入 knowledge_index.json 后重渲染 .md）
 - [ ] **假说治理触发器**：`python3 <专家包>/scripts/hypothesis_watch.py`——EXIT=5 时 archivist 复查活跃假说是否被新闭环证伪，需废弃的改 JSON（status=deprecated）后跑 render_context_stack.py 重渲染
-- [ ] **处置闭环验收（C2 · 2026-11-08）**：触发 EXIT=5 后，archivist 须把处置过的 `finding_id` 写入 `00_governance/hypothesis_watch_state.json` 的 `handled_finding_ids`，例行复核另写 `reviewed_at`；随后跑 `python3 <专家包>/scripts/hypothesis_watch.py --check-disposition`。**EXIT=6（处置缺失/不完整）时禁止派发下一批 WF1/WF3/WF5 假说相关 spawn**——台账由项目侧落盘，专家包脚本只读、不代写；该前置判定在 T0 一并复核
+- [ ] **处置闭环验收（C2 · 2026-10-08）**：触发 EXIT=5 后，archivist 须把处置过的 `finding_id` 写入 `00_governance/hypothesis_watch_state.json` 的 `handled_finding_ids`，例行复核另写 `reviewed_at`；随后跑 `python3 <专家包>/scripts/hypothesis_watch.py --check-disposition`。**EXIT=6（确有未处置项或例行复核缺失）时禁止派发下一批 WF1/WF3/WF5 假说相关 spawn**——台账由项目侧落盘，专家包脚本只读、不代写；该前置判定在 T0 一并复核。
+      **注（L3 2026-11-09 · A-8 口径统一）**：本脚本退出码 = 0 无需复查/处置完整、5 需要复查、**6 处置不完整**、**3 无法裁决**。判别原则：区别不是「哪个文件坏了」，而是**坏掉后还能不能算出裁决**——证据源（假说池 / redteam_ledger.csv）畸形 → 无法算 late_fatal → **EXIT=3**；处置记录（hypothesis_watch_state.json）畸形 → 证据源完好、保守按未处置 → **EXIT=6**。
+      **无待处置项且假说池未超期时判 EXIT=0**，不因台账文件缺失而误阻断存量项目。
 - [ ] 新发现/新方法是否入 5 主题索引？新文件是否入文件路径清单？
 - [ ] 4 个仓（04_H5/research-ops/专家包/exports）的状态是否同步？
 - [ ] ledger 闭环率与 commit hash 标注？
