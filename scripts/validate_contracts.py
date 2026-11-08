@@ -30,6 +30,7 @@ TEAM_CONTRACT = {
     "知识态/真源": r"confirmed_hypotheses|knowledge_index|RESEARCH_OPS_DIR|知识态",
     "下行 task_payload": r"task_payload|下行",
     "两仓分层纪律": r"两仓分层|GOVERNANCE_BOUNDARIES|check_scope",
+    "假说锚定字段": r"hypothesis_anchor|falsification_condition",
 }
 
 # B（2026-10-14）：skills 层契约（SKILL.md 唯一入口须索引团队工具+核心铁律）
@@ -135,7 +136,7 @@ def main() -> int:
             for m in miss[:2]:
                 print(f"   - {m['contract']}（需匹配: /{m['missing_pattern'][:40]}/）")
         else:
-            print("✅ skills/team-contract.md（正本 7 条款完整）")
+            print(f"✅ skills/team-contract.md（正本 {len(TEAM_CONTRACT)} 条款完整）")
 
     if total_missing:
         print(f"\n总计 {total_missing} 处契约缺失——影响层间一致性，建议补齐")

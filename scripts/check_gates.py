@@ -14,7 +14,8 @@ check_gates.py —— 团队级脚本化门禁（D2/M3 修复 · 2026-10-15）
                   （T-B2 强化：phase:int / confidence:0-100 类型校验 + 期望 vs 实际字段对照输出）
     G2 数字溯源   关键数字（n=/p=/D′/百分比/CI）在权威源 grep 得到（复用 verify_member_output）
     G3 产出落盘   <task-id>__<member>.md 至少一份存在
-    G4 核验留痕   output-check.json 已生成（G2 的落盘凭证）
+    G4 核验留痕   output-check.json 已生成（G2 的落盘凭证）；gate_mode=block
+                  且 verdict≠PASS 时判 FAIL（C4：--gate 阻断信号传导）
     G5 审判留痕   checklist.json 已生成（T0/T1 的落盘凭证）
 
 退出码：0 = 全过；3 = artifact 缺失；5 = 任一门禁 FAIL
@@ -90,6 +91,26 @@ def check_envelope(art: Path) -> tuple[bool, str]:
         conf = obj.get("confidence")
         if isinstance(conf, bool) or not isinstance(conf, (int, float)) or not (0 <= conf <= 100):
             return False, f"confidence 越界/类型漂移（须 0-100 数值，实为 {conf!r}） | {cmp_txt}"
+        # C1（2026-11-08 · 元层审计第 1 轮）：假说锚定字段按 workflow 条件触发。
+        # 仅当信封显式声明 WF4/analysis 时强校验，存量信封与 fuzz 基线一律不受影响
+        # （防 P3.1 同构崩溃：新增校验不得使畸形输入回归失效）。
+        wf = str(obj.get("workflow", "")).strip().upper()
+        anchor_txt = ""
+        if wf in ("WF4", "ANALYSIS"):
+            anchor = obj.get("hypothesis_anchor")
+            if not isinstance(anchor, dict):
+                return False, f"WF4 缺 hypothesis_anchor（须为对象） | {cmp_txt}"
+            need = ("biological_question", "falsification_condition")
+            miss_a = [k for k in need
+                      if not isinstance(anchor.get(k), str) or not anchor[k].strip()]
+            if miss_a:
+                return False, f"hypothesis_anchor 缺/空 {miss_a} | {cmp_txt}"
+            has_id = isinstance(anchor.get("hypothesis_id"), str) and anchor["hypothesis_id"].strip()
+            has_just = (isinstance(anchor.get("no_hypothesis_justification"), str)
+                        and anchor["no_hypothesis_justification"].strip())
+            if not (has_id or has_just):
+                return False, "hypothesis_anchor 须有 hypothesis_id 或 no_hypothesis_justification | " + cmp_txt
+            anchor_txt = " | anchor=OK"
         # R2-10：issues 消费——非空则浮出门禁详情（主理人 T1 逐条处置的输入）
         issues = obj.get("issues")
         if issues is None:
@@ -100,7 +121,7 @@ def check_envelope(art: Path) -> tuple[bool, str]:
             return False, f"issues 须为数组（实为 {type(issues).__name__}） | {cmp_txt}"
         issues_txt = f" | issues×{len(issues)}: {'; '.join(map(str, issues[:2]))}" if issues else ""
         return True, (f"agent_id={obj.get('agent_id')} status={obj.get('status')} "
-                      f"confidence={obj.get('confidence')}{issues_txt} | {cmp_txt}")
+                      f"confidence={obj.get('confidence')}{issues_txt}{anchor_txt} | {cmp_txt}")
     return False, "头部 2000 字符内未找到含 agent_id 的 JSON 信封"
 
 
@@ -144,6 +165,8 @@ def main() -> int:
     ap.add_argument("run_dir")
     ap.add_argument("task_id")
     ap.add_argument("--sources", nargs="*", default=None, help="权威源（默认自动探测）")
+    ap.add_argument("--require-tag", action="store_true",
+                    help="严审模式：G2 权威源池只接受带 source_tag: authoritative 标记的文件（默认关闭，向后兼容）")
     args = ap.parse_args()
 
     run_dir = Path(args.run_dir)
@@ -185,7 +208,7 @@ def main() -> int:
         record("G2 数字溯源", False, "无权威源可核（须配 RESEARCH_OPS_DIR 或 --sources）")
         g2_ok, unverified_n = False, -1
     else:
-        pool = vmo._vn.load_sources(sources, ["_trash", "_archive"])
+        pool = vmo._vn.load_sources(sources, ["_trash", "_archive"], require_tag=args.require_tag)
         unverified_n = 0
         waived_n = 0
         unverified_detail = []
@@ -236,7 +259,15 @@ def main() -> int:
                 a.name for a in artifacts
                 if a.name in mtimes and int(a.stat().st_mtime) != mtimes[a.name]
             ]
-            if tampered:
+            gate_mode = oc_data.get("gate_mode")
+            if gate_mode == "block" and oc_data.get("verdict") not in (None, "PASS"):
+                # C4（2026-11-08）：--gate 的阻断信号必须在下游门禁生效，
+                # 否则 DEGRADE 只靠主理人裁量，违反「科学真实性 > 效率」。
+                # 无 verdict 字段的存量/fuzz output-check 不受影响（向后兼容）。
+                record("G4 核验留痕", False,
+                       "阻断态 DEGRADE 未处置（gate_mode=block）：须成员补 [待人工核验] 重传，"
+                       "或主理人核 URL 后写 waivers.json 放行；禁止仅凭人工裁量跳过")
+            elif tampered:
                 record("G4 核验留痕", False,
                        f"artifact 在核验后被修改（mtime 不符）: {tampered}——须重跑 verify_member_output")
             else:

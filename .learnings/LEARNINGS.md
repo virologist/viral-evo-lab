@@ -181,3 +181,66 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - See Also: LRN-20261014-004, LRN-20261015-005
 
 ---
+
+
+## [LRN-20261108-007] bug
+
+**Logged**: 2026-11-08T17:50:00+08:00
+**Priority**: high
+**Status**: resolved
+**Area**: scripts
+
+### Summary
+「文档声称已落地、代码却无消费点」再次出现两例：`require_tag` 闸在 4 个调用点全部不传 True（`CLAUDE.md` 却记为已落地），`--gate` 定义后 `args.gate` 零消费且无条件 `return 5`。二者都属「防线存在但未接线」，静态文档检查无法发现。
+
+### Details
+- `verify_numbers.py:95` `require_tag: bool = False`，4 个调用点（自身 main、`verify_member_output.py`、`check_gates.py`）均不传 True → LRN-005 假数据防线虚设。
+- `verify_member_output.py` 的 `--gate` 是死参数 → DEGRADE 无机制阻断，返工纯靠主理人裁量。
+- 共同模式：**开关/参数已定义 ≠ 已接线**；验收必须看到「消费点」而非「定义点」。
+
+### Suggested Action
+- 凡新增布尔开关，必须同时给出「三点接线清单」（定义点 + 全部消费点 + 透传点）并用自动守卫守住。
+- 行为级测试优先于文本存在性检查：同一输入在开/关两态下 EXIT 码必须不同。
+
+### Resolution
+- **Resolved**: 2026-11-08（v1.5.2）
+- **Commit/PR**: 本轮提交
+- **Notes**: 三点 `--require-tag` 全部接线；`test_gate_fuzz.py::test_require_tag_gate` 两态行为断言；`test_contract_guard.py` 第 5 项守「三点接线存活」。`--gate` 改为写 `gate_mode=block` 并由 G4 消费，L2 实测 warn→EXIT 0 / block→EXIT 5。
+
+### Metadata
+- Source: conversation
+- Tags: dead-parameter, unwired-gate, behavioral-test
+- Recurrence-Count: 2
+- See Also: LRN-20261015-005
+
+---
+
+## [LRN-20261108-008] insight
+
+**Logged**: 2026-11-08T17:55:00+08:00
+**Priority**: medium
+**Status**: resolved
+**Area**: tests
+
+### Summary
+验收脚本自身再次踩到「zsh 不做 word splitting」：用 `spec="tagged.csv --require-tag"; set -- $spec` 拼参数，zsh 把整串当单个词，导致 `--sources` 路径混进 flag，三态演练全部输出假结果（EXIT 全 5）。
+
+### Details
+- 该坑在本仓 CHANGELOG/LEARNINGS 已有记录，但**只约束了生产脚本，没有约束审计者自己的临时验证脚本**。
+- 同类先例：BSD grep `\|` 假阴性（上一轮诊断中主审亲踩）。两者同属「验证工具本身的缺陷被误读为被测对象缺陷」。
+
+### Suggested Action
+- 多参数 CLI 演练一律**显式写出每个参数**，或用 Python `subprocess` 传 list；禁止用 shell 变量拼接后靠分词展开。
+- 演练结果出现「全部与预期相反」时，先怀疑验证脚本，不要先改被测代码。
+
+### Resolution
+- **Resolved**: 2026-11-08（本轮 L2 重跑）
+- **Notes**: 显式参数重跑后三态为 5/0/0，与 pytest 行为级守卫一致；假结果未写入任何结论。
+
+### Metadata
+- Source: conversation
+- Tags: verification-tool-bug, zsh-word-splitting, false-negative
+- Recurrence-Count: 1
+- See Also: LRN-20261015-006
+
+---

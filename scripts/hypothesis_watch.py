@@ -12,8 +12,11 @@ hypothesis_watch.py —— 假说治理触发器（D1 修复 · 2026-10-15）
 
 用法：
     python3 scripts/hypothesis_watch.py [--research-ops <路径>] [--max-age 14]
+    python3 scripts/hypothesis_watch.py --check-disposition [--research-ops <路径>]
+        （只读验收「告警→处置」闭环；供 T2 与假说相关 WF 入口作前置门禁）
 
-退出码：0 = 无需复查；5 = 需要复查（deprecate/复核挂起）；3 = 文件缺失
+退出码：0 = 无需复查 / 处置完整；5 = 需要复查（deprecate/复核挂起）；
+        3 = 文件缺失；6 = --check-disposition 下处置缺失或不完整
 边界：只做"时间差与状态比对"（确定性）；"某发现是否真的证伪某假说"是语义判断，归 LLM/人。
 """
 import argparse
@@ -48,11 +51,50 @@ def parse_dt(s: str):
     return None
 
 
+def check_disposition(state_p: Path, late_fatal: list, hyp_updated: datetime,
+                      age_days: int, max_age: int) -> tuple[bool, list[str]]:
+    """C2（2026-11-08 · 元层审计第 1 轮）：只读验收「告警 → 处置」闭环。
+
+    触发器本体只负责报警，处置台账由项目侧 archivist 落盘；此前不存在机器
+    可判定的验收点，导致 T2 复选框形同虚设（实测 EXIT=5 而 state 从未生成）。
+    本函数纯只读，不写 research-ops；合格须三项全满足：
+      1. state 为对象且 handled_finding_ids 是字符串数组；
+      2. 无未处置 fatal/severe（调用方已排除 handled，故 late_fatal 非空即覆盖不全）；
+      3. 假说池超 max_age 未更新时，reviewed_at 不早于池更新且在有效期内
+         （防「只 bump 时间戳、不真复核」）。
+    """
+    notes: list[str] = []
+    if not state_p.is_file():
+        return False, [f"处置台账缺失: {state_p.name}（archivist 复查后须写 handled_finding_ids）"]
+    try:
+        obj = json.loads(state_p.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        return False, [f"处置台账不可解析: {type(e).__name__}: {e}"]
+    if not isinstance(obj, dict):
+        return False, ["处置台账顶层须为对象"]
+    handled = obj.get("handled_finding_ids")
+    if not isinstance(handled, list) or any(not isinstance(x, str) for x in handled):
+        return False, ["handled_finding_ids 须为字符串数组"]
+    notes.append(f"handled_finding_ids 合法（{len(handled)} 条）")
+    if late_fatal:
+        ids = [str(r.get("finding_id", "")) for r in late_fatal]
+        return False, [f"仍有 {len(ids)} 条 fatal/severe 未处置: {', '.join(ids[:5])}"] + notes
+    notes.append("全部 fatal/severe 闭环发现已处置")
+    if age_days > max_age:
+        rev = parse_dt(str(obj.get("reviewed_at", "")))
+        if rev is None or rev < hyp_updated or (datetime.now() - rev).days > max_age:
+            return False, [f"假说池 {age_days} 天未更新，reviewed_at 缺失/过期/早于池更新"] + notes
+        notes.append(f"例行复核有效（reviewed_at={obj.get('reviewed_at')}）")
+    return True, notes
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="假说治理触发器：假说池 vs 台账闭环时间差比对")
     ap.add_argument("--research-ops", default=None)
     ap.add_argument("--max-age", type=int, default=14,
                     help="假说池最长免复查天数（默认 14）")
+    ap.add_argument("--check-disposition", action="store_true",
+                    help="只读验收处置闭环：state 存在、结构合法、覆盖全部待处置 finding，且例行复核在有效期内")
     args = ap.parse_args()
 
     ro = args.research_ops or autodetect_research_ops()
@@ -137,6 +179,15 @@ def main() -> int:
         alerts.append(f"{len(late_fatal)} 条 fatal/severe 发现闭环于假说池更新之后——活跃假说可能已被其中某些证伪，须逐条复查（语义判断归主理人）")
     if age_days > args.max_age:
         alerts.append(f"假说池 {age_days} 天未更新（> {args.max_age}）——即使无新证伪，也须例行复核")
+
+    # C2（2026-11-08）：处置闭环只读验收。默认模式行为完全不变；只有显式传
+    # --check-disposition 才启用，供 T0/T2 与 WF1/WF3/WF5 入口作前置门禁。
+    if args.check_disposition:
+        ok, notes = check_disposition(state_p, late_fatal, hyp_updated, age_days, args.max_age)
+        print(f"\n处置闭环验收: {'OK' if ok else 'INCOMPLETE'}")
+        for n in notes:
+            print(f"  {'✅' if ok else '🔴'} {n}")
+        return 0 if ok else 6
 
     if alerts:
         print("\n裁决: REVIEW_REQUIRED")

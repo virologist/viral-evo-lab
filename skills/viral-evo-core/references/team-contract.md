@@ -20,6 +20,23 @@
 
 **issues 定性**：成员侧必填（无则空数组）；G1 仅强校验 6 必填字段，`issues` 缺失不判 FAIL，但类型非数组判 FAIL。
 
+## 假说锚定字段（hypothesis_anchor · C1，仅 WF4/analysis 触发）
+
+上行信封在 `workflow: "WF4"` 时**必须**含 `hypothesis_anchor` 对象（G1 验收，缺失判 FAIL）：
+
+```json
+"hypothesis_anchor": {
+  "hypothesis_id": "<锚定的活跃假说 ID；无则填 no_hypothesis_justification>",
+  "biological_question": "<本分析回答的生物学问题>",
+  "falsification_condition": "<什么结果会推翻当前假说>"
+}
+```
+
+- 三字段中 `biological_question` / `falsification_condition` 必填且非空字符串；
+  `hypothesis_id` 与 `no_hypothesis_justification` **至少填一项**（禁止两者皆空）。
+- 作用：把主理人的 B>C>A 内部追问从「结果不外显」变为**可验收落盘字段**，使单一 A 类任务也能被升维判定；不新增内容生产环节。
+- 非 WF4 信封不校验该字段（向后兼容）；判定逻辑在 `scripts/check_gates.py` 的 G1。
+
 ## 团队级契约要点
 
 - **下行 task_payload 格式**：`{task_id, phase, instruction, input, output_contract, constraints, handoff_source}`，详见主理人 MD 接口契约段

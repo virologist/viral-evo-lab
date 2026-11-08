@@ -4,6 +4,28 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.2] - 2026-11-08（元层审计第 1 轮 · 洞察引擎闭环补丁）
+
+> 版本口径：以 `purpose_charter`（假说优先 B>C>A / 科学真实性优先 / 诚实性红线 / 使命链完整 / 单一用户）重排施工优先级后的**补丁级**发版。施工前补 `v1.5.1` tag 锚点；A 桶 18 项已闭合机制一律未重新设计，全部改动为「接线 / 字段 / 前置条款 / 只读验收」。
+
+### Added
+- **C2 处置闭环只读验收**：`scripts/hypothesis_watch.py` 新增 `--check-disposition` 与 `check_disposition()`，纯只读判定处置台账存在性、结构、`handled_finding_ids` 覆盖全部 late_fatal、`reviewed_at` 有效性；退出码 6 = 处置缺失或不完整。主理人 MD T2 增「EXIT=6 禁止派发下一批 WF1/WF3/WF5」前置条款，T0 一并复核。
+- **C3 严审闸三点接线**：`verify_numbers.py` / `verify_member_output.py` / `check_gates.py` 新增 `--require-tag` 并透传 `load_sources(..., require_tag=...)`；新增行为级测试 `test_require_tag_gate()` 与 guard 第 5 项「三点接线存活」，防接线被并发分发静默摘除。
+- **C1 假说锚定字段**：`team-contract.md` 定义 `hypothesis_anchor`（`hypothesis_id` 或 `no_hypothesis_justification` + `biological_question` + `falsification_condition`）；`check_gates.py` G1 在 `workflow ∈ {WF4, ANALYSIS}` 时条件校验；`validate_contracts.py` 同步第 8 条契约；fuzz 24→27 例。主理人 MD 增「追问落盘」「A 类升维判定」「WF4 Phase 0」三处条款，使 B>C>A 从明文铁律变为可验收字段。
+
+### Fixed
+- **C4 返工阻断**：`--gate` 从死参数变为可传导信号——写入 `output-check.json` 的 `gate_mode=block`，G4 读到 DEGRADE 未处置即判 FAIL；主理人 MD 的「由主理人决定是否返工」订正为依 EXIT 码裁决 + 两条合法处置路径，不得仅凭人工裁量跳过。
+- **B3 文档时态**：`docs/P4_monitoring_design.md` 末尾「建议排期：下一迭代执行 B-1/B-2/B-3」为过期文本（提交史 `0b3bed1` + tag `bc89fa1`/`6d3fad3` 已证落地），改为标注剩余 B-4/B-5 未排期。
+
+### Changed
+- `CLAUDE.md` 追加「当前口径订正」节（不改写历史条目）；四处 version 1.5.1 → 1.5.2；`integrity_manifest.json` 重生成（68 文件）。
+- 验证：pytest **4 passed**（新增 1 个测试函数）｜fuzz **27/27**｜guard **5/5**｜contracts / scope / 13 脚本编译全绿｜L2 沙箱 12 组命令行演练全对。
+
+### Known Issues（本轮新增，不阻塞）
+- `--require-tag` 默认关闭（向后兼容）；严审任务须显式开启。默认态下未标记权威源仍可入池，属已知残余风险，下一轮评估是否翻转默认值。
+- `hypothesis_watch.py --check-disposition` 对真实项目侧实测 EXIT=6（处置台账缺失）——**属 Loop B 项目数据侧，专家包不可代写**，需 archivist 落盘后复验。
+- B 桶候补池未动：`dependency_artifacts` 假边、spawn_manifest 只写不读、三源零接入、P4 B-4/B-5、VG1–VG4 编号统一、vendor 两处联邦层已知问题。
+
 ## [1.5.1] - 2026-11-08（独立诊断 P1–P3 修复发版）
 
 > **版本口径**：本轮为诊断驱动的结构修复，原记录于 `[Unreleased]`（2026-11-07），经 P3 三轮交叉验证 + 两轮收敛重测（重要级新 finding=0，D2 判据收敛）后由管家节点裁决定版 **1.5.1**。4 处 `plugin.json` / `marketplace.json` version 已同步升级。

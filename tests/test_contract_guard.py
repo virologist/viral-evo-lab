@@ -9,13 +9,14 @@
       手工救火两次后，本守卫把「分发后的包是否仍处于正确状态」变成常态
       自动判定：任一不符即 FAIL，并给出恢复命令。
 
-校验四项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
+校验五项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
   1. test_vendor_core.py 的包名与 pytest 入口  → 抓 A2 回退
   2. 四处 version 一致性                        → 抓版本叙事漂移
   3. integrity_manifest.json 与磁盘 + git ls-files 一致
                                                → 抓内容漂移与新增文件漏收
   4. 联邦真源 / vendor 副本 / VENDOR.json 三方 sha256 一致
                                                → 抓分发不同步
+  5. require_tag 闸三点接线存活                → 抓产出端核验被静默摘除
 
 运行：python3 tests/test_contract_guard.py  或  pytest tests/ -q
 """
@@ -144,6 +145,19 @@ def _checks() -> list[tuple[bool, str]]:
                         f"[fed={a[:12]} vendor={b[:12]} 清单={declared[:12]}]"))
     except (OSError, UnicodeError, ValueError, KeyError, AttributeError) as e:
         out.append((False, f"vendor 三方哈希：校验失败 {type(e).__name__}: {e}"))
+
+    # 5. require_tag 闸三点接线存活（C3 · 2026-11-08）----------------------
+    try:
+        targets = ("verify_numbers.py", "verify_member_output.py", "check_gates.py")
+        bad = []
+        for fn in targets:
+            t = (PKG / "scripts" / fn).read_text(encoding="utf-8")
+            for needle in ("--require-tag", "require_tag=args.require_tag"):
+                if needle not in t:
+                    bad.append(f"{fn} 缺 {needle}")
+        out.append((not bad, "require_tag 闸三点接线存活" if not bad else "; ".join(bad)))
+    except (OSError, UnicodeError) as e:
+        out.append((False, f"require_tag 闸：校验失败 {type(e).__name__}: {e}"))
 
     return out
 

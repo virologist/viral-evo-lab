@@ -115,3 +115,15 @@
 - **理由**：R2 诊断 10 短板清算 + 巡检范式跃迁（轮询→事件驱动）
 - **影响**：主理人上下文占用降级；LRN-005/006 双防线机制化；waiver/授权矩阵/契约正本三层治理闭环
 - **下一步**：v1.5.1 backlog = T-E1（--require-tag CLI 化）+ decision_log 审计例行化；回滚锚点 v1.4.0-r2-anchor
+
+
+## 当前口径订正（v1.5.2 · 2026-11-08 · 元层审计第 1 轮）
+
+> 本节为**追加订正**，不改写上方任何历史 Changelog 条目（守本文件第 4 行「禁止改写历史」）。历史叙述仅作差异与证据，当前执行以本节为准。
+
+- **`require_tag` 闸**：v1.5.0 条目所载「闸」在本版才完成三点接线（`verify_numbers.py` / `verify_member_output.py` / `check_gates.py`），且**默认关闭**以保持向后兼容；严审任务须显式传 `--require-tag`。未标记权威源在默认态仍可入池，属已知残余风险（见 CHANGELOG Known Issues）。
+- **`--gate`**：不再是未串联的死参数。`verify_member_output.py --gate` 把 `gate_mode=block` 写入 `output-check.json`，`check_gates.py` 的 G4 读到 DEGRADE 未处置即判 FAIL；处置路径仅「补 [待人工核验] 重传」或「waivers.json 放行」两条。
+- **契约正本**：`skills/viral-evo-core/references/team-contract.md` 现为 8 条款（新增 `hypothesis_anchor`，仅 `workflow ∈ {WF4, ANALYSIS}` 触发）；`validate_contracts.py` 的条款数文案已动态化。
+- **CONTEXT_STACK 口径**：四份 JSON 为机器真源（confirmed_hypotheses / knowledge_index / method_library / research_anchor），`.md` 仅为人类可读渲染视图，禁直编；历史条目中的「三 JSON」表述以本节为准。
+- **P4 监控**：B-1/B-2/B-3 已随 v1.5.0 落地；B-4/B-5 未排期。`docs/P4_monitoring_design.md` 末尾过期排期句已订正。
+- **假说治理触发器**：新增 `--check-disposition` 纯只读验收（EXIT=6 = 处置台账缺失或不完整）；处置台账由项目侧 archivist 落盘，专家包脚本不代写。

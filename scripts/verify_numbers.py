@@ -148,6 +148,8 @@ def main() -> int:
     ap.add_argument("--min-digits", type=int, default=2,
                     help="n= 值最小位数（默认2，即 n>=10 才核）")
     ap.add_argument("--json", action="store_true", help="输出 JSON")
+    ap.add_argument("--require-tag", action="store_true",
+                    help="严审模式：权威源头部 3 行须含 source_tag: authoritative；未标记源一律拒收（默认关闭，向后兼容）")
     args = ap.parse_args()
 
     art = Path(args.artifact)
@@ -156,7 +158,7 @@ def main() -> int:
         return 3
     text = art.read_text(encoding="utf-8", errors="ignore")
     nums = extract_numbers(text, args.min_digits)
-    pool = load_sources(args.sources, args.exclude, args.allow_md)
+    pool = load_sources(args.sources, args.exclude, args.allow_md, require_tag=args.require_tag)
 
     found, not_found = [], []
     for kind, val, _ in nums:

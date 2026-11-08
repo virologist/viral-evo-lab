@@ -22,6 +22,8 @@ skills: [viral-evo-core]
 
 每轮输出前内部强制追问（结果不外显）：本分析回答的生物学问题是什么？什么结果会推翻当前假说？置信度依据是什么，推断已标注？
 
+**追问落盘（C1 · 2026-11-08）**：「结果不外显」仅指不外显推理全文，**不等于不落盘**。`hypothesis_anchor` 三要素须写入下行 `task_payload` 与上行 envelope——`hypothesis_id`（或 `no_hypothesis_justification`）、`biological_question`、`falsification_condition`；WF4 类任务由 G1 强制验收，缺失即打回。这是把 B>C>A 权重从明文铁律变为可验收字段的唯一机制，不新增内容生产环节。
+
 ---
 
 ## 全局重试预算（防多层循环叠加）
@@ -61,6 +63,7 @@ skills: [viral-evo-core]
    - 假说/机制/创新/为什么/预测 → WF1（假说引擎）
    - 文献/方法/附件/借鉴/前沿 → WF2（方法迁移）或 WF3（前沿追踪）
    - 序列/代码/pipeline/数据 → WF4（分析执行）
+     **A 类升维判定（C1）**：命中该信号时先内部追问该分析可否锚定到活跃假说；不可锚定须填 `no_hypothesis_justification`（禁止空值），并按 B>C>A 决定是否并联 WF1。判定结果落 `hypothesis_anchor`，不以「不外显」为由省略。
    - 审查/投稿前/critique → WF5（红队审查）
    - 混合信号 → 按 B>C>A 权重并联，分层输出
 4. **信息熵评估**：隐含假设密度 + 歧义量 + 缺失参数 → 置信度(0-100%)
@@ -161,8 +164,10 @@ Phase 1：literature-scout → 4R 检索循环（R1 检索→R2 反思→R3 骨�
 
 ### WF4 分析执行（触发：序列/代码/pipeline/数据/报错）
 ```
+Phase 0（假说锚定前置 · C1）：主理人在 task_payload 写 hypothesis_anchor 三要素并完成 A 类升维判定；
+  缺任一字段 = 不得派 spawn，回 ① 研究问题解析补齐（G1 会判 FAIL）
 Phase 1：pipeline-engineer → 数据质控报告（覆盖度/异常序列，未过门控禁止进入 pipeline）
-  质控不通过 → 通知主理人；由主理人决定是否返工（pipeline-engineer 不可直接"退回"）
+  质控不通过 → 通知主理人；pipeline-engineer 不可直接"退回"；主理人须依 verify_member_output.py --gate 的 EXIT 码裁决：DEGRADE 阻断信号（gate_mode=block）写入 output-check.json，check_gates.py 的 G4 必判 FAIL，无 waivers.json 不得放行
 Phase 2（按需并行）：phylo-analyst → 建树方案 | popgen-modeler → 选择压方案 | structural-virologist → 结构方案
 Phase 3：pipeline-engineer → 代码生成（模块化/禁硬编码/依赖命令/日志）
 主理人汇编 → 对齐 → ACK 后交付（人工审核执行）→ 结果回传后 archivist 落盘 30_results/
@@ -429,7 +434,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
       `python3 <专家包>/scripts/verify_member_output.py <run-dir> <task-id> --gate`
       自动定位 `<task-id>__<member>.md` 全部成员产出；5 类数字模式（n=/p=/D′/百分比/CI）在权威源（默认仅 csv/json 计算产物，自动探测 RESEARCH_OPS_DIR）grep 同值；EXIT=5 = DEGRADE_TO_PARTIAL（未溯源数字列清单 + 落盘 `<task-id>__output-check.json`）。`--gate` 供工作流串联阻断
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行
-- [ ] （手工兜底）`--gate` 未串联时，EXIT=5 同样须处置：成员补 [待人工核验] 标注后重传，或主理人工核后放行
+- [ ] **`--gate` 已串联（C4 · 2026-11-08）**：EXIT=5 时 `gate_mode=block` 写入 `output-check.json`，`check_gates.py` 的 G4 必判 FAIL。处置只有两条路——成员补 [待人工核验] 重传并重跑核验，或主理人核 URL 后写 `waivers.json` 放行；**不得仅凭人工裁量跳过**（科学真实性 > 效率）
 - [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，EXIT=0 全过 / 3=artifact 缺失 / 5=FAIL（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
 - [ ] **T-A1：子代理证据纪律门**（R3 2026-10-21 增补·LRN-006）：成员 / 子代理产出采信前主理人必须抽查 ≥2 条原稿上下文（`file:行号` + 原文 1-2 行摘录，Read/grep 抓取），抽查通过方可入报告 / `decision_log.csv` / `context_stack/*.json`；抽查未通过 = 视为未交付（与"文件缺失"同等待遇），主理人当场重发或换 agent 来源。同类证伪 ≥2 处/任务 → 触发决策级升级（见 `authorization_matrix.md`）。完整条款与反向 fixture 见 `CLAUDE.md §1`。
       重发命令示例：`Agent(name=<其他成员ID>, subagent_type="general-purpose", prompt=<重新装配提示>)`
@@ -439,6 +444,7 @@ T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md
 
 ### T2 · 任务收尾（archivist 执行，写入 knowledge_index.json 后重渲染 .md）
 - [ ] **假说治理触发器**：`python3 <专家包>/scripts/hypothesis_watch.py`——EXIT=5 时 archivist 复查活跃假说是否被新闭环证伪，需废弃的改 JSON（status=deprecated）后跑 render_context_stack.py 重渲染
+- [ ] **处置闭环验收（C2 · 2026-11-08）**：触发 EXIT=5 后，archivist 须把处置过的 `finding_id` 写入 `00_governance/hypothesis_watch_state.json` 的 `handled_finding_ids`，例行复核另写 `reviewed_at`；随后跑 `python3 <专家包>/scripts/hypothesis_watch.py --check-disposition`。**EXIT=6（处置缺失/不完整）时禁止派发下一批 WF1/WF3/WF5 假说相关 spawn**——台账由项目侧落盘，专家包脚本只读、不代写；该前置判定在 T0 一并复核
 - [ ] 新发现/新方法是否入 5 主题索引？新文件是否入文件路径清单？
 - [ ] 4 个仓（04_H5/research-ops/专家包/exports）的状态是否同步？
 - [ ] ledger 闭环率与 commit hash 标注？

@@ -70,6 +70,15 @@ CASES = [
     ("output-check 顶层 str", json.dumps(BASE_ENV) + "\n", None, "oops"),
     ("output-check mtimes=list", json.dumps(BASE_ENV) + "\n", None, {"artifact_mtimes": [1]}),
     ("output-check mtimes=str", json.dumps(BASE_ENV) + "\n", None, {"artifact_mtimes": "x"}),
+    # ---- C1（2026-11-08）：WF4 假说锚定字段条件触发 ----
+    ("WF4合规（应 EXIT=0）", json.dumps(dict(BASE_ENV, workflow="WF4", hypothesis_anchor={
+        "hypothesis_id": "HX", "biological_question": "占位问题",
+        "falsification_condition": "占位条件"})) + "\n", None, {"artifact_mtimes": {}}),
+    ("WF4缺 anchor（应 G1 FAIL）", json.dumps(dict(BASE_ENV, workflow="WF4")) + "\n",
+     None, {"artifact_mtimes": {}}),
+    ("WF4 anchor 畸形（str）", json.dumps(dict(BASE_ENV, workflow="WF4",
+                                              hypothesis_anchor="oops")) + "\n",
+     None, {"artifact_mtimes": {}}),
 ]
 
 
@@ -84,7 +93,7 @@ def run_case(name: str, artifact_text: str, waivers, oc) -> tuple[bool, str]:
         d = Path(td)
         (d / f"{TASK_ID}__phylo-analyst.md").write_text(artifact_text, encoding="utf-8")
         # 合规基线需要 checklist 才能 G5 PASS
-        if name.startswith("基线"):
+        if name.startswith(("基线", "WF4合规")):
             _write(d / f"{TASK_ID}__checklist.json", {"hallucinated": 0})
         _write(d / f"{TASK_ID}__waivers.json", waivers)
         # output-check 为 None 时写显式 JSON null，覆盖「合法 JSON 但非对象」
@@ -93,7 +102,7 @@ def run_case(name: str, artifact_text: str, waivers, oc) -> tuple[bool, str]:
         else:
             _write(d / f"{TASK_ID}__output-check.json", oc)
         cmd = [sys.executable, str(CHECK_GATES), str(d), TASK_ID]
-        if name.startswith("基线"):
+        if name.startswith(("基线", "WF4合规")):
             # 信封自带 confidence=90 / phase=1，须给权威源，否则 G2 会（正确地）判未溯源
             src = d / "sources"
             src.mkdir()
@@ -108,8 +117,8 @@ def run_case(name: str, artifact_text: str, waivers, oc) -> tuple[bool, str]:
             problems.append("出现 Traceback")
         if not (d / f"{TASK_ID}__gates.json").is_file():
             problems.append("gates.json 未落盘")
-        if name.startswith("基线") and p.returncode != 0:
-            problems.append(f"基线应 EXIT=0，实为 {p.returncode}")
+        if name.startswith(("基线", "WF4合规")) and p.returncode != 0:
+            problems.append(f"{name} 应 EXIT=0，实为 {p.returncode}")
         if problems:
             return False, f"{name}: " + "; ".join(problems) + f" | {out.strip()[:160]}"
         return True, f"{name}: OK (exit={p.returncode})"
@@ -123,6 +132,36 @@ def test_gate_fuzz() -> None:
         if not ok:
             failures.append(msg)
     assert not failures, "门禁 fuzz 失败:\n  " + "\n  ".join(failures)
+
+
+def test_require_tag_gate() -> None:
+    """C3（2026-11-08）：产出端 require_tag 闸行为级守卫——未标记源必须被拒。
+
+    同一份含数字的 artifact 分别喂「未打 source_tag」与「已打 source_tag」的
+    权威源：--require-tag 开启后前者 DEGRADE(5)、后者 PASS(0)；关闭开关时
+    未标记源仍可载入（向后兼容，防存量任务被误杀）。
+    """
+    with tempfile.TemporaryDirectory(prefix="tag_gate_") as td:
+        d = Path(td)
+        art = d / "out.md"
+        art.write_text("样本量 n=1234。\n", encoding="utf-8")
+        src = d / "sources"
+        src.mkdir()
+        untagged = src / "raw.csv"
+        untagged.write_text("1234\n", encoding="utf-8")
+        tagged = src / "tagged.csv"
+        tagged.write_text("# source_tag: authoritative\n1234\n", encoding="utf-8")
+        vn = PKG / "scripts" / "verify_numbers.py"
+
+        def run(flag: bool, source: Path) -> int:
+            cmd = [sys.executable, str(vn), str(art), "--sources", str(source)]
+            if flag:
+                cmd.append("--require-tag")
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=60).returncode
+
+        assert run(True, untagged) == 5, "未标记源在 --require-tag 下必须被拒（DEGRADE）"
+        assert run(True, tagged) == 0, "已标记源在 --require-tag 下应放行（PASS）"
+        assert run(False, untagged) == 0, "默认关闭开关时须向后兼容"
 
 
 def main() -> int:

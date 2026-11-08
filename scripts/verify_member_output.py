@@ -9,14 +9,15 @@ verify_member_output.py —— 产出端数字核验关卡（A · 2026-10-14 V1 
 
 用法：
     python3 scripts/verify_member_output.py <run-dir> <task-id> \
-        [--sources <目录...>] [--gate] [--no-checklist]
+        [--sources <目录...>] [--gate] [--require-tag] [--no-checklist]
 
 行为：
     1. 定位 run-dir 下 <task-id>__<member>.md（支持多成员，逐个核）
     2. 提取关键数字（与 verify_numbers.py 同口径：pct/n=/p=/D′/CI）
     3. 在权威源 grep 同值（默认仅 csv/json 计算产物；md 叙述循环自证禁入）
     4. 输出裁决：PASS（exit 0）/ DEGRADE（exit 5，含未溯源清单）
-    5. --gate 时 exit 5 阻断后续流程（供 CI/主理人工作流串联）
+    5. --gate 时把 gate_mode="block" 写入 output-check.json；check_gates.py 的 G4
+       读取该字段，DEGRADE 未处置即判 FAIL——阻断信号可传导到下游门禁（C4 修复）
     6. 默认写 <run-dir>/<task-id>__output-check.json（与 checklist 同 schema 风格）
 
 退出码：0 = 全过；3 = artifact 缺失；5 = 存在未溯源数字（--gate 时阻断）
@@ -77,6 +78,8 @@ def main() -> int:
                     help="阻断模式：存在未溯源数字时 exit 5（供工作流串联）")
     ap.add_argument("--no-checklist", action="store_true",
                     help="不写 output-check.json")
+    ap.add_argument("--require-tag", action="store_true",
+                    help="严审模式：透传 verify_numbers.load_sources，未标记权威源一律拒收（默认关闭，向后兼容）")
     args = ap.parse_args()
 
     run_dir = Path(args.run_dir)
@@ -101,7 +104,7 @@ def main() -> int:
         print("   产出端核验跳过——主理人须人工确认或补 --sources", file=sys.stderr)
         return 0  # 不阻断（确定性工具缺失≠产出有问题）
 
-    pool = _vn.load_sources(sources, args.exclude)
+    pool = _vn.load_sources(sources, args.exclude, require_tag=args.require_tag)
     print(f"📂 权威源池: {len(pool)} 字符（{len(sources)} 个目录）")
 
     all_unverified = []
@@ -132,6 +135,7 @@ def main() -> int:
             "artifact_mtimes": {a.name: int(a.stat().st_mtime) for a in artifacts},
             "unverified": all_unverified,
             "verdict": verdict,
+            "gate_mode": "block" if args.gate else "warn",
             "sources_used": sources,
         }
         out = run_dir / f"{args.task_id}__output-check.json"
@@ -140,7 +144,10 @@ def main() -> int:
 
     if all_unverified:
         print(f"\n裁决: DEGRADE_TO_PARTIAL（{len(all_unverified)} 个未溯源数字）")
-        print("  处置：成员产出标 [待人工核验] 后重传，或主理人工核后放行")
+        print("  处置：成员产出标 [待人工核验] 后重传，或主理人核 URL 后写 waivers.json 放行")
+        if args.gate:
+            print("  ⛔ 阻断模式：gate_mode=block 已写入 output-check.json，"
+                  "check_gates.py 的 G4 必判 FAIL；未处置不得进入下游 WF")
         return 5
     print("\n裁决: PASS")
     return 0
