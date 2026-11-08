@@ -1,18 +1,18 @@
 {
- "generated": "2026-11-07T18:04:38",
+ "generated": "2026-11-08T15:58:46",
  "file_count": 68,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "51630bc68cc9fbc2",
-   "bytes": 703
+   "sha16": "8c60e1e484e5408a",
+   "bytes": 704
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "3abaa958a41ba7c0",
-   "bytes": 6691
+   "sha16": "60cf5fac41fea583",
+   "bytes": 6692
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "9b93aedc16715ddb",
-   "bytes": 6720
+   "sha16": "fd74f6d0de8e5cd9",
+   "bytes": 6721
   },
   ".gitignore": {
    "sha16": "837a094d5778ac69",
@@ -31,8 +31,8 @@
    "bytes": 9265
   },
   "CHANGELOG.md": {
-   "sha16": "9c1fe7107ca85474",
-   "bytes": 17595
+   "sha16": "bc0b85ab92defa7c",
+   "bytes": 17846
   },
   "CLAUDE.md": {
    "sha16": "89ad0c0eebe24fce",

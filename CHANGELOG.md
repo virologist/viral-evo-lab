@@ -4,9 +4,9 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
-## [Unreleased] - 2026-11-07（独立诊断 P1–P3 修复，尚未发版）
+## [1.5.1] - 2026-11-08（独立诊断 P1–P3 修复发版）
 
-> **版本口径**：本轮为诊断驱动的结构修复，`plugin.json` / `marketplace.json` 的 `version` 仍为 **1.5.0**，未擅自升版。是否发版为 1.5.1 由管家节点裁决。
+> **版本口径**：本轮为诊断驱动的结构修复，原记录于 `[Unreleased]`（2026-11-07），经 P3 三轮交叉验证 + 两轮收敛重测（重要级新 finding=0，D2 判据收敛）后由管家节点裁决定版 **1.5.1**。4 处 `plugin.json` / `marketplace.json` version 已同步升级。
 
 ### Added
 - **A1**：`scripts/assemble_spawn_prompt.py` 经 importlib 消费 vendor 版 `check_task_package_v5`（JSON 五要素 + 验收三件套 + 占位值拒收）；新增 `--legacy-package-check` 回退开关；vendor 缺失时回退旧子串校验并输出显式告警
@@ -56,9 +56,9 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 - **Known Issues 收敛**：`VENDOR.json` 的 `synced_at` 已由并发工作线回填为 `2026-11-07T17:43:24`，与 hash 自洽，原残留项销项
 
 ### Known Issues（残留，不阻塞）
-- 本轮未升 version；如需发版，须同步 4 处版本号并重跑 `gen_integrity_manifest.py`
-- `vendor/shared-core/assemble_spawn_prompt.py:544` 仍向 spawn prompt 注入 E1 已废弃的 `next_agent_hint` 字段规范（包内 `scripts/` 版已订正）。同属联邦真源镜像，**须在联邦真源层修复后重新分发**，本轮未擅改
-- `vendor/shared-core/assemble_spawn_prompt.py:122` 命中首个 `vendor/shared-core` 段后 `break`（而非 `continue`），多层同名嵌套路径下会放弃扫描更内层真包根（隔离实测 EXIT 3）。该文件是联邦真源镜像，改包内副本会破坏 V3/V4 哈希门禁与「vendor 零改动」修改禁区，**须在联邦真源层修复后重新分发**；本轮未擅改
+- ~~本轮未升 version~~ → **已销项**：1.5.1 定版时同步升级 4 处 version 并重跑 `gen_integrity_manifest.py`
+- `vendor/shared-core/assemble_spawn_prompt.py:544` 仍向 spawn prompt 注入 E1 已废弃的 `next_agent_hint` 字段规范（包内 `scripts/` 版已订正）。同属联邦真源镜像，**须在联邦真源层修复后重新分发**，本轮未擅改。**2026-11-08 复核**：vendor 副本与联邦真源 sha256 完全一致（`3c3648f1…`，694 行），确认为上游既有设计，维持「联邦真源层修复后分发」结论
+- `vendor/shared-core/assemble_spawn_prompt.py:122` 命中首个 `vendor/shared-core` 段后 `break`（而非 `continue`），多层同名嵌套路径下会放弃扫描更内层真包根（隔离实测 EXIT 3）。**2026-11-08 复核**：同上，vendor=上游一致（`3c3648f1…`），属上游层既有设计，不在包内擅改
 
 ## [1.5.0] - 2026-10-15
 
