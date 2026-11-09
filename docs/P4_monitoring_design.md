@@ -110,8 +110,8 @@
 |---|---|---|---|
 | B-1 | `scripts/poll_run_dir.py`（期望清单生成 + 落盘巡检 + 分级超时） | ✅ 已落地 | v1.5.0 T-B1（tag bc89fa1） |
 | B-2 | spawn 记录自动落 `<run-dir>/spawn_manifest.jsonl` | ✅ 已落地 | v1.4.0 R2-3 `scripts/log_spawn.py`（tag 6d3fad3） |
-| B-3 | 主理人 MD 增"阶段节点巡检"步骤（T1 前置 poll） | ✅ 已落地 | v1.5.0 T-B1（主理人 MD 纪律审判 T1 节） |
-| B-4 | 429 指数退避逻辑（复用平台重试，脚本侧只做间隔建议） | 未排期 | 依赖 B-1（已就绪） |
+| B-3 | 主理人 MD 增"阶段节点巡检"步骤（T1 前置 poll） | ✅ 已落地 | v1.5.4 R-13e（2026-11-09 审计发现 v1.5.0 的 ✅ 为失效声明——T1 段实测无 poll 步骤；本轮已真实写入 T1 首位，`--from-manifest` 顺带打通 spawn_manifest 只写不读） |
+| B-4 | 429 指数退避逻辑 | ✅ 部分落地（v1.5.4 R-10b） | poll_run_dir 巡检加 3 次指数退避重试（2s/4s/8s，失败原因写 stderr）；find_knowledge 三处 subprocess 补 returncode 检查 + 单次重试。原「复用平台重试」改为脚本侧自含（平台重试不可控） |
 | B-5 | 远期：cron 巡检（跨会话） | 未排期 | 依赖 B-1（已就绪） |
 
 ---

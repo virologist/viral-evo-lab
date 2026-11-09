@@ -9,7 +9,7 @@
       手工救火两次后，本守卫把「分发后的包是否仍处于正确状态」变成常态
       自动判定：任一不符即 FAIL，并给出恢复命令。
 
-校验七项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
+校验九项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
   1. test_vendor_core.py 的包名与 pytest 入口  → 抓 A2 回退
   2. 四处 version 一致性                        → 抓版本叙事漂移
   3. integrity_manifest.json 与磁盘 + git ls-files 一致
@@ -20,7 +20,10 @@
   6. L3 修复存活守卫（2026-11-09）             → 抓本轮高严重度修复被静默回退
      （hypothesis_watch 安全 JSON 入口 / G4 waiver 放行 / workflow 归一化 / 三个行为回归）
   7. A-1 修复存活守卫（2026-11-09）             → 抓 workflow 生产与防规避链路被静默摘除
-     （装配 --workflow / sidecar 落盘 / 门禁交叉核验 / 契约与主理人 MD 同步 / 回归用例）
+     （装配 --workflow / sidecar 落盘 / 门禁交叉核验 / 契约与主理人 MD 同步 / 回归用例 / 语料下限）
+  8. 撞限巡检接线守卫（R-13a/c · 2026-11-09）  → 抓撞限标注消费与 manifest 读取被回退
+  （互锚补强：test_vendor_core.py V7 反向锚定本文件存活——空壳化本守卫会被 V7 抓住，
+    双向互锚收窄「旧基线覆盖」攻击面至双文件同时覆盖）
 
 运行：python3 tests/test_contract_guard.py  或  pytest tests/ -q
 """
@@ -228,10 +231,36 @@ def _checks() -> list[tuple[bool, str]]:
         fuzz = (PKG / "tests" / "test_gate_fuzz.py").read_text(encoding="utf-8")
         if "A1 下发WF4+回传WF1（谎报规避，应 G1 FAIL）" not in fuzz:
             bad.append("test_gate_fuzz.py 缺 A-1 交叉核验回归用例")
+        # 7.5 fuzz 语料规模下限（R-13b · 2026-11-09）：守卫只锚函数名时，
+        # 语料可被抽稀（45→1 条守卫仍全过，实测）。用数量下限拦抽稀：
+        # 当前 45 例 + 3 行为级；下限 40 留增补余量，只拦删减不拦扩展。
+        n_cases = len(re.findall(r'\n    \("', fuzz))
+        if n_cases < 40:
+            bad.append(f"test_gate_fuzz.py CASES 仅 {n_cases} 条（<40 下限）——疑遭抽稀")
         out.append((not bad, "A-1 修复存活守卫（workflow 生产与防规避链路）"
                     if not bad else "; ".join(bad)))
     except (OSError, UnicodeError) as e:
         out.append((False, f"A-1 修复存活守卫：校验失败 {type(e).__name__}: {e}"))
+
+    # 8. 撞限巡检接线守卫（R-13a/c · 2026-11-09）--------------------------
+    # 锚定 poll_run_dir 的撞限标注消费与 --from-manifest 接线，防被静默回退：
+    #   8.1 撞限标注识别串存在（轮次耗尽）
+    #   8.2 --from-manifest 参数与 manifest 读取函数存在（补"只写不读"）
+    #   8.3 主理人 MD T1 段有 poll 前置步骤（P4 B-3 失效声明的真化）
+    try:
+        bad = []
+        poll = (PKG / "scripts" / "poll_run_dir.py").read_text(encoding="utf-8")
+        for needle in ('HIT_LIMIT_MARK = "轮次耗尽"', "def head_hit_limit",
+                       "--from-manifest", "def load_expected_from_manifest"):
+            if needle not in poll:
+                bad.append(f"poll_run_dir.py 缺 {needle}")
+        lead = (PKG / "agents/viral-evo-lab-team-lead.md").read_text(encoding="utf-8")
+        if "poll_run_dir.py" not in lead:
+            bad.append("主理人 MD 无 poll_run_dir.py 调用（巡检未接线）")
+        out.append((not bad, "撞限巡检接线守卫（撞限标注消费 + manifest 读取 + T1 前置）"
+                    if not bad else "; ".join(bad)))
+    except (OSError, UnicodeError) as e:
+        out.append((False, f"撞限巡检接线守卫：校验失败 {type(e).__name__}: {e}"))
 
     return out
 

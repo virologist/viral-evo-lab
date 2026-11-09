@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Phylogenetics Analyst"
   zh: "系统发育分析师"
+domain: 病毒学/系统发育动力学
 maxTurns: 60
 skills: [viral-evo-core]
 ---

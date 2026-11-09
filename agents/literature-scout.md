@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Frontier Literature Scout"
   zh: "前沿文献侦察员"
+domain: 跨域检索/方法迁移（含医学-兽医桥）
 maxTurns: 60
 skills: [viral-evo-core]
 ---

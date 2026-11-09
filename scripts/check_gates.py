@@ -34,6 +34,20 @@ REQUIRED_ENV = ["agent_id", "task_id", "phase", "status", "confidence", "deliver
 VALID_STATUS = {"success", "partial", "failed", "blocked"}
 
 
+
+def _load_guard():
+    """R-10a：加载同目录 guard_readonly（只读区写盘守卫）；加载失败不阻断（降级为无守卫）。"""
+    here = Path(__file__).resolve().parent
+    try:
+        spec = importlib.util.spec_from_file_location("guard_readonly", here / "guard_readonly.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, SyntaxError) as e:
+        print(f"⚠ guard_readonly 加载失败（守卫降级）: {e}", file=sys.stderr)
+        return None
+
+
 def load_member_output():
     """复用 verify_member_output 的核验逻辑（同目录 import；C3 修复：异常转 exit 3 契约）。"""
     here = Path(__file__).resolve().parent
@@ -652,6 +666,8 @@ def main() -> int:
         "gates": [{"gate": g, "ok": ok, "detail": d} for g, ok, d in results],
         "verdict": verdict,
     }
+    _g = _load_guard()
+    if _g: _g.guard_or_exit(str(run_dir / f"{args.task_id}__gates.json"))  # R-10a 只读区守卫
     out = run_dir / f"{args.task_id}__gates.json"
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"\n裁决: {verdict} → {out}")

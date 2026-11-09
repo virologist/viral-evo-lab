@@ -29,10 +29,18 @@ MANIFEST = PKG_ROOT / "integrity_manifest.json"
 
 
 def tracked_files() -> list[str]:
-    out = subprocess.run(
-        ["git", "-C", str(PKG_ROOT), "ls-files"],
-        capture_output=True, text=True, check=True,
-    ).stdout
+    # R-12b（2026-11-09）：git 缺失/仓库损坏不再裸抛——明确报错 EXIT=2
+    # （此前的 check=True 无兜底会直接 traceback，无退出码契约）
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(PKG_ROOT), "ls-files"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, OSError, subprocess.TimeoutExpired) as e:
+        print(f"❌ git ls-files 失败（{type(e).__name__}: {e}）——"
+              f"manifest 以 git 跟踪清单为源，git 不可用即无法生成。"
+              f"请确认本目录是 git 仓库且 git 在 PATH。", file=sys.stderr)
+        raise SystemExit(2)
     return sorted(ln for ln in out.splitlines() if ln.strip())
 
 

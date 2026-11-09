@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-09T06:19:21",
- "file_count": 68,
+ "generated": "2026-11-09T10:31:21",
+ "file_count": 70,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "0636adb039d5661e",
+   "sha16": "a51f24541b912dc0",
    "bytes": 704
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "ae4363cc8487ee41",
+   "sha16": "7955ce5231175429",
    "bytes": 6692
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "71be8b0038e08e04",
+   "sha16": "4e1a6e67599970a5",
    "bytes": 6721
   },
   ".gitignore": {
@@ -27,12 +27,12 @@
    "bytes": 61
   },
   ".learnings/LEARNINGS.md": {
-   "sha16": "31186b32cc461b43",
-   "bytes": 19323
+   "sha16": "d32e4b0a2c028f1d",
+   "bytes": 22334
   },
   "CHANGELOG.md": {
-   "sha16": "3b236f23c1c0bdd3",
-   "bytes": 27637
+   "sha16": "92439aa4e6ec5309",
+   "bytes": 35590
   },
   "CLAUDE.md": {
    "sha16": "f507089af7b23cdf",
@@ -55,44 +55,44 @@
    "bytes": 3188
   },
   "agents/archivist.md": {
-   "sha16": "5f68f82f505c0576",
-   "bytes": 10102
+   "sha16": "cebce8623922f0d1",
+   "bytes": 10136
   },
   "agents/hypothesis-officer.md": {
-   "sha16": "79b45ddd6ebd255c",
-   "bytes": 5659
-  },
-  "agents/literature-scout.md": {
-   "sha16": "4b2c0217f785c2af",
-   "bytes": 7423
-  },
-  "agents/phylo-analyst.md": {
-   "sha16": "a9f2c0a3f35b4062",
+   "sha16": "3880f4ea441eda55",
    "bytes": 5704
   },
+  "agents/literature-scout.md": {
+   "sha16": "d802bb74dfaf8da6",
+   "bytes": 7482
+  },
+  "agents/phylo-analyst.md": {
+   "sha16": "5b0f382174bd54ab",
+   "bytes": 5744
+  },
   "agents/pipeline-engineer.md": {
-   "sha16": "7a9ebd3e9631f740",
-   "bytes": 5507
+   "sha16": "d507d1e733161e15",
+   "bytes": 5550
   },
   "agents/popgen-modeler.md": {
-   "sha16": "01fc4975d1e8695c",
-   "bytes": 5661
+   "sha16": "54028449155a4a32",
+   "bytes": 5704
   },
   "agents/predictive-virologist.md": {
-   "sha16": "f3f6c1663fdfd36a",
-   "bytes": 5600
+   "sha16": "9d355d49a6529224",
+   "bytes": 5657
   },
   "agents/research-diagnostician.md": {
-   "sha16": "77b2cafd44ba98ae",
-   "bytes": 8525
+   "sha16": "3d8a19dc774c70fe",
+   "bytes": 8562
   },
   "agents/structural-virologist.md": {
-   "sha16": "19c990b31e9dd4fa",
-   "bytes": 5255
+   "sha16": "7318cfc586b92d58",
+   "bytes": 5298
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "63508184556202a8",
-   "bytes": 40124
+   "sha16": "6fbe049e9558b457",
+   "bytes": 43811
   },
   "avatars/.gitkeep": {
    "sha16": "e3b0c44298fc1c14",
@@ -143,72 +143,80 @@
    "bytes": 70795
   },
   "docs/P4_monitoring_design.md": {
-   "sha16": "2382ec8f31b94b96",
-   "bytes": 7046
+   "sha16": "0944fcfb25931c03",
+   "bytes": 7378
+  },
+  "docs/SPOF_INVENTORY.md": {
+   "sha16": "5b80591c28c436dc",
+   "bytes": 3784
   },
   "docs/authorization_matrix.md": {
-   "sha16": "f3eea5920914643a",
-   "bytes": 3917
+   "sha16": "a557a6e4d5f64002",
+   "bytes": 4692
   },
   "scripts/assemble_spawn_prompt.py": {
    "sha16": "b24e9eb6f6852b79",
    "bytes": 35277
   },
   "scripts/check_gates.py": {
-   "sha16": "9456f23826696ba5",
-   "bytes": 35080
+   "sha16": "d2eefbb8a8278089",
+   "bytes": 35761
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
    "bytes": 4925
   },
   "scripts/find_knowledge.py": {
-   "sha16": "3d341d539f6c954e",
-   "bytes": 4007
+   "sha16": "180c06ee5265e0c7",
+   "bytes": 5412
   },
   "scripts/gen_integrity_manifest.py": {
-   "sha16": "0ef1643e6e9eaea4",
-   "bytes": 3141
+   "sha16": "dd743cb05233237e",
+   "bytes": 3703
+  },
+  "scripts/guard_readonly.py": {
+   "sha16": "815f24a92b55bcf8",
+   "bytes": 4502
   },
   "scripts/hypothesis_watch.py": {
    "sha16": "b201a34cbae9d055",
    "bytes": 15514
   },
   "scripts/log_spawn.py": {
-   "sha16": "9d9380888676e6f3",
-   "bytes": 1969
+   "sha16": "c8a74d1b704b3d73",
+   "bytes": 2649
   },
   "scripts/poll_run_dir.py": {
-   "sha16": "7992852701ea9116",
-   "bytes": 4005
+   "sha16": "0b4461d56a1a55dc",
+   "bytes": 9084
   },
   "scripts/render_context_stack.py": {
-   "sha16": "e380326bcecd3506",
-   "bytes": 6271
+   "sha16": "3532b030ecb5d777",
+   "bytes": 6962
   },
   "scripts/validate_contracts.py": {
-   "sha16": "0b7145fcb44bc2fc",
-   "bytes": 7063
+   "sha16": "6096d0ddd834b16e",
+   "bytes": 7174
   },
   "scripts/verify_member_output.py": {
-   "sha16": "bf46dac5a4a469a6",
-   "bytes": 7612
+   "sha16": "c7c3e69c1e2deb5b",
+   "bytes": 8308
   },
   "scripts/verify_numbers.py": {
    "sha16": "19f82cae28887db2",
    "bytes": 8508
   },
   "scripts/write_checklist.py": {
-   "sha16": "5f7a28b620ddbf27",
-   "bytes": 2963
+   "sha16": "c8d64d4902c5981b",
+   "bytes": 3643
   },
   "settings.json": {
    "sha16": "d74fcffe455cd1b8",
    "bytes": 188
   },
   "skills/viral-evo-core/SKILL.md": {
-   "sha16": "7d0b7c8a40d927e7",
-   "bytes": 3626
+   "sha16": "c011bc2986934bf6",
+   "bytes": 4368
   },
   "skills/viral-evo-core/references/code-standards.md": {
    "sha16": "12c748105ab051e3",
@@ -227,8 +235,8 @@
    "bytes": 2185
   },
   "skills/viral-evo-core/references/frontier-2025-2026.md": {
-   "sha16": "a55e5523f55a2c8d",
-   "bytes": 2129
+   "sha16": "7866a17555e302c5",
+   "bytes": 2127
   },
   "skills/viral-evo-core/references/lead-ops.md": {
    "sha16": "8bdb1fffbbd889f7",
@@ -251,20 +259,20 @@
    "bytes": 1383
   },
   "skills/viral-evo-core/references/team-contract.md": {
-   "sha16": "51f6105f6edd81dd",
-   "bytes": 6605
+   "sha16": "d1118b71917840d6",
+   "bytes": 7139
   },
   "tests/test_contract_guard.py": {
-   "sha16": "135e3f4693b113b7",
-   "bytes": 13189
+   "sha16": "812981d3ca028415",
+   "bytes": 15276
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "251e96362c2eb806",
-   "bytes": 26701
+   "sha16": "aa3cd1e706648a7a",
+   "bytes": 30615
   },
   "tests/test_vendor_core.py": {
-   "sha16": "a3715171990c5340",
-   "bytes": 9566
+   "sha16": "7f6eea873cb85157",
+   "bytes": 11688
   },
   "vendor/shared-core/VENDOR.json": {
    "sha16": "ab3df020b0f07ed8",

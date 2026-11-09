@@ -35,7 +35,7 @@ TEAM_CONTRACT = {
 
 # B（2026-10-14）：skills 层契约（SKILL.md 唯一入口须索引团队工具+核心铁律）
 SKILL_CONTRACTS = {
-    "团队工具索引（scripts/ 全清单）": r"assemble_spawn_prompt|verify_member_output|check_scope|write_checklist|find_knowledge|validate_contracts",
+    "团队工具索引（scripts/ 全清单）": r"assemble_spawn_prompt|verify_member_output|check_scope|write_checklist|find_knowledge|validate_contracts|check_gates|hypothesis_watch|render_context_stack|log_spawn|poll_run_dir|verify_numbers|gen_integrity_manifest",
     "数字必溯源铁律": r"数字必溯源|未溯源|待人工核验",
     "禁项目叙事铁律（P2）": r"禁项目叙事|GOVERNANCE_BOUNDARIES|check_scope",
     "契约源回指（主理人 MD）": r"team-lead|主理人",

@@ -4,6 +4,47 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.4] - 2026-11-09（任务 B 十编号对齐施工 · 断链接线与防复发）
+
+> 版本口径：任务 B（编号 1/2/3/4/5/6/9/10/12/13）第一阶段对齐方案经用户 GATE 2 放行后的施工发版。三批次（B1 断链接线 / B2 只读守卫与重试 / B3 文档增补）一次交付；全部改动为「接线 / 补测试 / 口径订正 / 维度增补」，**零重新设计已闭合机制**。
+
+### Added
+- **R-13b 🔴 守卫互锚（决定性新发现修复）**：实测发现 `test_contract_guard.py` 自身无任何锚定——空壳化 + 重生成 manifest 后 EXIT=0 全静默（历史事故「tests 被旧基线覆盖 → CI 静默 0 覆盖」的同构复发路径，当前零防御）。现 `test_vendor_core.py` 新增 **V7 守卫互锚**：反向锚定守卫文件的 `_checks`/`test_contract_guard`/`sys.exit(main())`/守卫标题等 6 锚点；删守卫 → V7 FAIL，删 vendor_core → 守卫第 1 项 FAIL，**双向互锚**（残余风险：双文件同时覆盖 → Known Issues，缓解 = 施工前后必跑守卫）。
+- **R-13b fuzz 语料下限**：实测 fuzz CASES 可抽稀 45→1 而守卫全过（只锚函数名不锚数量）。现守卫第 7 项增 CASES ≥40 下限断言（拦删减不拦扩展），实测抽稀至 35 条 → `❌ CASES 仅 35 条（<40 下限）——疑遭抽稀` EXIT=1。
+- **R-13a 🔴 撞限标注消费（决定性新发现修复）**：实测带 `<!-- 轮次耗尽 -->` 头部标注的 artifact 被 `poll_run_dir.py` 判 READY/EXIT=0（主理人「无标注 = Phase 完成」的续跑判据在代码侧落空）。现 poll 读每个 artifact 头 3 行，命中「轮次耗尽」→ 新增「撞限」分类 + NOT_READY/EXIT=5 + 明确提示「不得收 envelope」。实测：撞限 1 → `NOT_READY（撞限 1）`。
+- **R-13c spawn_manifest 读取接线**：manifest 此前**只写不读**（穷举 grep 仅 log_spawn.py 自身 2 处；续跑三步判定的第 1 步「读 spawn_manifest」无代码实现）。现 `poll_run_dir.py` 新增 `--from-manifest`：从 manifest 自动生成期望清单（`--expected` 保留为显式覆盖项）；manifest 缺失 → EXIT=5 不静默放行。
+- **R-10a 只读区写盘守卫**：新增 `scripts/guard_readonly.py`——`check_write_target(path)` 按 `VIRAL_EVO_READONLY_DENY` 显式清单 + `RESEARCH_OPS_DIR` 兜底判定只读区，命中即 EXIT=7；逃生开关 `VIRAL_EVO_ALLOW_READONLY=1`。**接线 5 个写盘脚本**（check_gates / verify_member_output / write_checklist / log_spawn / render_context_stack）写盘前调用；加载失败降级为无守卫（不阻断）。实测复现 LEARNINGS-012 事故场景（只读区跑 check_gates）：修复前 gates.json 落入只读区，修复后 **EXIT=7 且零落盘**；正常工作区行为逐字节不变。
+- **R-10b 重试与降级接线**：① poll manifest 读取加 3 次指数退避（2s/4s/8s，失败原因写 stderr——P4 B-4 从「未排期」转「部分落地」）；② find_knowledge 三处 subprocess 补 `run_cmd` 封装（returncode 检查 + 单次重试，rg/grep 无命中 returncode=1 不误重试）；③ 主理人 MD 增「本地降级检索」条款：联网检索全失败 → `find_knowledge.py` 扫本地三仓 + 信封标注 `[本地知识库降级检索]`（「联网失败→本地库」从文档声明变流程接线）。
+- **R-12a legacy 回退测试锁定**：`--legacy-package-check` 回退链此前**零测试覆盖**（实测可放行 V5 拒收的散文包 = 真实退化通道，可能被静默改动）。新增行为级测试：V5 拒收散文包（EXIT=4）→ `--legacy-package-check` 放行（EXIT=0, mode=legacy-forced）。
+- **R-12b 单点故障清单**：新增 `docs/SPOF_INVENTORY.md`（14 项依赖逐条「类型/降级/状态」+ 冗余编排现状 + 残余单点归属）；`gen_integrity_manifest.py` 的 git `check=True` 裸抛改为明确报错 EXIT=2。
+- **编号1 坍缩三维扩展**：坍缩路由表增「三维度」（分析主题/数据集·基因段/领域匹配度——成员 frontmatter 新增 `domain:` 字段，9 员全配）+「坍缩确认」行（无坍缩行 = 任务对齐不完整）。
+- **编号3 分歧协议补全**：authorization_matrix §五 从两步扩为四步（数据仲裁 → **多数共识**（≥3 非当事成员评审，票型落 decision_log）→ **用户终裁** → 记录义务）；仲裁输入接 literature-scout 4R R2 证据对比表；补 decision_log 对账诚实声明（无脚本审计，不虚构自动化）。
+- **编号5 信封可选 next_action**：schema 增可选字段（≤120 字、描述动作不含成员名、非路由指令、G1 不校验）——与 E1 已删的 `next_agent_hint` 明确切割。
+- **编号6 元审计触发条款**：主理人 MD 新增「每轮元审计收轮必须写 ≥1 条 LRN（含漏检维度）」+「修复后 1 轮内用守卫锚点回查改进落地」+ 空模板（ERRORS/FEATURE_REQUESTS）使用说明。
+- **编号9 白名单真化**：validate_contracts 工具索引正则 6→13 脚本（原「全清单」名不符实）；SKILL.md 工具索引表 7→13 行（补 check_gates/hypothesis_watch/render_context_stack/log_spawn/poll_run_dir/guard_readonly/gen_integrity_manifest）。
+- **SPOF/任务B状态**：见 docs/SPOF_INVENTORY.md 与工作空间 `viral-evo-lab-audit/MISSION_B_ALIGNMENT.md`。
+
+### Fixed
+- **P4 B-3 失效声明真化**：P4 文档曾标 B-3「✅ 已落地（v1.5.0）」，实测 T1 段无任何 poll 步骤。现已真实写入 T1 首位（收 envelope 前先 `poll_run_dir --from-manifest`，NOT_READY 不收），P4 条目订正并注明失效史。
+- **信噪比 >70% 死声明作废**：主理人 MD 声明的「相关度 >70% 注入」全包唯一命中、无任何计算实现（render_context_stack 仅做 JSON→md 渲染）。订正为「全量注入固定清单 + 诚实声明作废死阈值」。
+- **两仓分层污染泛化**：`predictive-virologist.md:54` 与 `frontier-2025-2026.md:16` 含项目特定位点叙事（HA Site 140 / H5Nx 框架 A），泛化为领域通用表述（复扫 + check_scope EXIT=0 clean）。
+
+### Changed
+- 主理人 MD：T1 增 poll 前置与 R-10a/R-10b 条款；坍缩路由表三维扩展；元审计触发条款；D2 适用面声明；maxTurns/全局重试预算口径诚实化（声明式定档无脚本校验 / 计数靠 checklist note，不虚构机器计数）。
+- `P4_monitoring_design.md`：B-3 真化、B-4 部分落地订正。
+- fuzz main() 行为级清单 3→6（+require_tag/poll_hitlimit/legacy_fallback），独立跑合计 **51/51**。
+- 守卫校验项 7→**9**（+语料下限 + 撞限巡检接线锚点）；vendor_core 检查项 V1-V6→**V1-V7**。
+
+### Verification
+- pytest **9 passed**（7 原有 + test_poll_hitlimit_and_manifest + test_legacy_package_check_fallback）
+- fuzz **51/51**（45 用例 + 6 行为级）；守卫 **8/8**；contracts EXIT=0（白名单 13 脚本）；check_scope EXIT=0 clean；14 脚本编译 + `--help` 全过
+- 沙箱实测：撞限标注 NOT_READY / --from-manifest 三态 / 守卫空壳化被 V7 抓获 / CASES 抽稀被下限抓获 / 只读区写盘 EXIT=7 零落盘 / 正常区行为不变 / legacy 回退两分支
+
+### Known Issues（本轮新增/更新，不阻塞）
+- 守卫互锚残余风险：两测试文件**同时**被旧基线覆盖时双向锚同时失效——缓解：施工前后必跑守卫（工程纪律）+ 轮报人工 `git diff <tag> -- tests/`（零成本人工锚）；完全防御需包外 CI 锚（backlog）。
+- `RESEARCH_OPS_DIR` 未设置时只读守卫兜底根为空（仅显式 `VIRAL_EVO_READONLY_DENY` 生效）——研究工作流中该变量由装配流程注入，独立脚本调用场景建议显式设 DENY。
+- vendor 模板 `record_trace.py`/`progress.py` 死引用**不在本包 vendor 副本**（实测 grep=0，审计取证误报已订正）；如联邦层出现按 Known Issues 先例标「待联邦层修复」。
+
 ## [1.5.3] - 2026-11-09（L3 独立盲检回补 · 门禁诚实性收敛）
 
 > 版本口径：v1.5.2 已提交推送（tag `v1.5.2`），但 L3 独立盲检发现 **2 个严重代码缺陷** + 3 项高危契约缺口，故 v1.5.2 **不视为真正收敛**。本版为**补丁级**回补发版，不新增内容生产环节，全部改动为「修复 / 接线 / 口径统一」。

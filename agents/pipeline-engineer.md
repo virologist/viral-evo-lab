@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Bioinformatics Pipeline Engineer"
   zh: "生信管线工程师"
+domain: 生物信息学/分析管线工程
 maxTurns: 80
 skills: [viral-evo-core]
 ---

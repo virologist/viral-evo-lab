@@ -13,11 +13,14 @@
   "confidence": <0-100自评>,
   "deliverable_summary": "<一句话摘要>",
   "workflow": "<主理人下发的 workflow 值·原样回传>",
-  "issues": ["<自评发现的问题；无则空数组>"]
+  "issues": ["<自评发现的问题；无则空数组>"],
+  "next_action": "<可选·建议主理人下一步动作（≤120字）；描述动作本身，不含成员名——非路由指令，无则省略>"
 }
 ```
 
 **status自评准则**：完整满足→success；部分满足且issues非空→partial；无法满足需重试→failed；前置条件不足→blocked。
+
+**next_action 定性（编号5 · 2026-11-09）**：**可选字段**——区别于 E1 已删的 `next_agent_hint`（成员自创路由指令，防越权）：本字段只描述动作（如「建议对 NA 段补 dN/dS」），不含成员名、不构成路由权；G1 不校验该字段（缺省不拦）；主理人 T1 汇编须采纳或在 checklist note 说明不采纳理由。
 
 **issues 定性**：成员侧必填（无则空数组）；G1 仅强校验 6 必填字段，`issues` 缺失不判 FAIL，但类型非数组判 FAIL。
 

@@ -20,6 +20,21 @@ from datetime import datetime
 from pathlib import Path
 
 
+import importlib.util  # noqa: E402
+
+def _load_guard():
+    """R-10a：加载同目录 guard_readonly（只读区写盘守卫）；加载失败不阻断（降级为无守卫）。"""
+    here = Path(__file__).resolve().parent
+    try:
+        spec = importlib.util.spec_from_file_location("guard_readonly", here / "guard_readonly.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, SyntaxError) as e:
+        print(f"⚠ guard_readonly 加载失败（守卫降级）: {e}", file=sys.stderr)
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="spawn manifest 留痕")
     ap.add_argument("run_dir")
@@ -30,6 +45,8 @@ def main() -> int:
     args = ap.parse_args()
 
     run_dir = Path(args.run_dir)
+    _g = _load_guard()
+    if _g: _g.guard_or_exit(run_dir)  # R-10a 只读区守卫
     run_dir.mkdir(parents=True, exist_ok=True)
     spawn_file = run_dir / f"spawn__{args.member}.md"
     entry = {

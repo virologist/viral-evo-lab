@@ -47,6 +47,20 @@ _vn = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_vn)
 
 
+
+def _load_guard():
+    """R-10a：加载同目录 guard_readonly（只读区写盘守卫）；加载失败不阻断（降级为无守卫）。"""
+    here = Path(__file__).resolve().parent
+    try:
+        spec = importlib.util.spec_from_file_location("guard_readonly", here / "guard_readonly.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, SyntaxError) as e:
+        print(f"⚠ guard_readonly 加载失败（守卫降级）: {e}", file=sys.stderr)
+        return None
+
+
 def autodetect_sources() -> list:
     """权威源自动探测：env RESEARCH_OPS_DIR → CWD/research-ops → 本仓 outputs/。"""
     cands = []
@@ -138,6 +152,8 @@ def main() -> int:
             "gate_mode": "block" if args.gate else "warn",
             "sources_used": sources,
         }
+        _g = _load_guard()
+        if _g: _g.guard_or_exit(str(run_dir / f"{args.task_id}__output-check.json"))  # R-10a 只读区守卫
         out = run_dir / f"{args.task_id}__output-check.json"
         out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"📄 {out}")

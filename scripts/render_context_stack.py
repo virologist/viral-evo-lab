@@ -22,6 +22,21 @@ from datetime import datetime
 from pathlib import Path
 
 
+import importlib.util  # noqa: E402
+
+def _load_guard():
+    """R-10a：加载同目录 guard_readonly（只读区写盘守卫）；加载失败不阻断（降级为无守卫）。"""
+    here = Path(__file__).resolve().parent
+    try:
+        spec = importlib.util.spec_from_file_location("guard_readonly", here / "guard_readonly.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except (OSError, SyntaxError) as e:
+        print(f"⚠ guard_readonly 加载失败（守卫降级）: {e}", file=sys.stderr)
+        return None
+
+
 def render_hyp(d: dict) -> str:
     out = ["# Confirmed Hypotheses（人类可读视图）",
            f"> JSON 机器真源 → 渲染版｜更新：{d['last_updated']}\n", "## 活跃"]
@@ -141,6 +156,8 @@ def main() -> int:
         if mp.is_file() and mp.read_text(encoding="utf-8") == rendered:
             print(f"  ⏭ {stem}.md 内容未变，跳过写入（防 OneDrive 写放大）")
         else:
+            _g = _load_guard()
+            if _g: _g.guard_or_exit(mp)  # R-10a 只读区守卫
             mp.write_text(rendered, encoding="utf-8")
             print(f"  ✅ {stem}.md ← {stem}.json（{mp.stat().st_size}B）")
     print("\n纪律：md 由本脚本生成，禁手改；改 JSON → 重跑本脚本。")

@@ -28,7 +28,8 @@ skills: [viral-evo-core]
 
 ## 全局重试预算（防多层循环叠加）
 
-所有重试计数器（苏格拉底追问轮次、4R 重入 R1、Gödel 重入规划、某成员返工）共享同一全局预算：**总重试 ≤5 次**触发用户升级。任一计数器达到本层上限前需检查全局预算余额，耗尽则不再继续重试，直接给出现状报告与升级建议。
+所有重试计数器（苏格拉底追问轮次、4R 重入 R1、Gödel 重入规划、某成员返工）共享同一全局预算：**总重试 ≤5 次**
+**计数载体（编号4 · 2026-11-09）**：预算计数由主理人在 checklist note 字段落盘（`write_checklist.py --note '重试 x/5'`），无独立计数器脚本——计数靠主理人纪律 + checklist 留痕可审计（诚实声明，不虚构机器计数）。触发用户升级。任一计数器达到本层上限前需检查全局预算余额，耗尽则不再继续重试，直接给出现状报告与升级建议。
 
 ---
 
@@ -94,7 +95,13 @@ skills: [viral-evo-core]
 | literature-scout | 文溯源 | γ核心：4R 检索、PMID/DOI 核验、方法论迁移三步法、**跨域迁移专家坍缩态**（原 medical-vet-bridge 职责已并入，v1.3） |
 | archivist | 史治文 | 文档治理·勘探·CLAUDE.md 维护·CONTEXT_STACK 落盘·论文素材汇编 |
 
-### 坍缩方向路由表（消除双归属歧义）
+### 坍缩方向路由表（消除双归属歧义 · v1.5.4 三维扩展）
+
+**坍缩三维度**（按序判定）：①分析主题 ②数据集/基因段 ③领域匹配度（成员 frontmatter `domain:` 字段与任务领域坐标直接比对，取交集最大者）。
+
+**坍缩确认（编号1 · 2026-11-09）**：每次坍缩后、任务对齐 ACK 时，输出一行——
+`◎ 本次坍缩：成员 <ID> · 坍缩态 <专家态> · 维度 <主题/数据集·段位/匹配度>`；无坍缩行 = 任务对齐不完整。
+
 | 用户信号 | 直调 |
 |---|---|
 | 分歧时间 / 分子钟 / 系统发育动力学 / 流行病学结合树 | phylo-analyst → 坍缩**分子钟与系统发育动力学专家** |
@@ -202,14 +209,16 @@ WF5 Phase 2 红队矩阵完成后，主理人按严重度分派修复路由：
   - 次要/改进 → 记录入 01_diagnostics/，不阻塞交付（下一轮迭代处理）
 修复完成后 → 重新触发 WF5 验证（仅验证修复项 + 回归检查，不重跑全量）
 循环上限：**计入全局重试预算（≤5）**；预算耗尽 → 停止循环，报告残余缺陷清单 + 风险声明
-收敛判据（D2 · 2026-11-07，借鉴 a-evolve egl_window 思想）：**连续 2 轮修复验证无新 finding（severity ≥ 重要级）→ 终止循环**，输出收敛声明（每轮 finding 数已由 checklist 落盘，可审计）。预算未耗尽也可依此提前收敛——避免"为用完预算而循环"。
+收敛判据（D2 · 2026-11-07，借鉴 a-evolve egl_window 思想）：**连续 2 轮修复验证无新 finding（severity ≥ 重要级）→ 终止循环**
+**适用面（编号9 · 2026-11-09）**：D2 质量收敛判据仅适用于 WF5/WF6 修复循环；追问/4R/Gödel 等其他重试分支以「全局重试 ≤5」为唯一终止（当前无质量维度——诚实声明，扩展列 backlog）。，输出收敛声明（每轮 finding 数已由 checklist 落盘，可审计）。预算未耗尽也可依此提前收敛——避免"为用完预算而循环"。
 
 WF6 Phase 3 用户认可改进项后同样按此路由表分派：方法学新增→WF2/WF7；数据重切→WF4；投稿前攻击→WF5。
 ```
 
 ### 动态资源分配表（P1-5 2026-09-18，Anthropic「按复杂度分配投入」原则）
 
-> maxTurns 推导规则（2026-10-15，B3 2026-11-07 订正为唯一口径）：只读单产出=40｜假说引擎=50｜标准分析=60｜多步长链=80｜主理人=200（与各成员 frontmatter 逐一对齐）。新增成员按此定档，禁止随手填。
+> maxTurns 推导规则（2026-10-15，B3 2026-11-07 订正为唯一口径）：只读单产出=40｜假说引擎=50｜标准分析=60｜多步长链=80｜主理人=200（与各成员 frontmatter 逐一对齐）
+**口径诚实化（编号4 · 2026-11-09）**：maxTurns 为**声明式定档**——平台侧静态字段，脚本无法读取运行时实际轮次，故无脚本校验（check_gates/tests 均无该项，不虚构已自动化）；超限兜底走撞限协议（§撞限与断点续跑：落盘标注 + poll 巡检 + 三步判定）。。新增成员按此定档，禁止随手填。
 > 平台 maxTurns 为静态字段；主理人通过**任务粒度控制**实现等效动态分配：
 
 | WF | 单次派发粒度 | Phase 拆分 | 说明 |
@@ -432,7 +441,9 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 
 ## CONTEXT_STACK 记忆引擎（修正版 + JSON 真源化）
 
-- **读取**：每轮开始前检索 `research-ops/context_stack/` 四 JSON 真源（RENDERERS 定义：research_anchor / confirmed_hypotheses / method_library / knowledge_index）+ 四 .md 渲染视图 + 三协议 .md，相关条目前缀注入（信噪比控制：仅相关度 >70%）
+- **读取**：每轮开始前检索 `research-ops/context_stack/` 四 JSON 真源（RENDERERS 定义：research_anchor / confirmed_hypotheses / method_library / knowledge_index）+ 四 .md 渲染视图 + 三协议 .md，全量注入（注入范围 = 上述固定清单；**「相关度 >70% 信噪比过滤」声明已于 v1.5.4 作废**——脚本无相关度计算，原为死声明。信噪比由 CONTEXT_STACK 维护纪律把控：条目压缩阈值见 context-compaction.md 的 85% 用量 / 15 条目规则）
+- **只读区写入拦截（R-10a · 2026-11-09）**：对 `research-ops/`（Loop B 只读区）的任何脚本写入会被 `guard_readonly.py` 机械拦截（EXIT=7）——在只读区验证脚本行为时一律先 `cp -r` 到 /tmp 副本再跑（LEARNINGS LRN-20261109-012 事故的代码级防复发）；逃生开关 `VIRAL_EVO_ALLOW_READONLY=1` 仅限确需写入的受控场景
+- **本地降级检索（R-10b · 2026-11-09）**：WF1/WF2 联网检索（MCP/WebSearch）整体失败时，调用 `python3 <专家包>/scripts/find_knowledge.py <关键词> --limit 15` 扫本地三仓（04_H5 / research-ops / 专家包）作降级证据源；降级检索的产出在信封中标注 `[本地知识库降级检索]`，不得冒充联网前沿
 - **JSON 真源细则（写入规则/压缩策略/失败模式监控）**：见 `skills/viral-evo-core/references/lead-ops.md`（低频，按需 Read）；改 JSON 后跑 `render_context_stack.py` 重渲染 md
 
 
@@ -457,6 +468,11 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 - [ ] 若涉及改稿：是否已 git tag 当前 commit 作快照锚点？（防 .bak 回归）
 
 ### T1 · 收 envelope 时（主理人执行，VERIFY 阶段）
+- [ ] **落盘巡检前置（P4 B-3 真化 · R-13 · 2026-11-09）**：收 envelope 前先跑
+      `python3 <专家包>/scripts/poll_run_dir.py <run-dir> <task-id> --from-manifest`
+      （manifest 缺失时改用 `--expected <成员清单>`）——EXIT=0（READY）才进后续核验；
+      EXIT=5 时按输出分类处置：缺失→派工补位、红超时→人工介入、**撞限→按撞限协议续跑，
+      不得收 envelope**。断点续跑第 1 步（读 spawn_manifest）由此机械化，不再靠人工 cat
 - [ ] status 自评与实际产出一致？failed/partial 不可伪装为 success
 - [ ] 引用是否含 PMID/DOI 或标注"待人工核验"？（防幻觉）
 - [ ] 是否触及 H-ANCHOR-1 类已被 M* 推翻的已 deprecated 结论？（防口径漂移）
@@ -471,6 +487,12 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 - [ ] **workflow 交叉核验（A-1 · 2026-11-09）**：派 spawn 时已带 `--workflow`？sidecar `<run-dir>/<task_id>__workflow.json` 是否在位？成员信封 `workflow` 与 sidecar 是否类别一致（analysis/other）？**不一致即 G1 FAIL**——成员自报 workflow 不得降级规避 WF4 假说锚定强制
 - [ ] **T-A1：子代理证据纪律门**（R3 2026-10-21 增补·LRN-006）：成员 / 子代理产出采信前主理人必须抽查 ≥2 条原稿上下文（`file:行号` + 原文 1-2 行摘录，Read/grep 抓取），抽查通过方可入报告 / `decision_log.csv` / `context_stack/*.json`；抽查未通过 = 视为未交付（与"文件缺失"同等待遇），主理人当场重发或换 agent 来源。同类证伪 ≥2 处/任务 → 触发决策级升级（见 `authorization_matrix.md`）。完整条款与反向 fixture 见 `CLAUDE.md §1`。
       重发命令示例：`Agent(name=<其他成员ID>, subagent_type="general-purpose", prompt=<重新装配提示>)`
+
+### 元审计触发条款（编号6 · 2026-11-09）
+
+- **LRN 强制写入**：每轮元层审计收轮时，主理人必须向 `.learnings/LEARNINGS.md` 写 ≥1 条 LRN，内容须含「本轮漏检了什么」维度（元审计）——LEARNINGS 无脚本读者/写者（check_scope EXCLUDE 豁免），本条款靠纪律执行 + 轮报留痕审计
+- **改进回查**：修复类任务完成后 1 轮内，回查「采纳的改进项是否真的落地」——用 tests/test_contract_guard.py 的锚点项作回查工具（守卫锚点 = 改进存活的机械证明），不新建脚本
+- **空模板处置**：`.learnings/ERRORS.md` / `FEATURE_REQUESTS.md` 为空模板——ERRORS 用于记录脚本执行级失败（含退出码与复现命令），FEATURE_REQUESTS 记录用户提出的未排期能力；首次写入时替换模板头
 
 ### 执行痕迹（R14 · checklist 落盘纪律）
 T0/T1 的执行结果（哪怕全过）写入 `<run-dir>/<task_id>__checklist.md`（3 行以内：时间/项数/结论）。**无 checklist 痕迹 = 该任务 VERIFY 未执行**——事后审计以文件为准，不以"我记得跑过"为准。推荐用 `scripts/write_checklist.py <run-dir> <task-id> --hallucinated N --note '...'` 落 JSON+md 双格式。

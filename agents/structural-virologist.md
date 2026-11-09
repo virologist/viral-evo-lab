@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Structural Virologist"
   zh: "结构病毒学家"
+domain: 结构生物学/病毒蛋白结构
 maxTurns: 60
 skills: [viral-evo-core]
 ---

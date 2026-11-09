@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Research Archivist"
   zh: "科研档案治理官"
+domain: 文档治理/知识管理
 maxTurns: 40
 skills: [viral-evo-core]
 ---

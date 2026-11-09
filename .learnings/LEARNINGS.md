@@ -376,3 +376,24 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - See Also: LRN-20261109-009
 
 ---
+
+## [LRN-20261109-013] 守卫无自锚 = 防线可被整体静默摘除
+- **Category**: insight | **Severity**: critical | **Status**: resolved (v1.5.4 R-13b)
+- **Context**: 任务 B 取证实测：test_contract_guard.py 的 7 项锚点无一锚定自身——空壳化守卫 + 重生成 integrity_manifest 后 EXIT=0 全静默、manifest --check 照样 OK、pytest 收集数表面不变。
+- **Insight**: manifest 记录「当前是什么」而非「应该是什么」——以磁盘现状为基线的完整性校验无法检测「校验器本身被替换」；守卫与被守卫对象同文件时，覆盖守卫 = 摘除全部防线。历史事故「tests 被旧基线覆盖→CI 静默 0 覆盖」正是此模式的实发案例。
+- **Fix**: 跨文件双向互锚（vendor_core V7 锚 guard 六锚点；guard 第 1 项锚 vendor_core）+ fuzz CASES ≥40 数量下限（拦语料抽稀）。残余：双文件同时覆盖需人工纪律兜底。
+- **Prevention**: 任何「防线类」资产必须回答「谁防防线本身」；完整性清单类工具不得作为唯一锚点。
+
+## [LRN-20261109-014] 状态标注的生产者-消费者断链（只写不读 / 只标不查）
+- **Category**: insight | **Severity**: critical | **Status**: resolved (v1.5.4 R-13a/c)
+- **Context**: 两个同构缺陷：①spawn_manifest.jsonl 只写不读（续跑第 1 步「读 manifest」无代码）；②「轮次耗尽」标注只标不查（poll 只看 mtime，带标注 artifact 判 READY）。
+- **Insight**: 契约字段/状态标注必须有「生产者→传递→消费者→判定权威源」四段闭环（A-1 同律）；缺消费端的落盘是死数据，缺机械检查的标注是死文本——主理人「以落盘文件为准」的纪律在没有消费代码时退化为「以人工 cat 为准」。
+- **Fix**: poll --from-manifest 打通读取；poll 读 artifact 头 3 行消费撞限标注 → NOT_READY。
+- **Prevention**: 新增任何落盘字段/标注时，同步指定其消费者（脚本或门禁锚点）；无消费者的字段不进 schema。
+
+## [LRN-20261109-015] 失效的 ✅：状态文档自述与实物脱钩
+- **Category**: correction | **Severity**: medium | **Status**: resolved (v1.5.4 R-13e + 编号4/9 口径)
+- **Context**: P4 B-3 标「✅ 已落地」但 T1 段实测无 poll 步骤；validate_contracts「工具索引全清单」实含 6/13；「信噪比 >70%」「3 次指数退避」均为无实现的死声明。
+- **Insight**: 状态文档的 ✅ 会随时间脱钩（落地方被回退/部分落地被记全落地）；「全清单」类正则随代码增长漂移。检查状态声明的唯一可信方式 = 实测对应行为（grep 调用点 / 跑行为级用例）。
+- **Fix**: B-3 真化（T1 首位真实写入）；白名单 6→13；死声明作废或落地（退避→poll 实装；信噪比→口径订正）。
+- **Prevention**: 「✅ 已落地」条目须附可复验锚点（file:line 或测试名）；后续轮审计对每个 ✅ 抽查实测。

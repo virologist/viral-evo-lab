@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Research Diagnostician"
   zh: "研究诊断官"
+domain: 方法学审计/研究诊断
 maxTurns: 40
 skills: [viral-evo-core]
 ---

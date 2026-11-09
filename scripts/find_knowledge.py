@@ -33,6 +33,30 @@ def get_repos() -> dict[str, str]:
             ((k, (_REPOS_DEFAULT[k], _ENV_MAP[k])) for k in _REPOS_DEFAULT)}
 
 
+
+def run_cmd(cmd: list[str], timeout: int, retries: int = 1) -> subprocess.CompletedProcess | None:
+    """R-10b（2026-11-09）：带失败重试的 subprocess 封装。
+
+    retries=1 表示失败后重试 1 次（共 2 次尝试）；每次失败原因写 stderr。
+    返回最后一次 CompletedProcess；OSError（命令不存在等）返回 None。
+    """
+    last = None
+    for attempt in range(retries + 1):
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            print(f"⚠ find_knowledge 执行失败（第 {attempt + 1} 次）: {' '.join(cmd[:2])}...: {e}", file=sys.stderr)
+            last = None
+            continue
+        if r.returncode == 0:
+            return r
+        # rg/grep 无命中也返回 1——属正常业务态，不重试、不算失败
+        if r.returncode == 1:
+            return r
+        print(f"⚠ find_knowledge 非零退出 {r.returncode}（第 {attempt + 1} 次）: {' '.join(cmd[:2])}...: {r.stderr[:120]}", file=sys.stderr)
+        last = r
+    return last
+
 # rg 路径：PATH 探测优先，最后回退 homebrew 常见位置
 RG = shutil.which("rg") or "/opt/homebrew/bin/rg"
 
@@ -46,16 +70,24 @@ def grep_repo(name: str, root: str, query: str, type_filter: str | None, limit: 
         if type_filter:
             cmd += ["-t", type_filter]
         cmd += [query, root]
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        r = run_cmd(cmd, timeout=20)
+        if r is None or r.returncode not in (0, 1):
+            print("⚠ rg 查询失败（重试后仍失败），本仓跳过", file=sys.stderr)
+            return out
         lines = r.stdout.splitlines()[:limit]
     else:
         # 纯 grep 回退（macOS BSD grep -E 支持基础正则；不解释 | ，退化为字面）
         cmd = ["grep", "-rni", "-E", query, root, "-l"]  # 先列文件
-        r1 = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        r1 = run_cmd(cmd, timeout=20)
+        if r1 is None or r1.returncode not in (0, 1):
+            print("⚠ grep -l 失败（重试后仍失败），本仓跳过", file=sys.stderr)
+            return out
         files = r1.stdout.splitlines()[:limit]
         lines = []
         for f in files:
-            r2 = subprocess.run(["grep", "-ni", "-E", query, f], capture_output=True, text=True, timeout=10)
+            r2 = run_cmd(["grep", "-ni", "-E", query, f], timeout=10)
+            if r2 is None:
+                continue
             for line in r2.stdout.splitlines()[:3]:
                 lines.append(line)
                 if len(lines) >= limit:

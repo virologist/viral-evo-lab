@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Hypothesis Engine Officer"
   zh: "假说引擎官"
+domain: 病毒学/分子进化·假说生成
 maxTurns: 50
 skills: [viral-evo-core]
 ---

@@ -36,6 +36,13 @@ description: 病毒演化研究院共享方法库。当执行病毒遗传进化�
 | `scripts/write_checklist.py` | 纪律审判 checklist 落盘（JSON schema） | 主理人 T0/T1 |
 | `scripts/find_knowledge.py` | 跨仓知识查询入口 | 全员 |
 | `scripts/validate_contracts.py` | 契约完整性检查（agents+skills 层） | 主理人/CI |
+| `scripts/check_gates.py` | 团队级五门一条命令（G1-G5 + gates.json 落盘） | 主理人 T1 |
+| `scripts/hypothesis_watch.py` | 假说证伪触发与处置闭环检查 | 主理人/审计 |
+| `scripts/render_context_stack.py` | CONTEXT_STACK JSON→md 双轨同步渲染 | 主理人/archivist |
+| `scripts/log_spawn.py` | spawn 留痕（spawn_manifest.jsonl 追加） | 主理人每次 spawn 后 |
+| `scripts/poll_run_dir.py` | run_dir 落盘巡检（撞限标注/manifest 清单/分级超时） | 主理人 T1 前置 |
+| `scripts/guard_readonly.py` | 只读区写盘守卫（v1.5.4 R-10a） | 6 写盘脚本内置 + 人工预检 |
+| `scripts/gen_integrity_manifest.py` | integrity_manifest 生成与 --check | 施工定版流程 |
 
 **成员须知**（完整契约以 `agents/viral-evo-lab-team-lead.md` 为准，本表仅索引）：
 - 上行 `result_envelope` 6 必填字段（agent_id/task_id/phase/status/confidence/deliverable_summary）

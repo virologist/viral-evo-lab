@@ -182,6 +182,37 @@ def run_checks(expert_dir):
     finally:
         shutil.rmtree(tmp_root, ignore_errors=True)
 
+    # V7 守卫互锚（R-13b · 2026-11-09）-------------------------------------
+    # 背景：历史事故「tests 被旧基线覆盖 → CI 静默 0 覆盖」发生过两次。实测
+    # 发现 test_contract_guard.py 自身无任何守卫锚定——空壳化 + 重生成
+    # integrity_manifest 后 EXIT=0 全静默（manifest 记录"当前是什么"而非
+    # "应该是什么"）。本项从另一文件反向锚定守卫的存在性，形成跨文件互锚：
+    #   删/空壳化 test_contract_guard.py → 本项 FAIL
+    #   删/空壳化 test_vendor_core.py   → guard 第 1 项（A2 锚定本文件）FAIL
+    # 攻击面收窄：仅当两文件同时被覆盖时互锚才失效（收窄为人工纪律兜底，
+    # 见 Known Issues）。本项不依赖 integrity_manifest（那记录的是现状）。
+    guard_rel = os.path.join("tests", "test_contract_guard.py")
+    guard_path = os.path.join(expert_dir, guard_rel)
+    try:
+        with open(guard_path, encoding="utf-8") as f:
+            gsrc = f.read()
+        needles = [
+            "def _checks",                # 守卫主体函数
+            "def test_contract_guard",    # pytest 可收集入口（防收集数静默归零）
+            "def main",                   # 直跑入口
+            "sys.exit(main())",           # 退出码契约（失败≠0）
+            "A2 存活",                    # 第 1 项标题（守卫内容未被整体替换）
+            "A-1 修复存活守卫",            # 第 7 项标题（守卫版本未回退）
+        ]
+        missing = [n for n in needles if n not in gsrc]
+        r.add("V7", "守卫互锚：test_contract_guard.py 存活且锚点齐全",
+              "PASS" if not missing else "FAIL",
+              "" if not missing else f"缺失锚点={missing}（守卫可能被空壳化/旧基线覆盖）"
+                                     f"→ 恢复: git checkout <最新commit> -- {guard_rel}")
+    except OSError as e:
+        r.add("V7", "守卫互锚：test_contract_guard.py 存活且锚点齐全", "FAIL",
+              f"读取失败 {e}（守卫文件缺失？）")
+
     return r
 
 

@@ -470,6 +470,77 @@ def test_require_tag_gate() -> None:
         assert run(False, untagged) == 0, "默认关闭开关时须向后兼容"
 
 
+def test_poll_hitlimit_and_manifest() -> None:
+    """R-13a/c（2026-11-09）：撞限标注消费 + --from-manifest 行为级守卫。
+
+    三断言（对照 2026-11-09 任务 B 取证实测的缺陷）：
+      1. 头部带「轮次耗尽」标注的 artifact → NOT_READY / EXIT=5（此前判 READY）
+      2. --from-manifest 从 spawn_manifest.jsonl 自动生成期望清单 → 正常巡检
+      3. manifest 缺失 → EXIT=5（不静默放行）
+    """
+    with tempfile.TemporaryDirectory(prefix="poll_hl_") as td:
+        d = Path(td) / "r"
+        d.mkdir(parents=True)
+        poll = PKG / "scripts" / "poll_run_dir.py"
+
+        def run(*args: str) -> tuple[int, str]:
+            p = subprocess.run([sys.executable, str(poll), str(d), "T-P"] + list(args),
+                               capture_output=True, text=True, timeout=60)
+            return p.returncode, p.stdout + p.stderr
+
+        # 断言 1：撞限标注 → EXIT=5
+        (d / "T-P__literature-scout.md").write_text(
+            "<!-- 轮次耗尽，产出不完整：已完成 1/3，剩余 2 -->\n# p\n", encoding="utf-8")
+        rc, out = run("--expected", "literature-scout")
+        assert rc == 5 and "撞限" in out, f"撞限标注必须 NOT_READY/EXIT=5，实际 rc={rc}"
+        # 正常文件 → READY
+        (d / "T-P__literature-scout.md").write_text("# 正常产出\n", encoding="utf-8")
+        rc, _ = run("--expected", "literature-scout")
+        assert rc == 0, f"无标注文件应 READY，实际 rc={rc}"
+        # 断言 2：--from-manifest 自动清单
+        (d / "spawn_manifest.jsonl").write_text(
+            '{"task_id":"T-P","member":"literature-scout"}\n', encoding="utf-8")
+        rc, _ = run("--from-manifest")
+        assert rc == 0, f"--from-manifest 应自动生成清单并 READY，实际 rc={rc}"
+        # 断言 3：manifest 缺失 → EXIT=5
+        (d / "spawn_manifest.jsonl").unlink()
+        rc, out = run("--from-manifest")
+        assert rc == 5, f"manifest 缺失必须 EXIT=5，实际 rc={rc}"
+
+
+def test_legacy_package_check_fallback() -> None:
+    """R-12a（2026-11-09）：vendor V5 → legacy 子串校验回退链行为级守卫。
+
+    锁定既有行为（此前零测试覆盖，回退通道可能被静默改动）：
+      1. 散文任务包（无 JSON 结构）+ 默认路径 → V5 拒收（EXIT≠0）
+      2. 同输入 + --legacy-package-check → 放行（EXIT=0，mode=legacy-forced）
+    回退是「真实退化通道」：legacy 会放行 V5 拒收的输入——这是设计取舍
+    （A1 回退开关，正常情况勿用），本测试防止它被静默改为默认或移除。
+    """
+    with tempfile.TemporaryDirectory(prefix="legacy_fb_") as td:
+        d = Path(td)
+        asm = PKG / "scripts" / "assemble_spawn_prompt.py"
+        task_file = d / "task.txt"
+        # 含四要素字样的散文（legacy 子串校验可被"糊弄"——这正是其已知缺陷）
+        task_file.write_text(
+            "objective：示例目标 output_format：md constraints：只读 task_boundary：仅本任务",
+            encoding="utf-8")
+
+        def run(*args: str) -> tuple[int, str]:
+            p = subprocess.run(
+                [sys.executable, str(asm), "--task-file", str(task_file),
+                 "--member", "literature-scout", "--task-id", "T-LG",
+                 "--check-task-package", *args],
+                capture_output=True, text=True, timeout=60)
+            return p.returncode, p.stdout + p.stderr
+
+        rc_v5, _ = run()
+        assert rc_v5 != 0, f"散文任务包在 V5 校验下必须被拒，实际 rc={rc_v5}"
+        rc_lg, out_lg = run("--legacy-package-check")
+        assert rc_lg == 0 and "legacy" in out_lg, \
+            f"--legacy-package-check 应放行且注明 legacy 模式，实际 rc={rc_lg}"
+
+
 def main() -> int:
     ok_n = 0
     for name, art, wv, oc, expect in CASES:
@@ -478,14 +549,15 @@ def main() -> int:
         ok_n += int(ok)
     print(f"\nfuzz 用例 {len(CASES)} | 通过 {ok_n} | 失败 {len(CASES) - ok_n}")
     # 行为级用例（pytest 入口亦覆盖，此处供独立脚本运行）
-    for fn in (test_g4_waiver_release, test_gate_mode_blocks, test_disposition_gate):
+    for fn in (test_g4_waiver_release, test_gate_mode_blocks, test_disposition_gate,
+               test_require_tag_gate, test_poll_hitlimit_and_manifest, test_legacy_package_check_fallback):
         try:
             fn()
             print(f"  ✅ {fn.__name__}")
             ok_n += 1
         except AssertionError as e:
             print(f"  ❌ {fn.__name__}: {e}")
-    total = len(CASES) + 3
+    total = len(CASES) + 6
     print(f"\n合计 {total} | 通过 {ok_n} | 失败 {total - ok_n}")
     return 0 if ok_n == total else 1
 

@@ -7,6 +7,7 @@ displayName:
 profession:
   en: "Population Genetics & Molecular Evolution Modeler"
   zh: "群体遗传与分子进化建模师"
+domain: 群体遗传学/分子进化建模
 maxTurns: 60
 skills: [viral-evo-core]
 ---
