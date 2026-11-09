@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-09T13:59:55",
+ "generated": "2026-11-09T19:27:47",
  "file_count": 70,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "0dd0185ce6e544f8",
+   "sha16": "4fe6d0870203aca8",
    "bytes": 704
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "7d77786cf0ba6169",
+   "sha16": "4d94ad5b9d7d2cd9",
    "bytes": 6692
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "3eb04f7e088be0e8",
+   "sha16": "934b32ef953025f2",
    "bytes": 6721
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 27153
   },
   "CHANGELOG.md": {
-   "sha16": "3295879498e0a161",
-   "bytes": 42229
+   "sha16": "58bcb5e7ca0cdd77",
+   "bytes": 43469
   },
   "CLAUDE.md": {
    "sha16": "f507089af7b23cdf",
@@ -147,8 +147,8 @@
    "bytes": 7378
   },
   "docs/SPOF_INVENTORY.md": {
-   "sha16": "b20fc7e09aefd896",
-   "bytes": 3951
+   "sha16": "1f5974552c8eb94c",
+   "bytes": 3979
   },
   "docs/authorization_matrix.md": {
    "sha16": "a557a6e4d5f64002",
@@ -175,8 +175,8 @@
    "bytes": 3703
   },
   "scripts/guard_readonly.py": {
-   "sha16": "d2f264c5cf50eae0",
-   "bytes": 6123
+   "sha16": "f033b0f9657f89a9",
+   "bytes": 6361
   },
   "scripts/hypothesis_watch.py": {
    "sha16": "b201a34cbae9d055",
@@ -187,8 +187,8 @@
    "bytes": 2723
   },
   "scripts/poll_run_dir.py": {
-   "sha16": "ecf1068d6671a20a",
-   "bytes": 10789
+   "sha16": "5596b4849cc19320",
+   "bytes": 10896
   },
   "scripts/render_context_stack.py": {
    "sha16": "f443b75a652fe06f",

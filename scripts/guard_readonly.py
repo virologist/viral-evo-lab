@@ -54,11 +54,13 @@ def _deny_roots() -> list[Path]:
         for sub in DEFAULT_READONLY_SUBDIRS:
             roots.append(rp / sub)
     if not roots:
-        # 一次性警告：守卫无根 = 空转（放行一切但不静默）
-        if not getattr(_deny_roots, "_warned", False):
+        # 四轮🟢2：一次性警告改为「进程内一次」——函数属性会随 _load_guard 的
+        # 每次 exec_module 重置（六脚本各自加载新实例，同进程可重复打印）。
+        # 标记挂到 sys 模块（跨 exec_module 实例存活，进程退出即失效）。
+        if not getattr(sys, "_guard_readonly_warned", False):
             print("⚠ [guard_readonly] 未设置 VIRAL_EVO_READONLY_DENY / RESEARCH_OPS_DIR——守卫空转（全部放行）；"
                   "建议显式设置只读根", file=sys.stderr)
-            _deny_roots._warned = True
+            sys._guard_readonly_warned = True
     return roots
 
 

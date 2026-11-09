@@ -107,7 +107,8 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
                 # L3 盲检 Y7+三轮🟡2：member 会拼进 {task_id}__{member}.md——
                 # 白名单 [a-z0-9-]+ 与 9 名成员 ID 形态精确对齐（一剑封喉：
                 # 空格/大写/路径成分/特殊字符全部拦掉，消除跨平台大小写分裂）
-                if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", m):
+                if (len(m) > 64  # 四轮🟢3：长度上限（防超长标识符进文件名）
+                        or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", m)):
                     bad += 1
                     continue
                 members.append(m)

@@ -20,7 +20,7 @@
 | 权威源（数字溯源池） | check_gates.py G2 | 硬（门禁层） | 无权威源 → 判 FAIL（fail-closed） | ✅（方向安全） |
 | guard_readonly.py 只读根 | RESEARCH_OPS_DIR/_archive（v1.5.5 收窄） | 软 | 根缺失 → 不拦截（一次性 stderr 警告）；显式 DENY 优先 | ✅ |
 | `research-ops` 目录 | verify_member_output.py | 软 | env→CWD→本仓 outputs/ 逐级回退；无源 → fail-open 跳过 + 人工确认 | ✅ |
-| 本地知识库（context_stack 四 JSON） | render_context_stack.py | 软 | 单 JSON 缺失 → 静默 skip 并继续渲染其余 | ⚠️ 缺失不落痕（backlog：加 stderr 汇总） |
+| 本地知识库（context_stack 四 JSON） | render_context_stack.py | 软 | 单 JSON 缺失 → 跳过并继续渲染其余；结束前 stderr 汇总缺失清单（v1.5.6 已落地，四轮盲检 B-d 实测） | ✅ |
 | 联网（MCP/WebSearch） | 成员侧（literature-scout 等） | 软 | 降级三通道（search-sources.md）；**v1.5.4 R-10b 新增**：全失败 → find_knowledge.py 本地三仓降级检索 + 信封标注 `[本地知识库降级检索]` | ✅ 已接线 |
 | PyYAML | vendor 动态层（仅 vendor 副本） | 软 | 缺失 → 拒收动态层 | ✅（scripts/ 版不触发） |
 
