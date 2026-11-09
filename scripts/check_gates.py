@@ -8,8 +8,9 @@ check_gates.py —— 团队级脚本化门禁（D2/M3 修复 · 2026-10-15）
 
 用法：
     python3 scripts/check_gates.py <run-dir> <task-id> [--sources <目录...>]
+        [--require-tag] [--require-evidence-check]
 
-门禁清单（G1-G5，全部确定性）：
+门禁清单（G1-G6，全部确定性）：
     G1 信封完整   artifact 首个 JSON 含 6 必填字段且 status ∈ {success,partial,failed,blocked}
                   （T-B2 强化：phase:int / confidence:0-100 类型校验 + 期望 vs 实际字段对照输出）
     G2 数字溯源   关键数字（n=/p=/D′/百分比/CI）在权威源 grep 得到（复用 verify_member_output）
@@ -19,6 +20,11 @@ check_gates.py —— 团队级脚本化门禁（D2/M3 修复 · 2026-10-15）
                   L3（2026-11-09）：消费 <task-id>__waivers.json 人工放行——
                   须 value+reason+authorized_by 三项齐全且覆盖全部未溯源数字
     G5 审判留痕   checklist.json 已生成（T0/T1 的落盘凭证）
+    G6 抽查留痕   spawn_manifest.jsonl 含 ≥2 条 lead 的 evidence_check
+                  （file:行号 + 原文摘录 + reason）；ADR-002 裁决：**默认不强制**，
+                  须 --require-evidence-check 或 run_dir 下 evidence_check_policy.json
+                  显式启用。未启用时 gates.json 的 skipped_gates 显式记名，不静默跳过；
+                  启用后不合格 EXIT=5。只验形式要件，语义真伪归主理人 T1。
 
 退出码：0 = 全过；3 = artifact 缺失；5 = 任一门禁 FAIL
 边界：只做结构性/确定性检查；"产出质量好不好"归 LLM 与人。
@@ -77,6 +83,31 @@ def _load_verify_numbers():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def _load_evidence_check():
+    """ADR-002 / SOP T-D1：加载 G6 抽查留痕硬门（同目录 import）。
+
+    独立脚本形态见 verify_evidence_check.py；此处只做内联复用，
+    避免 check_gates 与 CLI 双份实现漂移（单一事实源）。
+    """
+    here = Path(__file__).resolve().parent
+    spec = importlib.util.spec_from_file_location("evidence_check_gate", here / "verify_evidence_check.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _evidence_policy_enabled(run_dir: Path) -> bool:
+    """任务级策略文件：{"enabled": true} 即启用 G6。畸形/缺失按未启用处理，不崩溃。"""
+    p = run_dir / "evidence_check_policy.json"
+    if not p.is_file():
+        return False
+    try:
+        obj = json.loads(p.read_text(encoding="utf-8-sig"))
+        return isinstance(obj, dict) and obj.get("enabled") is True
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
 
 
 def normalize_workflow(wf_raw) -> str:
@@ -428,6 +459,8 @@ def main() -> int:
     ap.add_argument("--sources", nargs="*", default=None, help="权威源（默认自动探测）")
     ap.add_argument("--require-tag", action="store_true",
                     help="严审模式：G2 权威源池只接受带 source_tag: authoritative 标记的文件（默认关闭，向后兼容）")
+    ap.add_argument("--require-evidence-check", action="store_true",
+                    help="ADR-002：启用 G6 抽查留痕硬门（默认不强制；也可由 evidence_check_policy.json 启用）")
     args = ap.parse_args()
 
     run_dir = Path(args.run_dir)
@@ -438,6 +471,7 @@ def main() -> int:
         if not any(s in a.stem for s in LEAD_SUFFIXES)
     )
     results = []
+    skipped_gates: list[str] = []   # ADR-002：SKIP 必须留痕，禁止静默恒 PASS
 
     def record(gate: str, ok: bool, detail: str):
         results.append((gate, ok, detail))
@@ -458,6 +492,10 @@ def main() -> int:
             "gates": [{"gate": g, "ok": ok, "detail": d} for g, ok, d in results],
             "verdict": verdict,
         }
+        if skipped_gates:
+            # ADR-002 诚实性：未评估的门不记进 gates，但必须显式列名，
+            # 防「把 SKIP 伪装成 PASS」的语义空壳化。
+            report["skipped_gates"] = list(skipped_gates)
         out = run_dir / f"{args.task_id}__gates.json"
         if not run_dir.is_dir():
             print(f"⚠ 无法落盘门禁报告（run_dir 不存在）: {run_dir}", file=sys.stderr)
@@ -469,12 +507,39 @@ def main() -> int:
         print(f"\n裁决: {verdict} → {out}")
         return verdict
 
+    g6_enabled = args.require_evidence_check or _evidence_policy_enabled(run_dir)
+
+    def run_g6():
+        """ADR-002 / SOP T-D1：G6 抽查留痕硬门。
+
+        默认不强制，但 SKIP 必须写进 skipped_gates——不把「没检查」写成 PASS。
+        启用后内联复用 verify_evidence_check.check，单一事实源，不复制判定逻辑。
+        """
+        if not g6_enabled:
+            skipped_gates.append(
+                "G6 抽查留痕（默认未强制；--require-evidence-check 或 evidence_check_policy.json 可启用）")
+            print("  ⏭ G6 抽查留痕: SKIP（已写入 skipped_gates，非 PASS）")
+            return
+        try:
+            mod = _load_evidence_check()
+        except Exception as e:
+            record("G6 抽查留痕", False, f"硬门加载失败 {type(e).__name__}: {e}")
+            return
+        rc6, rep6 = mod.check(run_dir, args.task_id)
+        detail = (f"记录 {rep6['total']} / 合格 {rep6['valid']} / "
+                  f"不合格 {len(rep6['invalid'])} / 裁决 {rep6['verdict']}")
+        if rep6["invalid"]:
+            detail += "；首条问题=" + "；".join(rep6["invalid"][0]["problems"])
+        record("G6 抽查留痕", rc6 == 0, detail[:240])
+
     print(f"═══ 团队级门禁 {args.task_id} ═══")
 
     # G3 产出落盘
     g3 = bool(artifacts)
     record("G3 产出落盘", g3, f"{len(artifacts)} 份 artifact" if g3 else f"{run_dir}/{args.task_id}__*.md 无一存在")
     if not g3:
+        # 早退时 G6 未评估 → 显式记名，不静默。EXIT=3 契约不变。
+        skipped_gates.append("G6 抽查留痕（G3 早退，未评估）")
         write_report()  # P0-2：失败也落盘（EXIT=3 契约不变）
         return 3
 
@@ -684,6 +749,9 @@ def main() -> int:
                 record("G5 审判留痕", True, f"{cl.name}（verdict=PASS{extra}）")
         except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError) as e:
             record("G5 审判留痕", False, f"checklist.json 解析失败: {e}")
+
+    # G6 抽查留痕（ADR-002 · SOP T-D1 硬门；默认 SKIP 但显式留名）
+    run_g6()
 
     # 落盘门禁报告（P0-2：与 G3 早退路径共用 write_report，单一事实源）
     verdict = write_report()

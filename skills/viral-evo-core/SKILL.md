@@ -36,13 +36,19 @@ description: 病毒演化研究院共享方法库。当执行病毒遗传进化�
 | `scripts/write_checklist.py` | 纪律审判 checklist 落盘（JSON schema） | 主理人 T0/T1 |
 | `scripts/find_knowledge.py` | 跨仓知识查询入口 | 全员 |
 | `scripts/validate_contracts.py` | 契约完整性检查（agents+skills 层） | 主理人/CI |
-| `scripts/check_gates.py` | 团队级五门一条命令（G1-G5 + gates.json 落盘） | 主理人 T1 |
+| `scripts/check_gates.py` | 团队级门禁一条命令（G1-G6 + gates.json 落盘；G6 默认 SKIP 记 skipped_gates） | 主理人 T1 |
 | `scripts/hypothesis_watch.py` | 假说证伪触发与处置闭环检查 | 主理人/审计 |
 | `scripts/render_context_stack.py` | CONTEXT_STACK JSON→md 双轨同步渲染 | 主理人/archivist |
 | `scripts/log_spawn.py` | spawn 留痕（spawn_manifest.jsonl 追加） | 主理人每次 spawn 后 |
 | `scripts/poll_run_dir.py` | run_dir 落盘巡检（撞限标注/manifest 清单/分级超时） | 主理人 T1 前置 |
 | `scripts/guard_readonly.py` | 只读区写盘守卫（默认根 = research-ops/_archive；R-10a/L3-R2） | 6 写盘脚本内置（assemble/check_gates/verify/checklist/log_spawn/render）+ 人工预检 |
 | `scripts/gen_integrity_manifest.py` | integrity_manifest 生成与 --check | 施工定版流程 |
+| `scripts/audit_decision_log.py` | decision_log.csv 只读四查（0/3/5/6） | 主理人/archivist |
+| `scripts/reconcile_decisions.py` | 决策事件语义候选对账 + DRAFT（只读、拒写台账） | 主理人 T2 |
+| `scripts/check_decision_records.py` | 架构裁决机器消费端（防 --require-tag 默认值被翻转） | 主理人/CI |
+| `scripts/verify_evidence_check.py` | G6 抽查留痕硬门（≥2 条 lead 证据形式要件） | 主理人 T1（G6 启用时） |
+| `scripts/check_baseline_anchors.py` | 包外 sha256 基线对账 + 受控 --refresh（须 ACK+reason） | 施工定版流程 |
+| `scripts/cron_watch.sh` / `install_cron_watch.sh` | P4 B-5 跨会话巡检与调度注册（dry-run 默认，不自动装 crontab） | 运维/人工显式安装 |
 
 **成员须知**（完整契约以 `agents/viral-evo-lab-team-lead.md` 为准，本表仅索引）：
 - 上行 `result_envelope` 6 必填字段（agent_id/task_id/phase/status/confidence/deliverable_summary）

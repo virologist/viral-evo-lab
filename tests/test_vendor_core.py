@@ -210,14 +210,15 @@ def run_checks(expert_dir):
             "A2 存活",                    # 第 1 项标题（守卫内容未被整体替换）
             "A-1 修复存活守卫",            # 第 7 项标题（守卫版本未回退）
             "P0 修复存活守卫",             # 第 9 项标题（v1.5.8 修改被整体回退即 FAIL）
+            "ADR/G6/B-5 修复存活守卫",     # 第 10 项标题（v1.5.9 清理轮被整体回退即 FAIL）
         ]
         missing = [n for n in needles if n not in gsrc]
-        # ② 项数下限（R1；v1.5.8 由 8 提至 9）：恒真空壳通常 return 1 条；
-        # 真实守卫 9 项 × (正常 + 异常兜底) ≈ 14 条断言，留抽稀余量只拦删减。
+        # ② 项数下限（R1；v1.5.9 由 9 提至 10）：恒真空壳通常 return 1 条；
+        # 真实守卫 10 项 × (正常 + 异常兜底) ≈ 16 条断言，留抽稀余量只拦删减。
         # 三轮🟢7：删除死变量 m_cnt（原 re.search 结果从未使用）
         cnt_anchors = sum(gsrc.count(p) for p in ('out.append((True', 'out.append((False', "out.append((not bad"))
-        if cnt_anchors < 9:
-            missing.append(f"守卫项断言数仅 {cnt_anchors}（<9）——疑语义空壳化")
+        if cnt_anchors < 10:
+            missing.append(f"守卫项断言数仅 {cnt_anchors}（<10）——疑语义空壳化")
         # ① 金丝雀（R1）：真加载 + 畸形输入下第 3 项必须真实 FAIL
         if not missing:
             try:

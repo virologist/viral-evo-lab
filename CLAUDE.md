@@ -174,3 +174,16 @@
 - **G3 失败留痕**：`check_gates.py` 的 `EXIT=3`（artifact 缺失）现在也落 `<task_id>__gates.json`（verdict=FAIL / G3 ok=false）；退出码表不变，仅补报告，失败不再零留痕。
 - **包外基线锚（双文件同覆残余的兜底）**：`scripts/check_baseline_anchors.py --anchors <包外 JSON>` 对关键防线文件做 sha256 只读对账；锚文件落在审计区（包外），路径不硬编码。锚文件生成于 v1.5.8 定版后，若此后有正常改动需重新生成基线，勿直接改锚来「刷绿」。
 
+---
+
+## 当前口径订正（v1.5.9 · 2026-11-10 · 「裁决与真实未完成」清理轮）
+
+> 本节为**追加订正**，不改写上方任何历史条目。v1.5.8 §14 把 1 项裁决 + 6 项真实未完成列为「不施工 / 不代写 / mitigated」；本轮按用户「直至全部任务完成」的显式授权全部施工闭合，以下口径覆盖 v1.5.8 的「明确不做」四条。
+
+- **`--require-tag` 裁决已工程化**：保持默认关闭**不变**，但新增 `docs/ADR-001_require_tag_default_off.md` + `docs/decision_records.json`（机器真源）+ `scripts/check_decision_records.py`（防翻转守卫，`EXIT=5/VIOLATION`）。变更后须跑 `python3 scripts/check_decision_records.py`；翻转默认值须先满足 ADR-001 的 `enable_when` 三条并升主版本。
+- **门禁从 G1-G5 变为 G1-G6**：G6 抽查留痕默认 SKIP，但 `gates.json` 必写 `skipped_gates`（**不把没检查写成 PASS**）；`--require-evidence-check` 或 run_dir 下 `evidence_check_policy.json {"enabled": true}` 启用后不合格 `EXIT=5`。只验形式要件（≥2 条 lead / file:行号 / 原文摘录 / reason），语义真伪仍归 T1。
+- **决策台账口径更新**：`reconcile_decisions.py` 只出候选与 `[DRAFT·待人工终裁]` CSV，**拒写台账**（ADR-004）；台账本身已于 2026-11-10 由主理人授权补落 5 条真实裁决（6 → 11 条，实测 `HEALTHY/EXIT=0`）。v1.5.8 订正节「台账 25 天未更新、应由 archivist 补落，本轮不代写」为历史文本，**已销项**。
+- **包外锚从 mitigated 升为 fixed**：`check_baseline_anchors.py --refresh --i-acknowledge-refresh --reason "<理由>" [--git-log <JSONL>]` 受控刷新（干净工作区 + 包外锚 + 文件齐全），写 `refresh_history` 与 commit 溯源；check 校验 `source.commit == git HEAD`，改锚刷绿会被抓（EXIT=3）。刷新仍是**人工动作**，默认只读不变。
+- **P4 B-5 / V2 销项**：`cron_watch.sh` + `install_cron_watch.sh` 资产就绪，安装器 **dry-run 默认**，未执行 `--install`、系统 crontab 零改动；V2 联邦真源归属实证为 `https://github.com/virologist/my-experts-plugins.git`（`shared-core/`），结论见审计区 `VENDOR_PROVENANCE.md`，`VENDOR.json` 的 `upstream_repo` 口径偏差按联邦红线不擅改。
+- **回归基线**：fuzz 45 CASES + 14 行为级 = **59/59**；守卫 **10/10**；V7 下限 10；pytest 全绿；四处 version = **1.5.9**。
+

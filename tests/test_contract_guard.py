@@ -9,7 +9,7 @@
       手工救火两次后，本守卫把「分发后的包是否仍处于正确状态」变成常态
       自动判定：任一不符即 FAIL，并给出恢复命令。
 
-校验九项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
+校验十项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
   1. test_vendor_core.py 的包名与 pytest 入口  → 抓 A2 回退
   2. 四处 version 一致性                        → 抓版本叙事漂移
   3. integrity_manifest.json 与磁盘 + git ls-files 一致
@@ -24,6 +24,9 @@
   8. 撞限巡检接线守卫（R-13a/c · 2026-11-09）  → 抓撞限标注消费与 manifest 读取被回退
   9. P0 修复存活守卫（v1.5.8 · 2026-11-09）     → 抓 decision_log 消费端 / G3 失败留痕
      被静默回退（含三组行为级回归与包外基线对账脚本的存活）
+ 10. ADR/G6/B-5 修复存活守卫（v1.5.9 · 2026-11-10）→ 抓「裁决与真实未完成」清理轮的
+     资产被整体回退：裁决机器消费端 / G6 抽查硬门 / 语义对账 / 锚受控刷新 / cron 资产
+     （含五组行为级回归）
   （互锚补强：test_vendor_core.py V7 反向锚定本文件存活——空壳化本守卫会被 V7 抓住，
     双向互锚收窄「旧基线覆盖」攻击面至双文件同时覆盖；包外基线锚见
     scripts/check_baseline_anchors.py + 审计区 BASELINE_ANCHORS.json）
@@ -322,6 +325,45 @@ def _checks_at(pkg_root: Path) -> list[tuple[bool, str]]:
                     if not bad else "; ".join(bad)))
     except (OSError, UnicodeError) as e:
         out.append((False, f"P0 修复存活守卫：校验失败 {type(e).__name__}: {e}"))
+
+    # 10. ADR/G6/B-5 修复存活守卫（v1.5.9 · 2026-11-10）------------------
+    #   10.1 裁决机器消费端：ADR-001 的 JSON + 脚本 + VIOLATION 退出语义
+    #   10.2 G6 抽查硬门：独立脚本 + check_gates 接线 + SKIP 显式留痕
+    #   10.3 语义对账 / 锚受控刷新：只读契约与 ACK 前置不可被摘
+    #   10.4 B-5 cron 资产：两个 shell 脚本存在（dry-run 默认）
+    #   10.5 五组行为级用例名在 test_gate_fuzz.py 中存活
+    try:
+        bad = []
+        checks = (
+            ("docs/decision_records.json", ("ADR-001", "enable_when", "verification")),
+            ("scripts/check_decision_records.py", ("EXIT_VIOLATION = 5", "--pkg-root", "default=True")),
+            ("scripts/verify_evidence_check.py", ("MIN_RECORDS = 2", "def check(", "value.file")),
+            ("scripts/check_gates.py", ("--require-evidence-check", "skipped_gates", "def run_g6")),
+            ("scripts/reconcile_decisions.py", ("拒绝", "--draft-out", "DRAFT_PREFIX")),
+            ("scripts/check_baseline_anchors.py", ("--i-acknowledge-refresh", "refresh_history", "def refresh(")),
+        )
+        for rel, needles in checks:
+            p = PKG / rel
+            if not p.is_file():
+                bad.append(f"{rel} 缺失")
+                continue
+            s = p.read_text(encoding="utf-8")
+            for needle in needles:
+                if needle not in s:
+                    bad.append(f"{rel} 缺 {needle}")
+        for rel in ("scripts/cron_watch.sh", "scripts/install_cron_watch.sh"):
+            if not (PKG / rel).is_file():
+                bad.append(f"{rel} 缺失（P4 B-5 cron 资产被摘除）")
+        fuzz = (PKG / "tests" / "test_gate_fuzz.py").read_text(encoding="utf-8")
+        for needle in ("def test_decision_records_guard", "def test_g6_evidence_gate",
+                       "def test_reconcile_decisions", "def test_anchor_refresh_guard",
+                       "def test_cron_b5_assets"):
+            if needle not in fuzz:
+                bad.append(f"test_gate_fuzz.py 缺 {needle}")
+        out.append((not bad, "ADR/G6/B-5 修复存活守卫（裁决消费端 + 抽查硬门 + 对账 + 刷新 + cron）"
+                    if not bad else "; ".join(bad)))
+    except (OSError, UnicodeError) as e:
+        out.append((False, f"ADR/G6/B-5 修复存活守卫：校验失败 {type(e).__name__}: {e}"))
 
     return out
 

@@ -112,7 +112,7 @@
 | B-2 | spawn 记录自动落 `<run-dir>/spawn_manifest.jsonl` | ✅ 已落地 | v1.4.0 R2-3 `scripts/log_spawn.py`（tag 6d3fad3） |
 | B-3 | 主理人 MD 增"阶段节点巡检"步骤（T1 前置 poll） | ✅ 已落地 | v1.5.4 R-13e（2026-11-09 审计发现 v1.5.0 的 ✅ 为失效声明——T1 段实测无 poll 步骤；本轮已真实写入 T1 首位，`--from-manifest` 顺带打通 spawn_manifest 只写不读） |
 | B-4 | 429 指数退避逻辑 | ✅ 部分落地（v1.5.4 R-10b） | poll_run_dir 巡检加 3 次指数退避重试（2s/4s/8s，失败原因写 stderr）；find_knowledge 三处 subprocess 补 returncode 检查 + 单次重试。原「复用平台重试」改为脚本侧自含（平台重试不可控） |
-| B-5 | 远期：cron 巡检（跨会话） | 未排期 | 依赖 B-1（已就绪） |
+| B-5 | 远期：cron 巡检（跨会话） | ✅ 已落地（v1.5.9 R-14；**系统调度未自动安装**） | `scripts/cron_watch.sh`（manifest 汇总 task_id → 逐个 `poll_run_dir.py --from-manifest` → `cron_watch.jsonl` 留痕 + noclobber 原子锁）+ `scripts/install_cron_watch.sh`（dry-run 默认，`--install/--uninstall` 幂等标记块）。实测 macOS 沙箱 `rmdir` 返回 Operation not permitted，故弃目录锁改 O_EXCL 文件锁。行为级用例 `test_cron_b5_assets` 锁定 dry-run 不改 crontab、锁必清理、结果落盘 |
 
 ---
 
@@ -125,3 +125,5 @@
 - 撞限发现：从"被动等"变为"超时红名单主动触发"
 
 排期订正（v1.5.2 · 2026-11-08）：B-1/B-2/B-3 已随 v1.5.0 落地（见 §5），本行原「下一迭代执行」为过期文本；剩余 B-4（429 退避）与 B-5（cron 巡检）仍未排期。
+
+**销项订正（v1.5.9 · 2026-11-10，追加不改写历史）**：B-4 已于 v1.5.4 部分落地（见 §5 表）；B-5 的**脚本资产**已落地并在 `test_cron_b5_assets` 中实证，上段「仍未排期」为 v1.5.2 历史文本，已失效。仍未做的只有**系统调度注册**：安装器默认 dry-run，须用户显式执行 `--install` 才写 crontab；本轮未执行，crontab 零改动（权限红线，非未完成缺陷）。跨会话告警的**推送通道**（邮件/IM）仍未排期，属新范围，不在 B-5 定义内。

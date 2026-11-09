@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "generated": "2026-11-10",
+  "policy": "裁决只由主理人显式变更；脚本只读校验、不改写任何裁决或代码。变更默认值须先改本文件的 decision/status 并完成 enable_when 与 migration 全部前置，再动 CLI。",
+  "records": [
+    {
+      "id": "ADR-001",
+      "title": "--require-tag 保持默认关闭（严审任务显式开启）",
+      "status": "accepted",
+      "decided_at": "2026-11-10",
+      "decision": "三个 CLI 均保持 argparse action=\"store_true\"（默认 False）；严审任务显式传 --require-tag。不翻转默认值。",
+      "rationale": [
+        "向后兼容：v1.5.0 起已发布行为，test_require_tag_gate 锁定「默认关闭」契约，翻转即破坏已发布行为",
+        "存量权威源多数未打 source_tag: authoritative，默认翻转会误杀存量任务且无任何自动迁移路径",
+        "收益不抵回归成本：严审场景显式传参即可获得同等强度校验"
+      ],
+      "consequences": [
+        "默认态未标记权威源仍可入池，属已知残余风险，须在 Known Issues 持续披露",
+        "新增 CLI 若接入 require_tag，必须同步本记录的 cli_sites 与 guard 第 5 项"
+      ],
+      "enable_when": [
+        "存量权威源 100% 打齐 source_tag: authoritative（需脚本全量盘点并出具报告）",
+        "test_require_tag_gate 与三处 CLI 的契约测试改写为默认开启版并通过全量 fuzz",
+        "主版本升级（≥2.0.0）且 CHANGELOG 明确列 Breaking Change 与迁移命令"
+      ],
+      "migration": [
+        "① 生成待打标源清单并逐条补标",
+        "② 默认开启先走一个过渡版本：默认 True + --no-require-tag 逃生开关",
+        "③ 过渡期结束再移除逃生开关，同步更新本记录 status=superseded 并新增 ADR"
+      ],
+      "review_after": "2027-01-31",
+      "verification": {
+        "rule": "require_tag_default_off",
+        "cli_sites": [
+          "scripts/check_gates.py",
+          "scripts/verify_numbers.py",
+          "scripts/verify_member_output.py"
+        ],
+        "tests": [
+          "test_require_tag_gate",
+          "require_tag 闸三点接线存活"
+        ]
+      }
+    },
+    {
+      "id": "ADR-002",
+      "title": "G6 抽查门默认不强制，显式启用才阻断",
+      "status": "accepted",
+      "decided_at": "2026-11-10",
+      "decision": "check_gates.py 的 G6 抽样留痕门默认 SKIP 并在 gates.json 的 skipped_gates 显式记名；--require-evidence-check 或 run_dir 策略文件才启用，启用后不合格 EXIT=5。",
+      "rationale": [
+        "存量 run_dir 无 evidence_check 记录，默认强制会全量误杀且无法追溯",
+        "T-D1 要的是「可触发的硬门」而非「静默恒 PASS」：SKIP 必须留痕，不能记成 ok=true 而不说明",
+        "抽查语义（原文摘录真伪判定）仍属 LLM 领域，脚本只验形式要件，不伪造语义核验"
+      ],
+      "consequences": [
+        "启用范围由任务级别决定；抽查任务须显式传参或落策略文件",
+        "形式合格 ≠ 证据为真，语义核验仍由主理人 T1 负责，不虚构已自动化"
+      ],
+      "enable_when": [
+        "所有新任务 spawn_manifest.jsonl 均记录 ≥2 条 lead 的 evidence_check",
+        "存量 run_dir 完成回填或明确豁免清单"
+      ],
+      "migration": [
+        "① 过渡期任务级显式启用并观察误杀率",
+        "② 全量回填后改为默认启用，保留 --no-evidence-check 逃生",
+        "③ 稳定后移除逃生开关"
+      ],
+      "review_after": "2027-01-31",
+      "verification": {
+        "rule": "g6_opt_in_visible",
+        "cli_sites": ["scripts/check_gates.py"],
+        "tests": ["test_g6_evidence_gate"]
+      }
+    },
+    {
+      "id": "ADR-003",
+      "title": "包外基线锚的刷新须显式 ACK 且留 git 痕迹",
+      "status": "accepted",
+      "decided_at": "2026-11-10",
+      "decision": "check_baseline_anchors.py 默认只读；--refresh 仅在 --i-acknowledge-refresh + --reason + 干净工作区三者齐备时可用，并追加 refresh_history 与治理仓 JSONL 日志。",
+      "rationale": [
+        "v1.5.8 的锚需人工手算 sha256，属 mitigated 而非 fixed；人工刷新易误把漂移「刷绿」",
+        "刷新必须可回答「谁在哪个 commit 因何改锚」，故禁止静默覆盖且保留历史",
+        "包外锚的独立性来自不随包内提交被改写，故默认仍只读"
+      ],
+      "consequences": [
+        "正常改动后刷新成本降低，但刷新仍需人工发起并写理由",
+        "禁止改锚刷绿：check 会校验 source.commit 与 git HEAD 及 history 末条一致"
+      ],
+      "enable_when": ["无（本裁决即为最终形态）"],
+      "migration": ["无"],
+      "review_after": "2027-01-31",
+      "verification": {
+        "rule": "anchor_refresh_acked",
+        "cli_sites": ["scripts/check_baseline_anchors.py"],
+        "tests": ["test_anchor_refresh_guard"]
+      }
+    },
+    {
+      "id": "ADR-004",
+      "title": "决策台账由主理人/archivist 落盘，包内脚本只读",
+      "status": "accepted",
+      "decided_at": "2026-11-10",
+      "decision": "reconcile_decisions.py 只输出候选差异与 DRAFT CSV，且拒绝写入台账路径；真实条目由主理人或 archivist 按用户授权落盘 decision_log.csv。",
+      "rationale": [
+        "台账 decision 为自由文本，机械匹配不可靠，脚本代写会制造「看似闭环」的假条目",
+        "语义级逐条终裁属 T2 人工纪律；机器只负责把候选摊开、缩小人工负担"
+      ],
+      "consequences": [
+        "台账陈旧由 audit_decision_log.py 报 STALE，由人补落，不由脚本自动续期",
+        "DRAFT 仅作待确认清单，落盘后需在治理仓留痕"
+      ],
+      "enable_when": ["无"],
+      "migration": ["无"],
+      "review_after": "2027-01-31",
+      "verification": {
+        "rule": "decision_log_readonly",
+        "cli_sites": ["scripts/reconcile_decisions.py"],
+        "tests": ["test_reconcile_decisions"]
+      }
+    }
+  ]
+}

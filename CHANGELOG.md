@@ -4,6 +4,42 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.9] - 2026-11-10（「裁决与真实未完成」清理轮 · 七项全部闭合）
+
+> 版本口径：v1.5.8 的 §14 收轮把 1 项裁决与 6 项真实未完成列为「不施工 / 不代写 / mitigated」。本版按用户「妥善完成裁决与真实未完成，直至全部任务完成」的显式授权，把**全部 7 项转为施工项并闭合**；不重开 v1.5.7 已闭环的 L3 盲检循环。v1.5.8 的「明确不做」三条理由在本版失效，已逐条给出实现与边界。
+
+### Added
+- **ADR-001 正式裁决 + 机器消费端**：`docs/ADR-001_require_tag_default_off.md`（人读）、`docs/decision_records.json`（机器真源，4 条裁决含 `enable_when` / `migration` / `verification`）、`scripts/check_decision_records.py`（只读校验，三处 CLI 必须仍为 `action="store_true"` 且无 `default=True`，测试锚必须存活；`0 一致 / 3 结构 / 5 VIOLATION`）。**裁决从「一句话」升级为可验证契约**，防未来悄悄翻转默认值。
+- **G6 抽查留痕硬门（SOP T-D1 销项）**：`scripts/verify_evidence_check.py`（`≥2` 条 `evidence_check`、`actor=lead`、`file:行号 + excerpt + reason`；`0/3/5`），接入 `check_gates.py --require-evidence-check` 与 `evidence_check_policy.json`。ADR-002 裁决**默认不强制**，但 SKIP 写入 `gates.json` 的 `skipped_gates`——不把「没检查」伪装成 PASS。只验形式要件，语义真伪仍归主理人 T1。
+- **语义对账半自动化（ADR-004）**：`scripts/reconcile_decisions.py` 只读扫描 waivers/gates/checklist/manifest/策略文件，输出 `matched` / `unmatched` 候选与 `[DRAFT·待人工终裁]` CSV；**拒绝写入台账或同名文件**（EXIT=3）。机器缩小人工核对面，逐条终裁仍属 T2。
+- **包外锚受控刷新（ADR-003，mitigated → fixed）**：`check_baseline_anchors.py --refresh` 须 `--i-acknowledge-refresh` + `--reason` + 干净 git 工作区 + 锚在包外 + 被锚文件齐全；写 `refresh_history` 与可选治理仓 `--git-log`；check 侧校验 `source.commit == git HEAD` 与 history 末条，防「改锚刷绿」。默认仍只读。
+- **P4 B-5 cron 巡检资产**：`scripts/cron_watch.sh`（manifest 汇总 task_id → 逐个 `poll_run_dir.py --from-manifest` → `cron_watch.jsonl` 留痕 + 原子锁）、`scripts/install_cron_watch.sh`（**dry-run 默认**，`--install/--uninstall` 幂等标记块，`CRONTAB_BIN` 可替身）。未执行 `--install`，**系统 crontab 零改动**（权限红线）。
+- **`VENDOR_PROVENANCE.md`（审计区）**：V2 联邦真源归属实证核实销项。
+
+### Changed
+- `check_gates.py`：门禁清单 G1-G5 → **G1-G6**；`write_report()` 增 `skipped_gates`；G3 早退也记「G6 未评估」。既有 45 个 fuzz 用例与 `EXIT=0/3/5` 契约不变。
+- 回归基线：行为级用例 9 → **14**（+裁决防翻转 / G6 硬门 / 语义对账 / 锚刷新 / cron 资产），独立跑合计 **59/59**；守卫 9 → **10**（第 10 项「ADR/G6/B-5 修复存活守卫」）；V7 金丝雀项数下限 9 → **10** + 新标题锚。
+- 文档真化：`CLAUDE.md` 追加 v1.5.9 订正节；`docs/P4_monitoring_design.md` B-5 销项；`skills/viral-evo-core/SKILL.md` 工具表补 6 个脚本；`docs/authorization_matrix.md` 补 ADR-004 口径；SOP `T-A1_测试报告.md` / `00_交付报告.md` T-D1 追加销项标注（保留历史文本）；审计区 `ROUND2_SUMMARY.md` §4 追加 V2/B-5 销项。
+- **决策台账补落**：按本轮授权以 archivist 代行，向 `research-ops/00_governance/decision_log.csv` 追加 **5 条真实裁决**（6 → 11 条），审计 `HEALTHY/EXIT=0`、`age_days=0`。包内脚本仍**不代写台账**（ADR-004 不变），这是一次性治理落盘。
+- 四处 version → **1.5.9**；`integrity_manifest.json` 重生成；包外 `BASELINE_ANCHORS.json` 用 `--refresh` 更新并留 `refresh_history` + 治理仓 `anchor_refresh_log.jsonl`。
+
+### Fixed
+- **cron 锁死锁**：首轮测试实测 macOS 沙箱下 `rmdir` 返回 `Operation not permitted`，`mkdir` 目录锁清理失败会永久跳过后续巡检 → 改 `noclobber`（O_EXCL）文件锁 + `rm -f`，并用行为级用例锁定「锁必须清理」。
+- **VENDOR.json 口径偏差**：实证 `upstream_repo: my-experts/viral-evo-lab` 与真源所属仓不符；按联邦红线**不改 vendor**，在 `VENDOR_PROVENANCE.md` 记录偏差与正确修复通道。
+
+### 闭合对照（v1.5.8 §14「裁决与真实未完成」7 项）
+| 项 | v1.5.8 状态 | v1.5.9 处置 |
+|---|---|---|
+| `--require-tag` 裁决只落结论 | 不改代码 | ADR-001 + 防翻转守卫（**保持默认关闭**） |
+| G6 抽查门 | 明确不施工 | 硬门落地 + G6 接线 + SOP T-D1 销项 |
+| 语义对账纯人工 | 人工 T2 | `reconcile_decisions.py` 机器候选 + 人工终裁 |
+| 包外锚 mitigated | 人工手算刷新 | 受控刷新 + 防刷绿校验 → **fixed** |
+| 台账 25 天未更新 | 本轮不代写 | 授权补落 5 条真实裁决，HEALTHY |
+| V2 联邦归属 | 外部依赖 | 实证核实 → `VENDOR_PROVENANCE.md` |
+| P4 B-5 cron | 未排期 | 资产落地 + 显式安装器（不自动装） |
+
+---
+
 ## [1.5.8] - 2026-11-09（遗留 backlog 清理轮 · 生产者-消费者闭环 + 门禁失败留痕）
 
 > 版本口径：v1.5.7 已按「连续 2 轮无 🔴」宣布循环审计闭环。本版**不重开审计循环**，仅清理 `AUDIT_STATE.md` §13 实证清单里的 2 项 🔴 P0 + 3 项 🟠 P1 + 2 项 🟡 P2；⚪ P3 三项**列明真实未完成，不施工、不伪装**。

@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-09T22:37:57",
- "file_count": 72,
+ "generated": "2026-11-10T06:57:19",
+ "file_count": 79,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "5ce0b67375e8ed60",
+   "sha16": "8ffb8e977e31fd01",
    "bytes": 704
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "f486ce0cccf7f4b9",
+   "sha16": "2b5774fb5339f2ed",
    "bytes": 6692
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "102c3956274c0035",
+   "sha16": "840fa130d3a72628",
    "bytes": 6721
   },
   ".gitignore": {
@@ -27,16 +27,16 @@
    "bytes": 61
   },
   ".learnings/LEARNINGS.md": {
-   "sha16": "ed8ce1cd20d650b1",
-   "bytes": 30713
+   "sha16": "1b1ce7f2018ea148",
+   "bytes": 34270
   },
   "CHANGELOG.md": {
-   "sha16": "bbc34202a42d99f3",
-   "bytes": 48230
+   "sha16": "b71f56b1732e0e68",
+   "bytes": 53407
   },
   "CLAUDE.md": {
-   "sha16": "1a230764df6f4fe4",
-   "bytes": 21810
+   "sha16": "3839341bf4975824",
+   "bytes": 24275
   },
   "CONTRIBUTING.md": {
    "sha16": "57102d910bc66799",
@@ -142,17 +142,25 @@
    "sha16": "8598110847e4e712",
    "bytes": 70795
   },
+  "docs/ADR-001_require_tag_default_off.md": {
+   "sha16": "2a4dbe228d5bff26",
+   "bytes": 2649
+  },
   "docs/P4_monitoring_design.md": {
-   "sha16": "0944fcfb25931c03",
-   "bytes": 7378
+   "sha16": "15bca0aa176b6883",
+   "bytes": 8406
   },
   "docs/SPOF_INVENTORY.md": {
    "sha16": "1f5974552c8eb94c",
    "bytes": 3979
   },
   "docs/authorization_matrix.md": {
-   "sha16": "acaf875ec9ee9d38",
-   "bytes": 5516
+   "sha16": "469b75e9b1b2fdfa",
+   "bytes": 6668
+  },
+  "docs/decision_records.json": {
+   "sha16": "3b6ff9cd7ccd2aa5",
+   "bytes": 6211
   },
   "scripts/assemble_spawn_prompt.py": {
    "sha16": "49b773cb4627bacc",
@@ -163,16 +171,24 @@
    "bytes": 9156
   },
   "scripts/check_baseline_anchors.py": {
-   "sha16": "a00fbb7389cafc74",
-   "bytes": 6990
+   "sha16": "689986667c35ef21",
+   "bytes": 15312
+  },
+  "scripts/check_decision_records.py": {
+   "sha16": "14306751ccc434c7",
+   "bytes": 8464
   },
   "scripts/check_gates.py": {
-   "sha16": "c4374ab73cc86117",
-   "bytes": 36794
+   "sha16": "cf73ac1b35feade3",
+   "bytes": 40366
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
    "bytes": 4925
+  },
+  "scripts/cron_watch.sh": {
+   "sha16": "262bd66d3e9617ef",
+   "bytes": 3951
   },
   "scripts/find_knowledge.py": {
    "sha16": "180c06ee5265e0c7",
@@ -190,6 +206,10 @@
    "sha16": "b201a34cbae9d055",
    "bytes": 15514
   },
+  "scripts/install_cron_watch.sh": {
+   "sha16": "2ad7aad9a46c4895",
+   "bytes": 2873
+  },
   "scripts/log_spawn.py": {
    "sha16": "c87b18e66c008378",
    "bytes": 2723
@@ -198,6 +218,10 @@
    "sha16": "5596b4849cc19320",
    "bytes": 10896
   },
+  "scripts/reconcile_decisions.py": {
+   "sha16": "4ca61cf5f337c46e",
+   "bytes": 10427
+  },
   "scripts/render_context_stack.py": {
    "sha16": "f443b75a652fe06f",
    "bytes": 7393
@@ -205,6 +229,10 @@
   "scripts/validate_contracts.py": {
    "sha16": "6096d0ddd834b16e",
    "bytes": 7174
+  },
+  "scripts/verify_evidence_check.py": {
+   "sha16": "83a611bcfa7eb481",
+   "bytes": 6620
   },
   "scripts/verify_member_output.py": {
    "sha16": "2e52ec53f43b804d",
@@ -223,8 +251,8 @@
    "bytes": 188
   },
   "skills/viral-evo-core/SKILL.md": {
-   "sha16": "51a229ae9c84c831",
-   "bytes": 4462
+   "sha16": "b9fca2a53f710020",
+   "bytes": 5275
   },
   "skills/viral-evo-core/references/code-standards.md": {
    "sha16": "12c748105ab051e3",
@@ -271,16 +299,16 @@
    "bytes": 7139
   },
   "tests/test_contract_guard.py": {
-   "sha16": "9e79d35042a112f9",
-   "bytes": 18967
+   "sha16": "b50fe06c87b57e74",
+   "bytes": 21625
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "16f9cacab7bca517",
-   "bytes": 39686
+   "sha16": "925c34cc6f024c26",
+   "bytes": 55475
   },
   "tests/test_vendor_core.py": {
-   "sha16": "61268341ef9ac348",
-   "bytes": 14054
+   "sha16": "7aca0859da538634",
+   "bytes": 14171
   },
   "vendor/shared-core/VENDOR.json": {
    "sha16": "ab3df020b0f07ed8",

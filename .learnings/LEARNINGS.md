@@ -453,3 +453,24 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - **Insight**: 自校验系统的根信任锚必须在被校对象之外。包外 sha256 基线不能自动阻止覆盖，但能把「是否被换过」变成一次确定性对账；代价是基线需随正常改动刷新，因此必须标注 `source.tag/commit` 且禁止改锚刷绿。
 - **Fix**: `scripts/check_baseline_anchors.py --anchors <包外 JSON>`（0/3/5）+ 审计区 `BASELINE_ANCHORS.json`；路径不硬编码，脚本只读、不生成锚。
 - **Prevention**: 设计互锚/自校验时必答「如果这组文件全部被一次性替换，还剩什么能证明」；答案为无 → 补包外锚。状态仅 **mitigated**，须人工刷新基线。
+
+## [LRN-20261110-024] 裁决不配机器消费端，等于允许「文档还在、实现已翻」
+- **Category**: correction | **Severity**: high | **Status**: resolved (v1.5.9 ADR-001)
+- **Context**: v1.5.8 把 `--require-tag` 默认值裁决写成一句「保持关闭，不改代码」，当时看是诚实收敛；但没有任何机制能发现后续有人把 `default=True` 悄悄加回去——与 LRN-021「治理断言须配消费端」同构，只是这次被断言的是**裁决本身**。
+- **Insight**: 「不改代码」不能作为裁决的终点。裁决必须同时具备 ①机器可读真源 ②只读校验脚本 ③违反时的确定性退出码 ④启用前置与迁移路径；否则它只是一段会过期的话。防翻转守卫的价值不在阻止合法变更，而在**让非法变更必然留痕**。
+- **Fix**: `docs/decision_records.json`（4 条裁决含 verification）+ `scripts/check_decision_records.py`（`EXIT=5/VIOLATION`）+ `test_decision_records_guard` 用 /tmp fixture 实测「加 default=True → 5」「删裁决文件 → 3」。
+- **Prevention**: 写「保持 X 不变」类结论时，立即追问「谁会在 X 被改时报警」；答不出就补消费端，不要只写文档。
+
+## [LRN-20261110-025] SKIP 记成 PASS 是语义空壳化的另一副面孔
+- **Category**: insight | **Severity**: high | **Status**: resolved (v1.5.9 ADR-002)
+- **Context**: 给 `check_gates.py` 加 G6 时最省事的做法是「默认不评估、gates 列表里不放 G6」，报告照样 `verdict=PASS`。但读报告的人无法区分「检查通过」与「根本没检查」——与之前抓到的「恒真守卫」「撞限标注不消费」是同一类失效。
+- **Insight**: 可选门禁必须有三态：`PASS / FAIL / SKIPPED`，且 SKIP 要写进报告的**独立字段**（不是 gates 里的 `ok=true`）。把未评估项混进「全绿」会制造比没有门禁更危险的虚假安全感。
+- **Fix**: `gates.json` 增 `skipped_gates`；G3 早退也记「G6 未评估」；`test_g6_evidence_gate` 断言 SKIP 不在 gates 内、启用后必须出现 G6 记录、策略文件也能触发。
+- **Prevention**: 新增可选检查时，先写「关闭时报告长什么样」的断言，再写检查逻辑。
+
+## [LRN-20261110-026] 依赖人工兜底的防线，必须把「人工动作」也机制化
+- **Category**: correction | **Severity**: medium | **Status**: resolved (v1.5.9 ADR-003 / B-5)
+- **Context**: 两个同构实例：①v1.5.8 包外锚标 mitigated，理由「正常改动后人工重生成」，但人工手算 sha 既易错又可被用来改锚刷绿；②cron 目录锁用 `trap rmdir` 清理，实测 macOS 沙箱返回 `Operation not permitted`，锁永久残留、后续巡检全跳过——两者都把可靠性押在「人会正确处理」上，且都没测过失败路径。
+- **Insight**: 人工环节不是免责声明。至少要机制化三件事：**显式确认**（ACK+reason）、**前置校验**（干净工作区 / 资源可释放）、**事后可验证**（commit 溯源 / 锁不残留的断言）。
+- **Fix**: `--refresh` 须 ACK+reason+干净 git 仓并写 `refresh_history` 与 `source.commit=HEAD`，check 侧校验防刷绿；cron 改 `noclobber`（O_EXCL）文件锁 + `rm -f`，行为级用例明确断言「锁未清理」即 FAIL；两处均配 fixture 实测（含临时 git 仓）。
+- **Prevention**: 文档里出现「由人工…」时，立刻补一列「人工做错时谁报警」；清理类逻辑必须实测环境是否真允许该删除操作。

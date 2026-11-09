@@ -29,6 +29,7 @@ v1.5.8（2026-11-09 · 遗留 backlog 清理轮）：行为级用例 6 → **9**
 """
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -707,6 +708,296 @@ def test_baseline_anchor_roundtrip() -> None:
         "对账脚本改动了包内文件（只读契约被破坏）"
 
 
+def test_decision_records_guard() -> None:
+    """ADR-001（v1.5.9）：裁决必须有机器消费端，且「翻转默认值」会被抓住。
+
+    fixture 隔离：复制最小包结构到 /tmp，不碰真包。三种形态：
+      正常 → EXIT=0；给 CLI 加 default=True → EXIT=5/VIOLATION；
+      删裁决文件 → EXIT=3。防「文档还写着保持关闭、代码已悄悄翻转」。
+    """
+    script = PKG / "scripts" / "check_decision_records.py"
+    rels = [
+        "scripts/check_gates.py", "scripts/verify_numbers.py",
+        "scripts/verify_member_output.py", "scripts/verify_evidence_check.py",
+        "scripts/reconcile_decisions.py", "scripts/check_baseline_anchors.py",
+    ]
+    anchors = ("test_require_tag_gate", "require_tag 闸三点接线存活",
+               "test_g6_evidence_gate", "test_anchor_refresh_guard",
+               "test_reconcile_decisions")
+    with tempfile.TemporaryDirectory(prefix="adr_guard_") as td:
+        root = Path(td) / "pkg"
+        (root / "scripts").mkdir(parents=True)
+        (root / "docs").mkdir()
+        (root / "tests").mkdir()
+        for rel in rels:
+            (root / rel).write_bytes((PKG / rel).read_bytes())
+        (root / "docs" / "decision_records.json").write_bytes(
+            (PKG / "docs" / "decision_records.json").read_bytes())
+        (root / "tests" / "anchors.py").write_text(
+            "# 测试锚存活占位\n" + "".join(f"# {a}\n" for a in anchors), encoding="utf-8")
+
+        def run() -> tuple[int, dict]:
+            p = subprocess.run(
+                [sys.executable, str(script), "--pkg-root", str(root), "--json"],
+                capture_output=True, text=True, timeout=60)
+            assert "Traceback" not in p.stdout + p.stderr, "裁决守卫崩溃"
+            return p.returncode, json.loads(p.stdout)
+
+        rc, rep = run()
+        assert rc == 0 and rep["verdict"] == "OK" and rep["checked"] >= 4, \
+            f"正常形态应 EXIT=0: rc={rc} rep={rep}"
+
+        cg = root / "scripts" / "check_gates.py"
+        src = cg.read_text(encoding="utf-8")
+        assert 'action="store_true"' in src
+        cg.write_text(src.replace('action="store_true"', 'action="store_true", default=True', 1),
+                      encoding="utf-8")
+        rc, rep = run()
+        assert rc == 5 and rep["verdict"] == "VIOLATION" \
+            and any("default=True" in v for v in rep["violations"]), \
+            f"默认值被翻转应 EXIT=5: rc={rc} rep={rep}"
+
+        (root / "docs" / "decision_records.json").unlink()
+        rc, rep = run()
+        assert rc == 3 and rep["verdict"] == "RECORDS_UNREADABLE", \
+            f"裁决文件消失应 EXIT=3: rc={rc} rep={rep}"
+
+
+def test_g6_evidence_gate() -> None:
+    """ADR-002 / SOP T-D1：G6 从软门变成可触发硬门，且 SKIP 必须留痕。"""
+    script = PKG / "scripts" / "verify_evidence_check.py"
+
+    def ev(line: int, **kw) -> str:
+        obj = {"event": "evidence_check", "actor": "lead", "task_id": TASK_ID,
+               "reason": "要害证据抽查",
+               "value": {"file": "sources/a.md", "line": line, "excerpt": "原文 1-2 行摘录"}}
+        obj.update(kw)
+        return json.dumps(obj, ensure_ascii=False)
+
+    def run_v(path: Path, *args: str) -> tuple[int, dict]:
+        p = subprocess.run([sys.executable, str(script), str(path), *args, "--json"],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in p.stdout + p.stderr, "G6 硬门崩溃"
+        return p.returncode, json.loads(p.stdout)
+
+    with tempfile.TemporaryDirectory(prefix="g6_gate_") as td:
+        d = Path(td)
+        rd = d / "run"
+        rd.mkdir()
+        man = rd / "spawn_manifest.jsonl"
+
+        # 独立硬门：合格 / 不足 / actor 非 lead / 缺摘录 / 缺 reason / 字符串 value / 坏 JSON
+        man.write_text(ev(10) + "\n" + ev(20) + "\n", encoding="utf-8")
+        rc, rep = run_v(rd)
+        assert rc == 0 and rep["valid"] == 2 and rep["verdict"] == "PASS", f"合格应 PASS: {rep}"
+        for bad_lines, label in (
+            (ev(10), "仅 1 条"),
+            (ev(10, actor="member") + "\n" + ev(20), "actor 非 lead"),
+            (ev(10, value={"file": "a.md", "line": 10}) + "\n" + ev(20), "缺摘录"),
+            (ev(10, reason="") + "\n" + ev(20), "缺 reason"),
+            (ev(10, value="a.md:10") + "\n" + ev(20), "字符串 value"),
+        ):
+            man.write_text(bad_lines + "\n", encoding="utf-8")
+            rc, rep = run_v(rd)
+            assert rc == 5 and rep["verdict"] == "FAIL", f"{label} 应 FAIL: rc={rc} rep={rep}"
+        man.write_text("{not json}\n", encoding="utf-8")
+        rc, rep = run_v(rd)
+        assert rc == 3 and rep["verdict"] == "MANIFEST_INVALID", f"坏 JSON 应 EXIT=3: {rep}"
+
+        # check_gates 接线：SKIP 留名 / 显式启用 / 策略文件启用 / 启用后不合格判 FAIL
+        (rd / f"{TASK_ID}__phylo-analyst.md").write_text(json.dumps(BASE_ENV) + "\n", encoding="utf-8")
+        (rd / f"{TASK_ID}__output-check.json").write_text('{"artifact_mtimes": {}}', encoding="utf-8")
+        (rd / f"{TASK_ID}__checklist.json").write_text('{"verdict": "PASS"}', encoding="utf-8")
+
+        def run_g(*args: str) -> tuple[int, dict]:
+            p = subprocess.run([sys.executable, str(CHECK_GATES), str(rd), TASK_ID, *args],
+                               capture_output=True, text=True, timeout=90)
+            assert "Traceback" not in p.stdout + p.stderr, "check_gates 崩溃"
+            rep = json.loads((rd / f"{TASK_ID}__gates.json").read_text(encoding="utf-8"))
+            return p.returncode, rep
+
+        man.write_text(ev(10) + "\n" + ev(20) + "\n", encoding="utf-8")
+        _, rep = run_g()
+        assert "G6 抽查留痕" in " ".join(rep.get("skipped_gates", [])), \
+            "默认未启用必须写进 skipped_gates（禁止静默 PASS）"
+        assert not any(g["gate"] == "G6 抽查留痕" for g in rep["gates"]), \
+            "SKIP 不得伪装成 gates 里的 PASS"
+
+        _, rep = run_g("--require-evidence-check")
+        g6 = [g for g in rep["gates"] if g["gate"] == "G6 抽查留痕"]
+        assert len(g6) == 1 and g6[0]["ok"] is True, f"显式启用后应判 PASS: {rep['gates']}"
+        assert not rep.get("skipped_gates"), "启用后不应再列 SKIP"
+
+        man.write_text(ev(10) + "\n", encoding="utf-8")
+        _, rep = run_g("--require-evidence-check")
+        g6 = [g for g in rep["gates"] if g["gate"] == "G6 抽查留痕"]
+        assert len(g6) == 1 and g6[0]["ok"] is False and rep["verdict"] == "FAIL", \
+            f"记录不足必须 FAIL: {rep['gates']}"
+
+        (rd / "evidence_check_policy.json").write_text('{"enabled": true}', encoding="utf-8")
+        _, rep = run_g()
+        assert any(g["gate"] == "G6 抽查留痕" for g in rep["gates"]), \
+            "策略文件 enabled 应触发 G6"
+
+
+def test_reconcile_decisions() -> None:
+    """ADR-004：语义对账只出候选，绝不代写台账（含拒写同名文件）。"""
+    script = PKG / "scripts" / "reconcile_decisions.py"
+    header = "ts,actor,decision_type,decision,rationale,tier\n"
+    with tempfile.TemporaryDirectory(prefix="reconcile_") as td:
+        d = Path(td)
+        ledger = d / "decision_log.csv"
+        ledger.write_text(header + "2026-11-10T00:00:00+08:00,lead,process,历史裁决,理由,通知档\n",
+                          encoding="utf-8")
+        rd = d / "run"
+        rd.mkdir()
+        (rd / f"{TASK_ID}__waivers.json").write_text(
+            json.dumps({"waivers": [{"gate": "G2", "value": "79", "reason": "外部引文"}]}),
+            encoding="utf-8")
+        (rd / f"{TASK_ID}__gates.json").write_text(
+            json.dumps({"gates": [{"gate": "G6 抽查留痕", "ok": False, "detail": "记录 0"}],
+                        "skipped_gates": ["G6 抽查留痕（默认未强制）"]}), encoding="utf-8")
+
+        def run(*args: str) -> tuple[int, dict]:
+            before = ledger.read_bytes()
+            p = subprocess.run(
+                [sys.executable, str(script), "--run-dirs", str(rd), "--ledger", str(ledger),
+                 *args, "--json"], capture_output=True, text=True, timeout=60)
+            assert ledger.read_bytes() == before, "对账脚本改写了台账（只读契约被破坏）"
+            assert "Traceback" not in p.stdout + p.stderr, "对账脚本崩溃"
+            return p.returncode, json.loads(p.stdout)
+
+        rc, rep = run()
+        assert rc == 0 and rep["events"] >= 3 and rep["unmatched"], \
+            f"应产出待人工终裁候选: rc={rc} rep={rep}"
+
+        draft = d / "DRAFT.csv"
+        rc, rep = run("--draft-out", str(draft))
+        assert rc == 0 and draft.is_file(), f"草稿应生成: {rep}"
+        assert "[DRAFT·待人工终裁]" in draft.read_text(encoding="utf-8"), \
+            "草稿必须带不可直落台账的前缀"
+
+        rc, rep = run("--draft-out", str(ledger))
+        assert rc == 3 and "拒绝" in " ".join(rep["structural_errors"]), \
+            "指向台账必须拒绝: rc={} rep={}".format(rc, rep)
+        rc, rep = run("--draft-out", str(d / "decision_log.csv"))
+        assert rc == 3, "同名 decision_log.csv 也必须拒绝"
+
+
+def test_anchor_refresh_guard() -> None:
+    """ADR-003：刷新须 ACK + 理由 + 干净 git 仓；防「改锚刷绿」。"""
+    script = PKG / "scripts" / "check_baseline_anchors.py"
+    with tempfile.TemporaryDirectory(prefix="anchor_refresh_") as td:
+        d = Path(td)
+        pkg = d / "pkg"
+        (pkg / "tests").mkdir(parents=True)
+        target = pkg / "tests" / "guard.py"
+        target.write_text("v1\n", encoding="utf-8")
+        anchor = d / "BASELINE_ANCHORS.json"
+        sha = hashlib.sha256(target.read_bytes()).hexdigest()
+        anchor.write_text(json.dumps({"schema_version": 1,
+                                      "source": {"tag": "v0", "commit": "0" * 40, "note": "fixture"},
+                                      "files": {"tests/guard.py": {"sha256": sha, "bytes": 3}}}),
+                          encoding="utf-8")
+
+        def run(*args: str) -> tuple[int, dict]:
+            p = subprocess.run(
+                [sys.executable, str(script), "--anchors", str(anchor),
+                 "--pkg-root", str(pkg), *args, "--json"],
+                capture_output=True, text=True, timeout=60)
+            assert "Traceback" not in p.stdout + p.stderr, "锚脚本崩溃"
+            return p.returncode, json.loads(p.stdout)
+
+        base = ("--refresh", "--i-acknowledge-refresh", "--reason", "测试刷新理由：新增防线文件")
+        # 非 git 仓 → 拒绝；无 ACK / 理由过短 → 拒绝；锚放包内 → 拒绝
+        rc, rep = run(*base)
+        assert rc == 3 and "git" in " ".join(rep["structural_errors"]), f"非 git 仓应拒绝: {rep}"
+        rc, _ = run("--refresh", "--reason", "测试刷新理由足够长")
+        assert rc == 3, "缺 ACK 应拒绝"
+        rc, _ = run("--refresh", "--i-acknowledge-refresh", "--reason", "短")
+        assert rc == 3, "理由过短应拒绝"
+
+        git = lambda *a: subprocess.run(["git", "-C", str(pkg), *a],
+                                        capture_output=True, text=True, timeout=60)
+        assert git("init", "-q").returncode == 0
+        assert git("add", "-A").returncode == 0
+        assert git("-c", "user.name=test", "-c", "user.email=test@local",
+                   "commit", "-qm", "fixture").returncode == 0
+        head = git("rev-parse", "HEAD").stdout.strip()
+
+        inner = pkg / "inner.json"
+        inner.write_bytes(anchor.read_bytes())
+        p = subprocess.run(
+            [sys.executable, str(script), "--anchors", str(inner), "--pkg-root", str(pkg),
+             "--refresh", "--i-acknowledge-refresh", "--reason", "测试刷新理由：锚在包内", "--json"],
+            capture_output=True, text=True, timeout=60)
+        assert p.returncode == 3 and "包外" in p.stdout, "包内锚必须拒绝"
+        inner.unlink()  # 清掉夹具，恢复干净工作区（否则后续刷新会被正确拒绝）
+
+        rc, rep = run(*base)
+        assert rc == 0 and rep["verdict"] == "REFRESHED" and rep["commit"] == head, \
+            f"干净仓应刷新成功: rc={rc} rep={rep}"
+        obj = json.loads(anchor.read_text(encoding="utf-8"))
+        assert obj["source"]["commit"] == head and len(obj["refresh_history"]) == 1, \
+            "刷新必须写 commit 溯源与 history"
+
+        rc, rep = run()
+        assert rc == 0 and rep["verdict"] == "OK", f"刷新后应一致: {rep}"
+        # 改锚刷绿：把 commit 换成别的 hash（模拟手工改锚）→ check 必须抓住
+        obj["source"]["commit"] = "f" * 40
+        anchor.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+        rc, rep = run()
+        assert rc == 3 and any("改锚刷绿" in e for e in rep["structural_errors"]), \
+            f"改锚刷绿必须被抓: rc={rc} rep={rep}"
+
+        # 工作区 dirty → 拒绝刷新（防把未提交漂移写进基线）
+        target.write_text("v2 changed\n", encoding="utf-8")
+        obj["source"]["commit"] = head
+        anchor.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+        rc, rep = run(*base)
+        assert rc == 5 and "不干净" in " ".join(rep["structural_errors"]), \
+            f"dirty 工作区应拒绝刷新: rc={rc} rep={rep}"
+
+
+def test_cron_b5_assets() -> None:
+    """P4 B-5：cron 资产可执行、dry-run 不改系统调度、巡检结果落盘。"""
+    watch = PKG / "scripts" / "cron_watch.sh"
+    installer = PKG / "scripts" / "install_cron_watch.sh"
+    for sh in (watch, installer):
+        p = subprocess.run(["bash", "-n", str(sh)], capture_output=True, text=True, timeout=30)
+        assert p.returncode == 0, f"{sh.name} 语法错误: {p.stderr}"
+
+    with tempfile.TemporaryDirectory(prefix="cron_b5_") as td:
+        d = Path(td)
+        stub = d / "crontab_stub.sh"
+        marker = d / "crontab_called"
+        stub.write_text(f"#!/usr/bin/env bash\necho called >> {marker}\nexit 0\n", encoding="utf-8")
+        env = dict(os.environ, CRONTAB_BIN=str(stub))
+        p = subprocess.run(["bash", str(installer), "--run-dir", str(d / "run"),
+                            "--state-dir", str(d / "state")],
+                           capture_output=True, text=True, timeout=30, env=env)
+        assert p.returncode == 0 and "未修改 crontab" in p.stdout \
+            and "# BEGIN viral-evo-lab B-5" in p.stdout, f"dry-run 输出异常: {p.stdout}"
+        assert not marker.exists(), "dry-run 不得调用 crontab（系统调度零改动）"
+
+        rd, sd = d / "run", d / "state"
+        rd.mkdir()
+        p = subprocess.run(["bash", str(watch), "--run-dir", str(rd), "--state-dir", str(sd)],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 0 and "无巡检对象" in p.stdout + p.stderr, \
+            f"空 manifest 应安全跳过: rc={p.returncode} {p.stdout} {p.stderr}"
+        assert not (sd / ".cron_watch.lock").exists(), "锁未清理"
+
+        (rd / "spawn_manifest.jsonl").write_text(
+            json.dumps({"event": "spawn", "task_id": "T-CRON", "member": "phylo-analyst"}) + "\n",
+            encoding="utf-8")
+        p = subprocess.run(["bash", str(watch), "--run-dir", str(rd), "--state-dir", str(sd)],
+                           capture_output=True, text=True, timeout=60)
+        log = sd / "cron_watch.jsonl"
+        assert log.is_file() and "T-CRON" in log.read_text(encoding="utf-8"), \
+            f"巡检结果须落盘: rc={p.returncode} {p.stdout} {p.stderr}"
+
+
 def main() -> int:
     ok_n = 0
     for name, art, wv, oc, expect in CASES:
@@ -718,14 +1009,17 @@ def main() -> int:
     for fn in (test_g4_waiver_release, test_gate_mode_blocks, test_disposition_gate,
                test_require_tag_gate, test_poll_hitlimit_and_manifest,
                test_legacy_package_check_fallback, test_g3_fail_still_writes_report,
-               test_decision_log_audit, test_baseline_anchor_roundtrip):
+               test_decision_log_audit, test_baseline_anchor_roundtrip,
+               test_decision_records_guard, test_g6_evidence_gate,
+               test_reconcile_decisions, test_anchor_refresh_guard,
+               test_cron_b5_assets):
         try:
             fn()
             print(f"  ✅ {fn.__name__}")
             ok_n += 1
         except AssertionError as e:
             print(f"  ❌ {fn.__name__}: {e}")
-    total = len(CASES) + 9
+    total = len(CASES) + 14
     print(f"\n合计 {total} | 通过 {ok_n} | 失败 {total - ok_n}")
     return 0 if ok_n == total else 1
 
