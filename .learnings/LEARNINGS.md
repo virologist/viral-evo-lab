@@ -418,3 +418,17 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - **Insight**: 「失败降级」承诺的捕获面必须覆盖「任何加载路径异常」——动态加载的失败模式清单不可枚举（文件损坏方式无限），except Exception 是动态加载边界的正确形态（业务逻辑处仍窄捕）。
 - **Fix**: 六脚本 _load_guard 统一 except Exception + type 名入警告。
 - **Prevention**: 动态 import/spec_from_file_location 处的降级承诺 → except Exception；窄捕只用于可枚举失败的业务调用。
+
+## [LRN-20261109-019] 接线替换 ≠ 接线插入：守卫接线必须保全既有语句
+- **Category**: correction | **Severity**: critical | **Status**: resolved (v1.5.6)
+- **Context**: Y4 给 assemble 接守卫时，把 run_dir 的幂等 `mkdir` 当作「写盘点」**替换**成了守卫调用——守卫本应插在写盘**之前**而非替代原语句。新任务 run_dir 不存在 → sidecar FileNotFoundError + 主产物丢失，P0 派工链路崩溃（三轮盲检实测复现）。
+- **Insight**: 「写盘点接入守卫」的正确动作是 **插入守卫调用 + 保留原写盘语句**；把原语句当锚点做 replace 时极易滑成「替换」。接线类改动必须跑「按文档工作流全链路」验证（v1.5.5 只测了归档区拦截与已有目录，没测**新目录创建**这条最常见路径）。
+- **Fix**: 恢复 mkdir（守卫在前）；退出码表同步补 7。
+- **Prevention**: 守卫接线 PR 的验收清单固定含「新对象创建路径」「既有对象更新路径」「只读区拒绝路径」三态实测。
+
+## [LRN-20261109-020] 黑名单校验不如白名单：成员 ID 类标识符一剑封喉
+- **Category**: insight | **Severity**: medium | **Status**: resolved (v1.5.6)
+- **Context**: Y7 的 member 校验用黑名单（拦 `/`、`..`、前导点等），实测 `a b`/`UPPER`/`$VAR` 全通过——`UPPER` 在 APFS 大小写不敏感卷还能匹配 `upper.md`，跨平台行为分裂；而 9 名成员 ID 实测全为 `[a-z0-9-]+`。
+- **Insight**: 标识符类输入（成员 ID/任务 ID/文件名成分）几乎总有严格形态约定——白名单 `fullmatch` 一次表达全部约束，黑名单永远漏「没想到的那一种」；且校验规则的「声称保护对象」要核实（本例「防 G3/G4 读路径探测」中 check_gates 根本不消费 manifest）。
+- **Fix**: `[a-z0-9][a-z0-9-]*` 白名单 + 注释如实标注保护范围（仅 poll 自身）。
+- **Prevention**: 写校验前先 grep 声称要保护的那个消费者是否真的存在；标识符校验默认白名单。

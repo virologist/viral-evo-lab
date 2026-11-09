@@ -55,7 +55,8 @@
         --task-id T-20261109-001 --run-dir <run-dir> --out <run-dir>/spawn__phylo-analyst.md
 
 退出码：
-    0 = 成功；2 = 成员 ID 不在白名单；3 = 文件缺失；4 = 任务包要素缺失
+    0 = 成功；2 = 成员 ID 不在白名单；3 = 文件缺失；4 = 任务包要素缺失；
+    7 = 写目标命中只读区（v1.5.5 R-10a 守卫；L3 三轮补记退出码表）
 
 spawn 平台现实（LRN-003 实录 · 2026-10-15）：
     成员 ID 不可作 Agent 工具的 subagent_type（报 not available）。
@@ -713,7 +714,11 @@ def main() -> int:
     if args.run_dir:
         rd = Path(args.run_dir).expanduser().resolve()
         _g = _load_guard()
-        if _g: _g.guard_or_exit(rd)  # R-10a 只读区守卫
+        if _g: _g.guard_or_exit(rd)  # R-10a 只读区守卫（拦归档区）
+        # L3 三轮 🔴-1 修复（2026-11-09）：v1.5.5 接守卫时误把本幂等 mkdir 当作
+        # 写盘点替换掉了——新任务 run_dir 不存在 → sidecar 落盘 FileNotFoundError
+        # （EXIT=1 未声明 + 主产物丢失）。守卫通过后照常幂等建目录。
+        rd.mkdir(parents=True, exist_ok=True)   # 幂等建目录，成员只需写文件
         run_dir = str(rd)
         log(f"✅ 运行目录就绪：{run_dir}")
 

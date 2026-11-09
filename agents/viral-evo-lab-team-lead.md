@@ -331,7 +331,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 1. **装配**（确定性脚本）
    ```bash
    EXPERT_DIR=~/.workbuddy/plugins/marketplaces/my-experts/plugins/viral-evo-lab
-   RUN_DIR=<research-ops 或 workspace>/.harness-runs/<task_id>
+   RUN_DIR=<research-ops 或 workspace>/_harness_runs/<task_id>
    python3 "$EXPERT_DIR/scripts/assemble_spawn_prompt.py" \
      --member <member-id> --phase <WF 阶段> --task-id <task_id> \
      --workflow <WF1..WF7 或 analysis> \

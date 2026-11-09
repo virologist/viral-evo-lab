@@ -12,7 +12,7 @@ poll_run_dir.py —— run_dir 落盘巡检（P4 监控设计 §3 方案 B 落�
     黄超时  存在但 mtime 距今 >= yellow-min 分钟（落盘后久未更新，留意）
     缺失    文件不存在（成员未产出或派工未达）
     红超时  存在但 >= red-min 分钟未更新
-    撞限    文件头 3 行含「轮次耗尽」标注（R-13a · 2026-11-09：产出不完整，
+    撞限    文件头 8 行含「轮次耗尽」标注（R-13a · 2026-11-09：产出不完整，
             主理人声明"文件存在且无撞限标注 = Phase 完成"——本脚本负责把
             该判据的标注侧落成机械检查，带标注 = 视为未完成）
 
@@ -39,6 +39,7 @@ poll_run_dir.py —— run_dir 落盘巡检（P4 监控设计 §3 方案 B 落�
     # 典型节奏：spawn 后每 2-3 分钟跑一次；exit 0 即可进入 check_gates.py
 """
 import argparse
+import re
 import json
 import sys
 import time
@@ -62,7 +63,9 @@ def _read_manifest_with_retry(mf: Path, retries: int = 3, base_delay: float = 2.
         try:
             txt = mf.read_text(encoding="utf-8")
             return txt, ""
-        except OSError as e:
+        except (OSError, UnicodeDecodeError) as e:
+            # L3 三轮🟡4：UnicodeDecodeError 是 ValueError 子类，原仅捕 OSError
+            # 会让非 UTF-8 manifest 直接 traceback 击穿退出码契约
             last_err = f"第 {attempt + 1}/{retries} 次读取失败: {type(e).__name__}: {e}"
             if attempt < retries - 1:
                 delay = base_delay * (2 ** attempt)
@@ -101,10 +104,10 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
             m = obj.get("member")
             if isinstance(m, str) and m.strip():
                 m = m.strip()
-                # L3 盲检 Y7：member 会拼进 {task_id}__{member}.md——
-                # 含路径分隔符/父目录引用/非法成分的记录判畸形（防路径探测）
-                if ("/" in m or "\\" in m or m in (".", "..") or m.startswith(".")
-                        or any(c in m for c in "\x00:\t\n")):
+                # L3 盲检 Y7+三轮🟡2：member 会拼进 {task_id}__{member}.md——
+                # 白名单 [a-z0-9-]+ 与 9 名成员 ID 形态精确对齐（一剑封喉：
+                # 空格/大写/路径成分/特殊字符全部拦掉，消除跨平台大小写分裂）
+                if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", m):
                     bad += 1
                     continue
                 members.append(m)

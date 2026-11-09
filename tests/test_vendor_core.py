@@ -212,7 +212,7 @@ def run_checks(expert_dir):
         ]
         missing = [n for n in needles if n not in gsrc]
         # ② 项数下限（R1）：恒真空壳通常 return 1 条；真实守卫 ≥8 项
-        m_cnt = re.search(r"return\s+out\s*$", gsrc, re.M)
+        # 三轮🟢7：删除死变量 m_cnt（原 re.search 结果从未使用）
         cnt_anchors = sum(gsrc.count(p) for p in ('out.append((True', 'out.append((False', "out.append((not bad"))
         if cnt_anchors < 8:
             missing.append(f"守卫项断言数仅 {cnt_anchors}（<8）——疑语义空壳化")

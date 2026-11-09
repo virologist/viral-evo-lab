@@ -139,12 +139,14 @@ def main() -> int:
 
     targets = RENDERERS.keys() if args.which == "all" else [args.which]
     rc = 0
+    missing = []  # L3 三轮🟢6：缺失不再静默——结束前汇总到 stderr（SPOF 清单 backlog 清项）
     for key in targets:
         stem, fn = RENDERERS[key]
         jp = ctx / f"{stem}.json"
         mp = ctx / f"{stem}.md"
         if not jp.is_file():
             print(f"  ⏭ {stem}: JSON 缺失")
+            missing.append(f"{stem}.json")
             continue
         try:
             d = json.loads(jp.read_text(encoding="utf-8"))
@@ -160,6 +162,9 @@ def main() -> int:
             if _g: _g.guard_or_exit(mp)  # R-10a 只读区守卫
             mp.write_text(rendered, encoding="utf-8")
             print(f"  ✅ {stem}.md ← {stem}.json（{mp.stat().st_size}B）")
+    if missing:
+        print(f"⚠ {len(missing)} 个 JSON 缺失（未渲染）: {', '.join(missing)}"
+              f"——真源未建或路径漂移，md 视图不完整", file=sys.stderr)
     print("\n纪律：md 由本脚本生成，禁手改；改 JSON → 重跑本脚本。")
     return rc
 

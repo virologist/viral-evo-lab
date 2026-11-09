@@ -4,6 +4,22 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.6] - 2026-11-09（第三轮再诊断回补 · 守卫接线回归修复）
+
+> 版本口径：第三轮 L3 独立盲检（对 v1.5.5）发现 **1 🔴（施工自引入回归）+ 3 🟡 + 4 项低成本 backlog**，本版全部闭环。收敛计数：本轮 🔴 仍为接线施工自引入（mkdir 被误当写盘点替换），修复后进入第 4 轮收敛计数。
+
+### Fixed
+- **🔴 · assemble `--run-dir` mkdir 被守卫接线误删（施工自引入回归，实测复现）**：v1.5.5 Y4 接线时把幂等建目录 `rd.mkdir(...)` **替换**为守卫调用——新任务 run_dir 不存在 → sidecar 落盘 `FileNotFoundError`（EXIT=1 未在退出码契约）+ spawn 主产物丢失，主理人 P0 强制派工链路（`--run-dir ... --out ...`）在新任务上必崩。现恢复 mkdir（守卫通过后幂等建目录，两者本不冲突）。实测：新 run-dir 全链路 EXIT=0，sidecar + 主产物双落盘。
+- **🟡 · poll manifest member 校验过宽（「防路径探测」名不符实）**：黑名单拦不住空格/大写/`$VAR`（`UPPER` 在 APFS 还能匹配 `upper.md`，跨平台行为分裂）。收紧为白名单 `[a-z0-9][a-z0-9-]*`（与 9 名成员 ID 形态精确对齐）。实测：`literature-scout`/`a-1` 通过；`a b`/`UPPER`/`../x`/`.h`/`a:b` 全判畸形。
+- **🟡 · `_read_manifest_with_retry` 不捕 UnicodeDecodeError**：非 UTF-8 manifest 直接 traceback（退出码契约 0/5 被击穿）。现归入重试失败路径。实测 UTF-16 manifest → 3 次退避日志 + EXIT=5。
+- **🟡 · assemble 退出码表缺 7**：v1.5.5 三处守卫接线后 EXIT=7 未声明，主理人按表误判。退出码表补 `7 = 写目标命中只读区`。
+- **🟢 · 四项**：poll docstring「头 3 行」→「头 8 行」（修 Y3 时漏改模块头）；V7 死变量 `m_cnt` 删除；render_context_stack 缺失 JSON 结束前 stderr 汇总（SPOF_INVENTORY backlog 清项，实测 2 缺失 → `⚠ 2 个 JSON 缺失（未渲染）…`）；主理人 MD `.harness-runs`→`_harness_runs` 命名统一（遗留分裂）。
+- **文档销项**：v1.5.4 Known Issues「RESEARCH_OPS_DIR 未设守卫根为空」已被 v1.5.5 Y5 空转警告覆盖，标注销项。
+
+### Verification
+- pytest **9 passed** | fuzz **51/51** | 守卫 **8/8** | contracts/scope 全绿 | 四处 version=1.5.6
+- 关键实测：新 run-dir 全链路 EXIT=0 双落盘 / UTF-16 manifest 退避+EXIT=5 / 白名单 2 过 5 拦 / render 缺失汇总 2 场景
+
 ## [1.5.5] - 2026-11-09（第二轮再诊断盲检回补 · L3 九项发现闭环）
 
 > 版本口径：v1.5.4 经 L3 独立盲检**不收敛**（2 🔴 + 7 🟡 + 4 低危），本版为盲检回补发版。全部改动为「修复 / 加固 / 口径同步」，v1.5.4 引入的新机制（互锚/撞限消费/manifest 读取/只读守卫）全部保留并加固。
@@ -66,7 +82,7 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 ### Known Issues（本轮新增/更新，不阻塞）
 - 守卫互锚残余风险：两测试文件**同时**被旧基线覆盖时双向锚同时失效——缓解：施工前后必跑守卫（工程纪律）+ 轮报人工 `git diff <tag> -- tests/`（零成本人工锚）；完全防御需包外 CI 锚（backlog）。
-- `RESEARCH_OPS_DIR` 未设置时只读守卫兜底根为空（仅显式 `VIRAL_EVO_READONLY_DENY` 生效）——研究工作流中该变量由装配流程注入，独立脚本调用场景建议显式设 DENY。
+- ~~`RESEARCH_OPS_DIR` 未设置时只读守卫兜底根为空~~（**v1.5.5 销项**：未设根时打一次性 stderr 警告，不再静默；三轮盲检确认）
 - vendor 模板 `record_trace.py`/`progress.py` 死引用**不在本包 vendor 副本**（实测 grep=0，审计取证误报已订正）；如联邦层出现按 Known Issues 先例标「待联邦层修复」。
 
 ## [1.5.3] - 2026-11-09（L3 独立盲检回补 · 门禁诚实性收敛）
