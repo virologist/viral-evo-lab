@@ -5,3 +5,8 @@ ts,actor,decision_type,decision,rationale,tier
 2026-10-15T07:36:28+08:00,lead,rework-fix,T-20261015-M2 diag 双脚本审计抓 6 缺陷(2高2中2低)触发修复 H1/C1/C2/C3/H4/H2,缺陷清单与修复结论见 _harness_runs/T-20261015-M2/T-20261015-M2__checklist.json note(对应 v1.3.1),执行档
 2026-10-15T08:31:05+08:00,lead,spawn-dispatch,T-20261015-M2 双员并行派工(literature-scout+research-diagnostician),双员并行首测——见 _harness_runs/T-20261015-M2/spawn_manifest.jsonl 行1-2,通知档
 2026-10-15T08:36:56+08:00,lead,handoff-launch,T-20261015-M2H 串行 handoff 首测启动(hypothesis-officer 消费 scout 产出),R2-4 首测：3条可证伪假设采纳+spawn 装配产物缺失如实标记(traceability 生效)——见 _harness_runs/T-20261015-M2/T-20261015-M2H__checklist.json note,通知档
+2026-11-10T06:47:27+08:00,lead,process-decision,--require-tag 保持默认关闭：ADR-001 落裁决记录+防翻转守卫,向后兼容+存量权威源未打标+严审显式传参等价；docs/decision_records.json 与 scripts/check_decision_records.py 为机器消费端（v1.5.9）,通知档
+2026-11-10T06:47:27+08:00,lead,gate-hardening,G6 抽查留痕硬门落地：默认显式启用,SOP T-D1 软门硬化：verify_evidence_check.py + check_gates.py --require-evidence-check；SKIP 写入 skipped_gates 不伪装 PASS（ADR-002）,通知档
+2026-11-10T06:47:27+08:00,lead,governance,决策台账语义对账改机器辅助+包外锚受控刷新,reconcile_decisions.py 只出候选与 DRAFT 且拒写台账；check_baseline_anchors.py --refresh 须 ACK+reason+干净工作区+commit 溯源（ADR-003/004）,通知档
+2026-11-10T06:47:27+08:00,lead,external-dependency,V2 联邦真源归属核实销项,真源=my-experts-plugins 仓 shared-core/assemble_spawn_prompt.py；三方 sha256 3c3648f1 一致；VENDOR.json upstream_repo 为口径偏差且按红线不擅改,通知档
+2026-11-10T06:47:27+08:00,lead,monitoring,P4 B-5 cron 巡检资产落地：系统调度不自动安装,cron_watch.sh + install_cron_watch.sh 就绪（dry-run 默认）；未执行 --install，crontab 零改动；实测 rmdir 被拒故改 noclobber 文件锁,通知档
