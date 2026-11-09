@@ -65,7 +65,29 @@ def _load_obj(path: Path) -> dict:
 
 
 def _checks() -> list[tuple[bool, str]]:
+    """直跑/pytest 入口：对包根 PKG 执行全部守卫项（向后兼容签名）。"""
+    return _checks_at(PKG)
+
+
+def _checks_at(pkg_root: Path) -> list[tuple[bool, str]]:
+    """L3 盲检 R1 金丝雀入口（2026-11-09）：对任意包根执行守卫。
+
+    供 test_vendor_core V7 互锚注入畸形 fixture 后真加载调用——
+    证明守卫行为真实（非恒真）。pkg_root 参数化；全局常量（PKG 等）
+    仅作默认值，全部检查项改用 pkg_root 派生路径。
+    """
     out: list[tuple[bool, str]] = []
+    PKG = pkg_root  # 局部遮蔽：本函数全部检查改用传入包根
+    FED = PKG.parent / "shared-core" / "assemble_spawn_prompt.py"
+    VENDOR_PY = PKG / "vendor" / "shared-core" / "assemble_spawn_prompt.py"
+    VENDOR_JSON = PKG / "vendor" / "shared-core" / "VENDOR.json"
+    TVC = PKG / "tests" / "test_vendor_core.py"
+    MANIFEST = PKG / "integrity_manifest.json"
+    VERSION_FILES = (
+        ".claude-plugin/plugin.json",
+        ".codebuddy-plugin/plugin.json",
+        ".claude-plugin/marketplace.json",
+    )
 
     # 1. A2 回退检测 -------------------------------------------------------
     try:

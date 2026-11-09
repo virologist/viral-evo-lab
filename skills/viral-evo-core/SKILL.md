@@ -41,7 +41,7 @@ description: 病毒演化研究院共享方法库。当执行病毒遗传进化�
 | `scripts/render_context_stack.py` | CONTEXT_STACK JSON→md 双轨同步渲染 | 主理人/archivist |
 | `scripts/log_spawn.py` | spawn 留痕（spawn_manifest.jsonl 追加） | 主理人每次 spawn 后 |
 | `scripts/poll_run_dir.py` | run_dir 落盘巡检（撞限标注/manifest 清单/分级超时） | 主理人 T1 前置 |
-| `scripts/guard_readonly.py` | 只读区写盘守卫（v1.5.4 R-10a） | 6 写盘脚本内置 + 人工预检 |
+| `scripts/guard_readonly.py` | 只读区写盘守卫（默认根 = research-ops/_archive；R-10a/L3-R2） | 6 写盘脚本内置（assemble/check_gates/verify/checklist/log_spawn/render）+ 人工预检 |
 | `scripts/gen_integrity_manifest.py` | integrity_manifest 生成与 --check | 施工定版流程 |
 
 **成员须知**（完整契约以 `agents/viral-evo-lab-team-lead.md` 为准，本表仅索引）：

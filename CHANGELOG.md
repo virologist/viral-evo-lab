@@ -4,6 +4,30 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.5] - 2026-11-09（第二轮再诊断盲检回补 · L3 九项发现闭环）
+
+> 版本口径：v1.5.4 经 L3 独立盲检**不收敛**（2 🔴 + 7 🟡 + 4 低危），本版为盲检回补发版。全部改动为「修复 / 加固 / 口径同步」，v1.5.4 引入的新机制（互锚/撞限消费/manifest 读取/只读守卫）全部保留并加固。
+
+### Fixed
+- **🔴 R1 · V7 互锚语义空壳化绕过（已实验证实并修复）**：盲检实测——把守卫 `_checks` 改恒真但保留全部锚字符串，V7 仍 PASS（字符串锚与守卫第 7 项自己批评的「只锚函数名」缺陷同构）。现 V7 三层加固：① **项数下限**（守卫断言数 <8 即 FAIL，静态计数）；② **行为金丝雀**（`_checks_at(pkg)` 参数化新入口，V7 真加载守卫模块 + 拷贝包到临时目录 + 注入畸形 manifest → 断言第 3 项真实 FAIL）；③ 锚字符串保留。实测四级攻击（恒真 1 条 / 恒真 8 条 / 伪造真实形态 append / 8×`out.append((True`）全部被 V7 = FAIL 拦截。
+- **🔴 R2 · 只读守卫根与文档工作流冲突（已实验证实并收窄）**：盲检实测——设 `RESEARCH_OPS_DIR` 后按文档维护 context_stack、按 poll 示例跑 run_dir 全被自家守卫 EXIT=7 阻断（守卫拦整根 vs 工作流就在根下）。现默认只读根**收窄为 `research-ops/_archive/`**（归档/历史快照区 = LRN-012 事故现场，覆写即篡改证据）；`_harness_runs/`（演练区）与 `context_stack/`（维护流）放行；真源子目录可 `VIRAL_EVO_READONLY_DENY` 显式追加。实测：_archive → EXIT=7，_harness_runs/context_stack → EXIT=0。
+- **🟡 Y1 · poll manifest 重试被二次裸读架空**：重试取回全文后 86 行又 `mf.read_text()` 重新读盘（TOCTOU + 二次 OSError 会 traceback 违反退出码契约）。改为消费已取回的 `txt`。
+- **🟡 Y2 · macOS 大小写不敏感绕过（已实写证实）**：纯字符串前缀比对可被大小写变体绕过并在 APFS 实写成功。前缀比对统一 `.lower()` 折叠（normcase 在 darwin 不折叠大小写，不可用）。实测四态：正写拦 / `_ARCHIVE` 拦 / 全路径变体拦 / `_archive_new` 放。
+- **🟡 Y3 · 撞限标注位置规避 + 读失败偏放行**：窗口 3→8 行（标注落第 5 行已可检出，实测）；`head_hit_limit` 读失败从「无标注=完成」改「保守=撞限嫌疑交人工」（目录冒充文件实测 EXIT=5）。
+- **🟡 Y4 · assemble_spawn_prompt 三处写盘未接守卫（双口径打架）**：workflow sidecar / run_dir mkdir / --out 三写盘点全部接线（现 6 脚本 8 调用点，SKILL.md 口径同步）。
+- **🟡 Y5 · 守卫空转静默**：未设任何只读根时打一次性 stderr 警告（不静默放行）。
+- **🟡 Y6 · _load_guard 捕获面过窄**：五脚本 `except (OSError, SyntaxError)` → `except Exception`（半损坏/None loader 也降级不崩溃，兑现「加载失败不阻断」）。
+- **🟡 Y7 · manifest member 路径注入 + BOM 静默吞行**：member 含 `/` `\` `..` 前导点等路径成分 → 判畸形（防 G3/G4 读路径探测）；manifest 读取剥 UTF-8 BOM（实测 BOM 首条记录不再被静默跳过）。
+- **🟢 O1/O2/O3/O4/O5**：退避日志显示真实等待秒数（原打印墙钟秒针值）+ 文档「最多等 6s」口径；`--expected`+`--from-manifest` 同传打警告；主理人 MD 两处「。，/。。」双标点；guard CLI 补 `--allow-readonly` 旗标（docstring 已承诺）；CHANGELOG 守卫项数「7→9 vs 8/8」矛盾统一为 7→8。
+
+### Changed
+- `test_contract_guard.py`：`_checks()` 拆为 `_checks_at(pkg_root)` 参数化入口（金丝雀注入用），`_checks()` 保持向后兼容转调。
+- 文档同步：team-lead 只读区条款收窄口径、SKILL.md guard 行、SPOF_INVENTORY 补守卫根行、guard docstring 判定规则重写。
+
+### Verification
+- pytest **9 passed** | fuzz **51/51** | 守卫 **8/8** | contracts/scope 全绿 | 四处 version=1.5.5
+- R1 攻击矩阵 4/4 被 V7 拦截；R2 三态（拦/放/放）实测；Y1-Y7 逐项复现→修复→复测通过
+
 ## [1.5.4] - 2026-11-09（任务 B 十编号对齐施工 · 断链接线与防复发）
 
 > 版本口径：任务 B（编号 1/2/3/4/5/6/9/10/12/13）第一阶段对齐方案经用户 GATE 2 放行后的施工发版。三批次（B1 断链接线 / B2 只读守卫与重试 / B3 文档增补）一次交付；全部改动为「接线 / 补测试 / 口径订正 / 维度增补」，**零重新设计已闭合机制**。
@@ -33,7 +57,7 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 - 主理人 MD：T1 增 poll 前置与 R-10a/R-10b 条款；坍缩路由表三维扩展；元审计触发条款；D2 适用面声明；maxTurns/全局重试预算口径诚实化（声明式定档无脚本校验 / 计数靠 checklist note，不虚构机器计数）。
 - `P4_monitoring_design.md`：B-3 真化、B-4 部分落地订正。
 - fuzz main() 行为级清单 3→6（+require_tag/poll_hitlimit/legacy_fallback），独立跑合计 **51/51**。
-- 守卫校验项 7→**9**（+语料下限 + 撞限巡检接线锚点）；vendor_core 检查项 V1-V6→**V1-V7**。
+- 守卫校验项 7→**8**（第 7 项内嵌语料 ≥40 下限；新增第 8 项撞限巡检接线锚点）；vendor_core 检查项 V1-V6→**V1-V7**。
 
 ### Verification
 - pytest **9 passed**（7 原有 + test_poll_hitlimit_and_manifest + test_legacy_package_check_fallback）

@@ -30,8 +30,8 @@ def _load_guard():
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
-    except (OSError, SyntaxError) as e:
-        print(f"⚠ guard_readonly 加载失败（守卫降级）: {e}", file=sys.stderr)
+    except Exception as e:  # L3 盲检 Y6：放宽捕获面（半损坏也降级不崩溃）
+        print(f"⚠ guard_readonly 加载失败（守卫降级）: {type(e).__name__}: {e}", file=sys.stderr)
         return None
 
 

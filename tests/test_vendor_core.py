@@ -32,10 +32,12 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 _PKG_NAME = "viral-evo-lab"
 _INSTALL_DIR = os.path.expanduser(
@@ -182,15 +184,19 @@ def run_checks(expert_dir):
     finally:
         shutil.rmtree(tmp_root, ignore_errors=True)
 
-    # V7 守卫互锚（R-13b · 2026-11-09）-------------------------------------
+    # V7 守卫互锚（R-13b · 2026-11-09；L3 盲检 R1 加固 · 2026-11-09）--------
     # 背景：历史事故「tests 被旧基线覆盖 → CI 静默 0 覆盖」发生过两次。实测
     # 发现 test_contract_guard.py 自身无任何守卫锚定——空壳化 + 重生成
     # integrity_manifest 后 EXIT=0 全静默（manifest 记录"当前是什么"而非
     # "应该是什么"）。本项从另一文件反向锚定守卫的存在性，形成跨文件互锚：
     #   删/空壳化 test_contract_guard.py → 本项 FAIL
     #   删/空壳化 test_vendor_core.py   → guard 第 1 项（A2 锚定本文件）FAIL
-    # 攻击面收窄：仅当两文件同时被覆盖时互锚才失效（收窄为人工纪律兜底，
-    # 见 Known Issues）。本项不依赖 integrity_manifest（那记录的是现状）。
+    # 【L3 盲检 R1 加固】字符串锚可被「语义空壳化」绕过（_checks 改恒真但
+    # 保留锚字符串 → V7 仍 PASS，已实验证实）。现加两层行为锚：
+    #   ① 金丝雀：importlib 真加载 guard 模块，动态注入畸形 manifest 后
+    #     调 _checks()，断言第 3 项真实 FAIL（行为≠恒真）；
+    #   ② 守卫项数下限：len(results) ≥ 8（空壳 return 1 条即被抓）。
+    import importlib.util
     guard_rel = os.path.join("tests", "test_contract_guard.py")
     guard_path = os.path.join(expert_dir, guard_rel)
     try:
@@ -205,12 +211,36 @@ def run_checks(expert_dir):
             "A-1 修复存活守卫",            # 第 7 项标题（守卫版本未回退）
         ]
         missing = [n for n in needles if n not in gsrc]
-        r.add("V7", "守卫互锚：test_contract_guard.py 存活且锚点齐全",
+        # ② 项数下限（R1）：恒真空壳通常 return 1 条；真实守卫 ≥8 项
+        m_cnt = re.search(r"return\s+out\s*$", gsrc, re.M)
+        cnt_anchors = sum(gsrc.count(p) for p in ('out.append((True', 'out.append((False', "out.append((not bad"))
+        if cnt_anchors < 8:
+            missing.append(f"守卫项断言数仅 {cnt_anchors}（<8）——疑语义空壳化")
+        # ① 金丝雀（R1）：真加载 + 畸形输入下第 3 项必须真实 FAIL
+        if not missing:
+            try:
+                spec = importlib.util.spec_from_file_location("_guard_canary", guard_path)
+                gmod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(gmod)
+                with tempfile.TemporaryDirectory(prefix="v7canary_") as td:
+                    bad_pkg = os.path.join(td, "pkg")
+                    shutil.copytree(expert_dir, bad_pkg,
+                                    ignore=shutil.ignore_patterns(".git", ".pytest_cache", "__pycache__"))
+                    with open(os.path.join(bad_pkg, "integrity_manifest.json"), "w", encoding="utf-8") as fm:
+                        fm.write('{"files": "not-a-dict", "file_count": -1}')
+                    res = gmod._checks_at(Path(bad_pkg))
+                # 第 3 项（manifest 一致性）在畸形 manifest 下必须 FAIL
+                item3 = res[2] if len(res) > 2 else (True, "缺失")
+                if item3[0]:
+                    missing.append("金丝雀失败：畸形 manifest 下守卫第 3 项仍 PASS（恒真嫌疑）")
+            except Exception as e:  # noqa: BLE001 —— 金丝雀自身任何异常 = 锚定失败
+                missing.append(f"金丝雀加载/执行失败: {type(e).__name__}: {e}")
+        r.add("V7", "守卫互锚：test_contract_guard.py 存活 + 项数下限 + 行为金丝雀",
               "PASS" if not missing else "FAIL",
-              "" if not missing else f"缺失锚点={missing}（守卫可能被空壳化/旧基线覆盖）"
+              "" if not missing else f"缺失锚点={missing}（守卫可能被空壳化/语义改写）"
                                      f"→ 恢复: git checkout <最新commit> -- {guard_rel}")
     except OSError as e:
-        r.add("V7", "守卫互锚：test_contract_guard.py 存活且锚点齐全", "FAIL",
+        r.add("V7", "守卫互锚：test_contract_guard.py 存活 + 项数下限 + 行为金丝雀", "FAIL",
               f"读取失败 {e}（守卫文件缺失？）")
 
     return r

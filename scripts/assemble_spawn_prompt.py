@@ -85,6 +85,21 @@ TASK_PACKAGE_FIELDS = ["objective", "output_format", "constraints", "task_bounda
 _VENDOR_CORE_REL = Path("vendor") / "shared-core" / "assemble_spawn_prompt.py"
 
 
+import importlib.util  # noqa: E402
+
+
+def _load_guard():
+    """R-10a：加载同目录 guard_readonly（只读区写盘守卫）；加载失败不阻断（降级为无守卫）。"""
+    here = Path(__file__).resolve().parent
+    try:
+        spec = importlib.util.spec_from_file_location("guard_readonly", here / "guard_readonly.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+    except Exception as e:  # L3 盲检 Y6：放宽捕获面（半损坏/None loader 也降级不崩溃）
+        print(f"⚠ guard_readonly 加载失败（守卫降级）: {type(e).__name__}: {e}", file=sys.stderr)
+        return None
+
 def _load_v5_checker(expert_dir: Path):
     """从 vendor 版装配器加载 check_task_package_v5；失败返回 None。"""
     core = expert_dir / _VENDOR_CORE_REL
@@ -416,6 +431,8 @@ def _write_workflow_sidecar(run_dir: str | None, task_id: str | None,
         "declared_by": "team-lead",
         "source": "assemble_spawn_prompt.py --workflow",
     }
+    _g = _load_guard()
+    if _g: _g.guard_or_exit(str(Path(run_dir).expanduser() / f"{task_id}__workflow.json"))  # R-10a 只读区守卫
     out = Path(run_dir).expanduser() / f"{task_id}__workflow.json"
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return str(out)
@@ -695,7 +712,8 @@ def main() -> int:
     run_dir = None
     if args.run_dir:
         rd = Path(args.run_dir).expanduser().resolve()
-        rd.mkdir(parents=True, exist_ok=True)   # 幂等建目录，成员只需写文件
+        _g = _load_guard()
+        if _g: _g.guard_or_exit(rd)  # R-10a 只读区守卫
         run_dir = str(rd)
         log(f"✅ 运行目录就绪：{run_dir}")
 
@@ -714,6 +732,8 @@ def main() -> int:
                 "——门禁将退回「只信信封」旧行为")
 
     if args.out:
+        _g = _load_guard()
+        if _g: _g.guard_or_exit(Path(args.out).expanduser())  # R-10a 只读区守卫
         Path(args.out).expanduser().write_text(prompt, encoding="utf-8")
         log(f"✅ 已写入：{args.out}（{len(prompt)} 字符）")
     else:

@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-09T10:31:21",
+ "generated": "2026-11-09T13:21:52",
  "file_count": 70,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "a51f24541b912dc0",
+   "sha16": "260fa4d7db05ddd3",
    "bytes": 704
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "7955ce5231175429",
+   "sha16": "cf6ec1d128c7ebd1",
    "bytes": 6692
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "4e1a6e67599970a5",
+   "sha16": "03b1d769d902fddf",
    "bytes": 6721
   },
   ".gitignore": {
@@ -27,12 +27,12 @@
    "bytes": 61
   },
   ".learnings/LEARNINGS.md": {
-   "sha16": "d32e4b0a2c028f1d",
-   "bytes": 22334
+   "sha16": "01cecc13143138d3",
+   "bytes": 25080
   },
   "CHANGELOG.md": {
-   "sha16": "92439aa4e6ec5309",
-   "bytes": 35590
+   "sha16": "d8ee84c91bfefb1f",
+   "bytes": 39792
   },
   "CLAUDE.md": {
    "sha16": "f507089af7b23cdf",
@@ -91,8 +91,8 @@
    "bytes": 5298
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "6fbe049e9558b457",
-   "bytes": 43811
+   "sha16": "fa069c13e36ea7ef",
+   "bytes": 43994
   },
   "avatars/.gitkeep": {
    "sha16": "e3b0c44298fc1c14",
@@ -147,20 +147,20 @@
    "bytes": 7378
   },
   "docs/SPOF_INVENTORY.md": {
-   "sha16": "5b80591c28c436dc",
-   "bytes": 3784
+   "sha16": "b20fc7e09aefd896",
+   "bytes": 3951
   },
   "docs/authorization_matrix.md": {
    "sha16": "a557a6e4d5f64002",
    "bytes": 4692
   },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "b24e9eb6f6852b79",
-   "bytes": 35277
+   "sha16": "9c34aa2994c3ead7",
+   "bytes": 36209
   },
   "scripts/check_gates.py": {
-   "sha16": "d2eefbb8a8278089",
-   "bytes": 35761
+   "sha16": "9c0305fe38cc64cd",
+   "bytes": 35835
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
@@ -175,48 +175,48 @@
    "bytes": 3703
   },
   "scripts/guard_readonly.py": {
-   "sha16": "815f24a92b55bcf8",
-   "bytes": 4502
+   "sha16": "d2f264c5cf50eae0",
+   "bytes": 6123
   },
   "scripts/hypothesis_watch.py": {
    "sha16": "b201a34cbae9d055",
    "bytes": 15514
   },
   "scripts/log_spawn.py": {
-   "sha16": "c8a74d1b704b3d73",
-   "bytes": 2649
+   "sha16": "c87b18e66c008378",
+   "bytes": 2723
   },
   "scripts/poll_run_dir.py": {
-   "sha16": "0b4461d56a1a55dc",
-   "bytes": 9084
+   "sha16": "4742d83e9acbb10d",
+   "bytes": 10561
   },
   "scripts/render_context_stack.py": {
-   "sha16": "3532b030ecb5d777",
-   "bytes": 6962
+   "sha16": "2ddb3eda348ab61a",
+   "bytes": 7036
   },
   "scripts/validate_contracts.py": {
    "sha16": "6096d0ddd834b16e",
    "bytes": 7174
   },
   "scripts/verify_member_output.py": {
-   "sha16": "c7c3e69c1e2deb5b",
-   "bytes": 8308
+   "sha16": "2e52ec53f43b804d",
+   "bytes": 8382
   },
   "scripts/verify_numbers.py": {
    "sha16": "19f82cae28887db2",
    "bytes": 8508
   },
   "scripts/write_checklist.py": {
-   "sha16": "c8d64d4902c5981b",
-   "bytes": 3643
+   "sha16": "023ecd03203360ba",
+   "bytes": 3717
   },
   "settings.json": {
    "sha16": "d74fcffe455cd1b8",
    "bytes": 188
   },
   "skills/viral-evo-core/SKILL.md": {
-   "sha16": "c011bc2986934bf6",
-   "bytes": 4368
+   "sha16": "51a229ae9c84c831",
+   "bytes": 4462
   },
   "skills/viral-evo-core/references/code-standards.md": {
    "sha16": "12c748105ab051e3",
@@ -263,16 +263,16 @@
    "bytes": 7139
   },
   "tests/test_contract_guard.py": {
-   "sha16": "812981d3ca028415",
-   "bytes": 15276
+   "sha16": "4371ea3f940eff09",
+   "bytes": 16324
   },
   "tests/test_gate_fuzz.py": {
    "sha16": "aa3cd1e706648a7a",
    "bytes": 30615
   },
   "tests/test_vendor_core.py": {
-   "sha16": "7f6eea873cb85157",
-   "bytes": 11688
+   "sha16": "2b0cfe56268aded3",
+   "bytes": 13786
   },
   "vendor/shared-core/VENDOR.json": {
    "sha16": "ab3df020b0f07ed8",

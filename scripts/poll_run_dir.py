@@ -50,7 +50,7 @@ HIT_LIMIT_MARK = "轮次耗尽"
 
 
 def _read_manifest_with_retry(mf: Path, retries: int = 3, base_delay: float = 2.0):
-    """R-10b（2026-11-09）：manifest 读取带 3 次指数退避重试（2s/4s/8s）。
+    """R-10b（2026-11-09）：manifest 读取带 3 次指数退避重试（尝试 3 次，间隔 2s/4s，最多等 6s）。
 
     背景：P4 B-4 原为「未排期」；任务 B 指令要求「默认 3 次指数退避并记录
     原因」。落点选择：巡检是最需要重试的场景（OneDrive 同步窗口/并发写入
@@ -64,9 +64,12 @@ def _read_manifest_with_retry(mf: Path, retries: int = 3, base_delay: float = 2.
             return txt, ""
         except OSError as e:
             last_err = f"第 {attempt + 1}/{retries} 次读取失败: {type(e).__name__}: {e}"
-            print(f"⚠ {last_err}，{_t.strftime('%S')}s 后重试…" if attempt < retries - 1 else f"⚠ {last_err}——重试耗尽", file=sys.stderr)
             if attempt < retries - 1:
-                _t.sleep(base_delay * (2 ** attempt))
+                delay = base_delay * (2 ** attempt)
+                print(f"⚠ {last_err}，{delay:.0f}s 后重试…", file=sys.stderr)
+                _t.sleep(delay)
+            else:
+                print(f"⚠ {last_err}——重试耗尽", file=sys.stderr)
     return None, last_err
 
 def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
@@ -81,9 +84,11 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
     txt, rerr = _read_manifest_with_retry(mf)
     if txt is None:
         return None, f"spawn_manifest.jsonl 读取失败（重试耗尽）: {rerr}"
+    # L3 盲检 Y1：重试已取回全文，二次裸读会架空重试且引入 TOCTOU——改用 txt
+    # L3 盲检 Y7：UTF-8 BOM 首行会使首条记录 JSON 解析失败被静默跳过——读时剥 BOM
     members: list[str] = []
     bad = 0
-    for line in mf.read_text(encoding="utf-8").splitlines():
+    for line in txt.lstrip("\ufeff").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -95,7 +100,14 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
         if isinstance(obj, dict):
             m = obj.get("member")
             if isinstance(m, str) and m.strip():
-                members.append(m.strip())
+                m = m.strip()
+                # L3 盲检 Y7：member 会拼进 {task_id}__{member}.md——
+                # 含路径分隔符/父目录引用/非法成分的记录判畸形（防路径探测）
+                if ("/" in m or "\\" in m or m in (".", "..") or m.startswith(".")
+                        or any(c in m for c in "\x00:\t\n")):
+                    bad += 1
+                    continue
+                members.append(m)
             else:
                 bad += 1
         else:
@@ -110,14 +122,23 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
     return uniq, ""
 
 
-def head_hit_limit(f: Path, lines: int = 3) -> bool:
-    """R-13a：读文件头 N 行判断是否带撞限标注。读失败不误判（返回 False）。"""
+def head_hit_limit(f: Path, lines: int = 8) -> bool:
+    """R-13a：读文件头 N 行判断是否带撞限标注。
+
+    L3 盲检 Y3 修正（2026-11-09）：
+      - 窗口 3→8 行（模板头部可能占多行，标注被挤出 3 行窗口会漏检）
+      - 读失败从「偏放行」改「偏保守」：OSError → True（视为撞限嫌疑，
+        交人工裁决）。漏放不完整产出比多问一句人工更危险（守卫方向）。
+      - 空文件（0 字节）不算撞限（成员可能还在写，mtime 新鲜度另行判定）。
+    """
     try:
+        if f.stat().st_size == 0:
+            return False
         with f.open("r", encoding="utf-8", errors="replace") as fh:
             head = "".join(fh.readline() for _ in range(lines))
         return HIT_LIMIT_MARK in head
     except OSError:
-        return False
+        return True  # 读不到 ≠ 没标注——保守判定，人工复核
 
 
 def main() -> int:
@@ -138,6 +159,9 @@ def main() -> int:
         return 5
 
     # 期望清单：--expected 显式优先；否则 --from-manifest；两者皆无 = 参数错误
+    # L3 盲检 O2：同传时 manifest 被静默忽略——打警告消歧
+    if args.expected and args.from_manifest:
+        print("⚠ 同时传入 --expected 与 --from-manifest：以 --expected 为准（manifest 忽略）", file=sys.stderr)
     if args.expected:
         expected = [m.strip() for m in args.expected.split(",") if m.strip()]
     elif args.from_manifest:

@@ -397,3 +397,24 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - **Insight**: 状态文档的 ✅ 会随时间脱钩（落地方被回退/部分落地被记全落地）；「全清单」类正则随代码增长漂移。检查状态声明的唯一可信方式 = 实测对应行为（grep 调用点 / 跑行为级用例）。
 - **Fix**: B-3 真化（T1 首位真实写入）；白名单 6→13；死声明作废或落地（退避→poll 实装；信噪比→口径订正）。
 - **Prevention**: 「✅ 已落地」条目须附可复验锚点（file:line 或测试名）；后续轮审计对每个 ✅ 抽查实测。
+
+## [LRN-20261109-016] 字符串锚 ≠ 行为锚：守卫可被语义空壳化绕过
+- **Category**: insight | **Severity**: critical | **Status**: resolved (v1.5.5 R1)
+- **Context**: L3 盲检实测：V7 互锚的 6 个锚字符串全保留、`_checks` 改恒真 → V7 仍 PASS。这正是守卫第 7 项批评 fuzz「只锚函数名」的同构缺陷——互锚自身犯了同类错误。
+- **Insight**: 存在性检查（字符串/函数名/项数）都是静态锚，可被「保留形态、替换语义」绕过；只有**行为锚**（真加载 + 畸形输入下断言真实 FAIL，即金丝雀）才能区分「守卫活着」与「守卫的尸体还摆着姿势」。
+- **Fix**: V7 三层（项数下限静态计数 → 金丝雀行为验证）；`_checks_at(pkg)` 参数化入口使注入可行。
+- **Prevention**: 互锚/存活守卫设计时必答「把函数体改成恒真后本守卫是否仍 FAIL」；答案为否 = 只有静态锚，需补金丝雀。
+
+## [LRN-20261109-017] 守卫根选择必须对照真实工作流沙盘推演
+- **Category**: correction | **Severity**: high | **Status**: resolved (v1.5.5 R2)
+- **Context**: 只读守卫默认根设整个 research-ops，但 run_dir（_harness_runs）、context_stack 渲染、台账维护流的文档工作流全在 research-ops 下——按文档操作 = 被自家守卫阻断（盲检实测）。
+- **Insight**: 防线范围（granosity）是安全性与可用性的权衡：整根拦截「安全」但把正常工作流逼向 --allow-readonly 逃生（逃生常态化 = 防线失效）；收窄到事故现场（_archive）才实现「拦该拦的、放该放的」。
+- **Fix**: 默认根 = RESEARCH_OPS_DIR/_archive；扩根走显式 DENY（人工决策留痕）。
+- **Prevention**: 新守卫上线前跑一遍「按文档工作流走一遍」的沙盘（盲检 R2 的实验路径），确认零误拦。
+
+## [LRN-20261109-018] 守卫「降级不阻断」的兑现需捕获 Exception 而非窄清单
+- **Category**: correction | **Severity**: medium | **Status**: resolved (v1.5.5 Y6)
+- **Context**: _load_guard 只捕 (OSError, SyntaxError)；guard 文件半损坏（NameError/AttributeError）或 spec=None 时直接 traceback，退出码 1 不在任何脚本契约内。
+- **Insight**: 「失败降级」承诺的捕获面必须覆盖「任何加载路径异常」——动态加载的失败模式清单不可枚举（文件损坏方式无限），except Exception 是动态加载边界的正确形态（业务逻辑处仍窄捕）。
+- **Fix**: 六脚本 _load_guard 统一 except Exception + type 名入警告。
+- **Prevention**: 动态 import/spec_from_file_location 处的降级承诺 → except Exception；窄捕只用于可枚举失败的业务调用。
