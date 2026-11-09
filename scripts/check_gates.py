@@ -443,12 +443,39 @@ def main() -> int:
         results.append((gate, ok, detail))
         print(f"  {'✅' if ok else '❌'} {gate}: {detail}")
 
+    def write_report() -> str:
+        """P0-2（2026-11-09 · 遗留清理轮）：所有退出路径共用落盘，防 G3 FAIL 零留痕。
+
+        背景：AUDIT_STATE §9 已记「G3 FAIL 不落 gates.json」与诚实性红线相关且
+        优先级高于其他 B 桶项，但此前 `if not g3: return 3` 在落盘前直接返回。
+        本函数抽出后供早退路径与正常路径共用；**EXIT=3 契约不变，仅补留痕**。
+        run_dir 不存在时无法落盘（stderr 警告，不改退出码）；只读区由守卫 EXIT=7 拦截。
+        """
+        verdict = "PASS" if all(ok for _, ok, _ in results) else "FAIL"
+        report = {
+            "ts": datetime.now().isoformat(timespec="seconds"),
+            "task_id": args.task_id,
+            "gates": [{"gate": g, "ok": ok, "detail": d} for g, ok, d in results],
+            "verdict": verdict,
+        }
+        out = run_dir / f"{args.task_id}__gates.json"
+        if not run_dir.is_dir():
+            print(f"⚠ 无法落盘门禁报告（run_dir 不存在）: {run_dir}", file=sys.stderr)
+            return verdict
+        _g = _load_guard()
+        if _g:
+            _g.guard_or_exit(str(out))  # R-10a 只读区守卫
+        out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"\n裁决: {verdict} → {out}")
+        return verdict
+
     print(f"═══ 团队级门禁 {args.task_id} ═══")
 
     # G3 产出落盘
     g3 = bool(artifacts)
     record("G3 产出落盘", g3, f"{len(artifacts)} 份 artifact" if g3 else f"{run_dir}/{args.task_id}__*.md 无一存在")
     if not g3:
+        write_report()  # P0-2：失败也落盘（EXIT=3 契约不变）
         return 3
 
     # G1 信封（逐 artifact）
@@ -658,19 +685,8 @@ def main() -> int:
         except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError) as e:
             record("G5 审判留痕", False, f"checklist.json 解析失败: {e}")
 
-    # 落盘门禁报告
-    verdict = "PASS" if all(ok for _, ok, _ in results) else "FAIL"
-    report = {
-        "ts": datetime.now().isoformat(timespec="seconds"),
-        "task_id": args.task_id,
-        "gates": [{"gate": g, "ok": ok, "detail": d} for g, ok, d in results],
-        "verdict": verdict,
-    }
-    _g = _load_guard()
-    if _g: _g.guard_or_exit(str(run_dir / f"{args.task_id}__gates.json"))  # R-10a 只读区守卫
-    out = run_dir / f"{args.task_id}__gates.json"
-    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n裁决: {verdict} → {out}")
+    # 落盘门禁报告（P0-2：与 G3 早退路径共用 write_report，单一事实源）
+    verdict = write_report()
     return 0 if verdict == "PASS" else 5
 
 

@@ -22,8 +22,11 @@
   7. A-1 修复存活守卫（2026-11-09）             → 抓 workflow 生产与防规避链路被静默摘除
      （装配 --workflow / sidecar 落盘 / 门禁交叉核验 / 契约与主理人 MD 同步 / 回归用例 / 语料下限）
   8. 撞限巡检接线守卫（R-13a/c · 2026-11-09）  → 抓撞限标注消费与 manifest 读取被回退
+  9. P0 修复存活守卫（v1.5.8 · 2026-11-09）     → 抓 decision_log 消费端 / G3 失败留痕
+     被静默回退（含三组行为级回归与包外基线对账脚本的存活）
   （互锚补强：test_vendor_core.py V7 反向锚定本文件存活——空壳化本守卫会被 V7 抓住，
-    双向互锚收窄「旧基线覆盖」攻击面至双文件同时覆盖）
+    双向互锚收窄「旧基线覆盖」攻击面至双文件同时覆盖；包外基线锚见
+    scripts/check_baseline_anchors.py + 审计区 BASELINE_ANCHORS.json）
 
 运行：python3 tests/test_contract_guard.py  或  pytest tests/ -q
 """
@@ -283,6 +286,42 @@ def _checks_at(pkg_root: Path) -> list[tuple[bool, str]]:
                     if not bad else "; ".join(bad)))
     except (OSError, UnicodeError) as e:
         out.append((False, f"撞限巡检接线守卫：校验失败 {type(e).__name__}: {e}"))
+
+    # 9. P0 修复存活守卫（v1.5.8 · 遗留 backlog 清理轮）----------------------
+    # 锚定 §13 两项 🔴 P0 的「生产者-消费者」闭环，防被旧基线静默回退：
+    #   9.1 audit_decision_log.py 存在且保留退出码契约 / 只读边界
+    #   9.2 check_gates.py 的 write_report 定义 + G3 早退调用 + 主路径调用（≥3 处）
+    #   9.3 三组行为级用例名在 test_gate_fuzz.py 中存活
+    #   9.4 包外基线对账脚本存在（P2-7，双文件同覆的独立参照）
+    try:
+        bad = []
+        adl = PKG / "scripts" / "audit_decision_log.py"
+        if not adl.is_file():
+            bad.append("scripts/audit_decision_log.py 缺失（decision_log 零消费端复发）")
+        else:
+            s = adl.read_text(encoding="utf-8")
+            for needle in ("REQUIRED_COLS", "def audit(", "EXIT_STALE = 6",
+                           "--max-age-days", "不代写"):
+                if needle not in s:
+                    bad.append(f"audit_decision_log.py 缺 {needle}")
+        cg = (PKG / "scripts" / "check_gates.py").read_text(encoding="utf-8")
+        if "def write_report" not in cg:
+            bad.append("check_gates.py 缺 write_report 定义（落盘单一事实源被拆）")
+        # 定义串 1 处 + G3 早退调用 1 处 + 主路径调用 1 处 = 3；少于 3 即早退落盘被摘
+        if cg.count("write_report()") < 3:
+            bad.append("check_gates.py 的 write_report() 少于 3 处（G3 早退落盘疑被摘除）")
+        fuzz = (PKG / "tests" / "test_gate_fuzz.py").read_text(encoding="utf-8")
+        for needle in ("def test_g3_fail_still_writes_report",
+                       "def test_decision_log_audit",
+                       "def test_baseline_anchor_roundtrip"):
+            if needle not in fuzz:
+                bad.append(f"test_gate_fuzz.py 缺 {needle}")
+        if not (PKG / "scripts" / "check_baseline_anchors.py").is_file():
+            bad.append("scripts/check_baseline_anchors.py 缺失（包外基线兜底被摘除）")
+        out.append((not bad, "P0 修复存活守卫（decision_log 消费端 + G3 失败留痕 + 行为级回归）"
+                    if not bad else "; ".join(bad)))
+    except (OSError, UnicodeError) as e:
+        out.append((False, f"P0 修复存活守卫：校验失败 {type(e).__name__}: {e}"))
 
     return out
 

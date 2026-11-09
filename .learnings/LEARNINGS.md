@@ -432,3 +432,24 @@ R12 冒烟测试时在权威源池（research-ops/outputs/）放置了手编常�
 - **Insight**: 标识符类输入（成员 ID/任务 ID/文件名成分）几乎总有严格形态约定——白名单 `fullmatch` 一次表达全部约束，黑名单永远漏「没想到的那一种」；且校验规则的「声称保护对象」要核实（本例「防 G3/G4 读路径探测」中 check_gates 根本不消费 manifest）。
 - **Fix**: `[a-z0-9][a-z0-9-]*` 白名单 + 注释如实标注保护范围（仅 poll 自身）。
 - **Prevention**: 写校验前先 grep 声称要保护的那个消费者是否真的存在；标识符校验默认白名单。
+
+## [LRN-20261109-021] 治理断言必须配对消费端：「无记录=未发生」没有读的一方就是空话
+- **Category**: insight | **Severity**: high | **Status**: resolved (v1.5.8 P0-1)
+- **Context**: `authorization_matrix.md` §四 规定「无 decision_log 记录的裁决 = 未发生」，但全包 grep 脚本消费端 = **0**（仅 check_gates.py 一句注释），台账最后更新停在 2026-10-15（25 天）而无人察觉；`CLAUDE.md` 的「审计例行化」待办挂了多个版本。与 LRN-014「只写不读」同构，这次发生在治理层而非数据层。
+- **Insight**: 台账/留痕类机制的效力 = 生产者纪律 × **消费者存在性**。只规定「必须写」而没有可机器执行的读方，等于把合规退化为自觉；且写方停摆不会触发任何信号。消费端最低成本形态是**只读审计脚本 + 陈旧阈值**，不必做语义对账。
+- **Fix**: `scripts/audit_decision_log.py`（结构/必填/档位/陈旧四查，退出码 0/3/5/6，`--json`），`test_decision_log_audit` 锁退出码与「台账字节不变」；明确不代写台账、不做自由文本语义匹配。
+- **Prevention**: 每写下一条「无 X 即视为未发生」的规则，立刻 grep 是否有脚本读 X；没有就把消费端列入同批次交付，不许只留 TODO。
+
+## [LRN-20261109-022] 早退路径是留痕的隐形缺口：报告落盘必须覆盖所有 return
+- **Category**: correction | **Severity**: high | **Status**: resolved (v1.5.8 P0-2)
+- **Context**: `check_gates.py` 的 `if not g3: return 3` 位于报告落盘代码之前，G3（artifact 缺失）失败时 `gates.json` 完全不生成——恰恰是「最需要留痕判定为何失败」的路径零留痕。AUDIT_STATE §9 早已标为高优先级，因属边界分支被多轮忽略。
+- **Insight**: 单一事实源原则不只管正常流程；**每个提前 return 都是一次「落盘是否被跳过」的独立审计点**。把落盘抽成闭包并让所有退出路径共用，比在每个早退处复制写盘更抗回退（守卫第 9 项用 `write_report()` 出现次数 ≥3 直接锚定）。
+- **Fix**: 抽出 `write_report()`，G3 早退与正常路径共用；EXIT=3 契约不变；行为级测试断言报告存在、verdict=FAIL、G3=false 与补产出后的覆盖语义。
+- **Prevention**: 新增门禁/审计类脚本时，逐个列出所有 `return`/`sys.exit` 点，逐一回答「此处报告是否已落盘」。
+
+## [LRN-20261109-023] 包内互锚挡不住双文件同覆：防线需要包外参照
+- **Category**: insight | **Severity**: medium | **Status**: mitigated (v1.5.8 P2-7)
+- **Context**: guard ↔ test_vendor_core V7 双向互锚把「旧基线覆盖」攻击面收窄到「两文件同时被覆」，但历史事故正是**整包 tests/ 被覆盖**；包内任何参照都会随覆盖一起消失，只剩人工 diff。
+- **Insight**: 自校验系统的根信任锚必须在被校对象之外。包外 sha256 基线不能自动阻止覆盖，但能把「是否被换过」变成一次确定性对账；代价是基线需随正常改动刷新，因此必须标注 `source.tag/commit` 且禁止改锚刷绿。
+- **Fix**: `scripts/check_baseline_anchors.py --anchors <包外 JSON>`（0/3/5）+ 审计区 `BASELINE_ANCHORS.json`；路径不硬编码，脚本只读、不生成锚。
+- **Prevention**: 设计互锚/自校验时必答「如果这组文件全部被一次性替换，还剩什么能证明」；答案为无 → 补包外锚。状态仅 **mitigated**，须人工刷新基线。

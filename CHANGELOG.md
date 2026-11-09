@@ -4,6 +4,34 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.8] - 2026-11-09（遗留 backlog 清理轮 · 生产者-消费者闭环 + 门禁失败留痕）
+
+> 版本口径：v1.5.7 已按「连续 2 轮无 🔴」宣布循环审计闭环。本版**不重开审计循环**，仅清理 `AUDIT_STATE.md` §13 实证清单里的 2 项 🔴 P0 + 3 项 🟠 P1 + 2 项 🟡 P2；⚪ P3 三项**列明真实未完成，不施工、不伪装**。
+
+### Added
+- **P0-1 · `scripts/audit_decision_log.py`**：补齐 `decision_log.csv` 的**零消费端**断链（LRN-014「只写不读」同构）。只读审计四查（结构 / 必填字段 / tier 白名单 / 陈旧阈值），退出码 `0 健康 / 3 结构失败 / 5 内容违规 / 6 陈旧提醒`，`--json` 供机器消费。**不代写台账、不做语义级裁决对账**（自由文本机械匹配不可靠，仍属主理人 T2 人工纪律）。实测：真实台账 `HEALTHY/EXIT=0`；`--max-age-days 1` → `STALE/EXIT=6`；缺文件 / 缺列 / 条目不足 / 空值 / 坏 ts / 坏档位 六形态退出码全按契约。
+- **P2-7 · `scripts/check_baseline_anchors.py` + 包外锚文件**：以 `--anchors <包外 JSON>` 对关键防线文件做 sha256 只读对账（`0 一致 / 3 结构 / 5 漂移`），路径不硬编码。锚文件落在审计区 `viral-evo-lab-audit/BASELINE_ANCHORS.json`，使「双测试文件同时被旧基线覆盖」有**包外独立参照**可查，不再只靠包内互锚 + 人工 diff。
+
+### Fixed
+- **P0-2 · G3 FAIL 零留痕**：`check_gates.py` 原 `if not g3: return 3` 在报告落盘前早退，门禁失败无报告。抽出 `write_report()` 供早退与正常路径共用（单一事实源），**`EXIT=3` 契约不变**，失败也落 `<task_id>__gates.json`。守卫仍在写盘前调用，只读区 `EXIT=7` 不变。补行为级回归：断言报告落盘、verdict=FAIL、G3=false，以及补产出后重跑的报告覆盖语义。
+- **P1-4 · `CLAUDE.md` 三/四 JSON 硬冲突**：L69「四 JSON 真源」与 L81「三 .json 为真源」并存；L81 订正为四 .json，与 v1.5.2 订正节及 `render_context_stack.py` RENDERERS 一致。
+- **P0-1 配套 · 文档真化**：`docs/authorization_matrix.md` §四 补消费端脚本；§五 记录义务里 v1.5.4 编号3 的「当前无脚本审计 / 脚本化列入 backlog」订正为准确口径（脚本只验台账健康，语义级裁决对账仍属人工）。`CLAUDE.md` 追加 v1.5.8 订正节，销掉 v1.5.0「decision_log 审计例行化」待办与 v1.5.2「下一轮评估」；历史条目本身**保留不改**。
+- **P1-5 · 审计区文档漂移**：`ROUND2_SUMMARY.md` §4 已销项仍列 backlog、`agent-harness-sop/CLEANUP_CHECKLIST.md` §五「未推送」与实测 `0 0` 不符 → **保留历史文本 + 追加销项/订正标注**，不改写历史。
+
+### Changed
+- **P1-3 · `--require-tag` 默认值裁决（只落结论，不改代码）**：**保持默认关闭**。① `test_require_tag_gate` 已断言默认关闭的向后兼容契约，翻转即破坏已发布行为；② 存量权威源多数未打 `source_tag: authoritative`，翻转会误杀；③ 严审场景显式传参即可。CHANGELOG v1.5.2 Known Issues「下一轮评估是否翻转默认值」**销项**。
+- **P2-6 · D2 质量维度扩展**：team-lead MD 的 D2 适用面从「仅 WF5/WF6」扩展到追问 / 4R / Gödel 三分支的**轻量级质量终止判据**（连续 2 轮无新增实质问题 + 关键质疑已闭环 + checklist 留痕），与「全局重试 ≤5」并行而非替代。仍为文档级判据，不虚构机器计数。
+- **回归基线升级**：fuzz 行为级 6 → **9**（新增 G3 早退落盘 / decision_log 退出码 / 基线锚对账），守卫 8 → **9** 项（新增第 9 项「P0 修复存活守卫」：锚脚本、统一落盘、三处行为级用例名），V7 金丝雀项数下限 8 → **9** 同步。
+
+### Known Issues（本轮真实未完成，不阻塞）
+- ⚪ P3 · **agent-harness-sop T-D1「G6 抽查门」实测不存在**，属另一战线（需 `check_gates.py` 改造 + 红线评估，估 4h），本版不实现、不伪装已完成；已在 `04-test/00_交付报告.md` 标注真实状态。
+- ⚪ P3 · V2 联邦真源仓库归属核实（外部依赖，需人工）、P4 B-5 cron 巡检（跨会话场景，未排期）——均不施工，理由见 `AUDIT_STATE.md` §13。
+- 🟡 语义级「某裁决是否有对应 `decision_log` 条目」仍无机械对账（诚实声明，同 P0-1 边界）。
+
+### Verification
+- pytest **12 passed** | fuzz **54/54** | 守卫 **9/9** | contracts / scope / manifest `--check` 全绿 | 四处 version=1.5.8
+- 新增行为级用例全绿：G3 FAIL 落盘 + 覆盖语义 / decision_log 八形态退出码 + 台账字节不变 / 基线锚一致与篡改双态
+
 ## [1.5.7] - 2026-11-09（第四轮盲检收敛计数 · 零🔴零🟡 + 低危清理）
 
 > 版本口径：第四轮 L3 独立盲检对 v1.5.6 复核——**零 🔴 零 🟡**（收敛计 1 轮），3 项 🟢 观察项随本版清理。v1.5.6 的 mkdir 回归修复经新 run-dir 全链路实测确认；前两轮成果（守卫三态/白名单/金丝雀/render 可见性）无一被破坏；退出码契约经五个破坏性场景实测无击穿。

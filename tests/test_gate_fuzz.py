@@ -21,8 +21,13 @@ L3（2026-11-09）：补「行为断言」层——原套件只断言不崩溃�
     ⑥ 新增 G4 waiver 放行五路径用例（放行/无签名/无理由/值不匹配/部分覆盖）；
     ⑦ 新增 gate_mode 与处置门禁行为回归。
 
+v1.5.8（2026-11-09 · 遗留 backlog 清理轮）：行为级用例 6 → **9**，
+      新增三组「生产者-消费者闭环」回归——G3 FAIL 早退落盘 / decision_log
+      只读审计退出码与不代写 / 包外基线锚对账；main() 的 total 同步。
+
 运行：python3 tests/test_gate_fuzz.py  或  pytest tests/ -q
 """
+import hashlib
 import json
 import subprocess
 import sys
@@ -541,6 +546,167 @@ def test_legacy_package_check_fallback() -> None:
             f"--legacy-package-check 应放行且注明 legacy 模式，实际 rc={rc_lg}"
 
 
+def test_g3_fail_still_writes_report() -> None:
+    """P0-2（2026-11-09 · 遗留清理轮）：G3 FAIL 早退路径必须落 gates.json。
+
+    历史缺陷：check_gates.py 的 `if not g3: return 3` 在报告落盘之前直接返回，
+    门禁失败零留痕（AUDIT_STATE §9 已标高优先级）。本用例锁定修复：
+      ① run_dir 无任何成员 artifact → EXIT=3（退出码契约不变）
+      ② gates.json 必须存在，verdict=FAIL，G3 记为 false
+      ③ 补 1 份 artifact 重跑 → 报告被同一 write_report 重写且 G3 翻为 true
+    """
+    with tempfile.TemporaryDirectory(prefix="g3report_") as td:
+        d = Path(td)
+        cmd = [sys.executable, str(CHECK_GATES), str(d), TASK_ID]
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert p.returncode == 3, f"G3 FAIL 必须 EXIT=3，实际 {p.returncode} | {out[:200]}"
+        assert "Traceback" not in out, f"G3 早退路径异常: {out[:300]}"
+        report = d / f"{TASK_ID}__gates.json"
+        assert report.is_file(), "G3 FAIL 时 gates.json 未落盘（失败零留痕）"
+        data = json.loads(report.read_text(encoding="utf-8"))
+        assert data.get("verdict") == "FAIL", f"verdict 应为 FAIL: {data.get('verdict')}"
+        assert _read_gates(d).get("G3") is False, "G3 未以 FAIL 记入报告"
+
+        # 覆盖语义：补产出后重跑，报告须由同一 write_report 重写、G3 翻正
+        (d / f"{TASK_ID}__phylo-analyst.md").write_text("# 产出\n", encoding="utf-8")
+        p2 = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        assert p2.returncode in (0, 5), f"有产出时应进入完整门禁，实际 {p2.returncode}"
+        assert _read_gates(d).get("G3") is True, "补产出后 G3 未翻为 PASS"
+
+
+def test_decision_log_audit() -> None:
+    """P0-1（2026-11-09 · 遗留清理轮）：decision_log 只读审计的退出码契约。
+
+    §13 实证「decision_log.csv 零脚本消费端」。本用例锁定新增消费端的行为：
+      0 健康 / 3 结构失败（缺文件·缺列·条目不足）/ 5 内容违规（空值·坏 ts·坏 tier）
+      / 6 陈旧提醒；`--max-age-days 0` 禁用陈旧检查；`--json` 供机器消费。
+    另在每条路径上断言**台账字节不变**——脚本只校验落盘台账，不代写。
+    """
+    script = PKG / "scripts" / "audit_decision_log.py"
+    header = "ts,actor,decision_type,decision,rationale,tier\n"
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    good = f"{now},lead,G2-waiver,放行示例,理由,通知档\n"
+    old = "2020-01-01T00:00:00+08:00,lead,G2-waiver,陈旧条目,理由,通知档\n"
+
+    def run(csv_path: Path, *args: str) -> tuple[int, str]:
+        before = csv_path.read_bytes() if csv_path.is_file() else b""
+        p = subprocess.run(
+            [sys.executable, str(script), str(csv_path), *args],
+            capture_output=True, text=True, timeout=60)
+        after = csv_path.read_bytes() if csv_path.is_file() else b""
+        assert after == before, "只读契约被破坏：审计脚本改写了台账"
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, f"审计脚本崩溃: {out[:300]}"
+        return p.returncode, out
+
+    with tempfile.TemporaryDirectory(prefix="decision_audit_") as td:
+        d = Path(td)
+        csv_path = d / "decision_log.csv"
+
+        # 健康 + JSON 消费端
+        csv_path.write_text(header + good, encoding="utf-8")
+        rc, out = run(csv_path, "--json", "--max-age-days", "0")
+        assert rc == 0, f"健康台账应 EXIT=0，实际 {rc} | {out[:200]}"
+        rep = json.loads(out)
+        assert rep["verdict"] == "HEALTHY" and rep["entries"] == 1 and rep["exit_code"] == 0
+
+        # 陈旧提醒 / 禁用陈旧检查
+        csv_path.write_text(header + old, encoding="utf-8")
+        rc, out = run(csv_path, "--json", "--max-age-days", "1")
+        assert rc == 6 and json.loads(out)["verdict"] == "STALE", f"陈旧应 EXIT=6: {out[:200]}"
+        rc, _ = run(csv_path, "--json", "--max-age-days", "0")
+        assert rc == 0, "--max-age-days 0 应禁用陈旧检查"
+
+        # 结构失败：文件缺失 / 缺必需列 / 条目数不足
+        rc, out = run(d / "absent.csv", "--json")
+        assert rc == 3 and json.loads(out)["verdict"] == "MISSING"
+        csv_path.write_text("ts,actor,decision\n" + f"{now},lead,缺列\n", encoding="utf-8")
+        rc, out = run(csv_path, "--json")
+        assert rc == 3 and json.loads(out)["verdict"] == "SCHEMA_MISSING"
+        csv_path.write_text(header + good, encoding="utf-8")
+        rc, out = run(csv_path, "--json", "--min-entries", "2")
+        assert rc == 3 and json.loads(out)["verdict"] == "TOO_FEW"
+
+        # 内容违规：空必填 / 坏 ts / 非法 tier（三种独立形态）
+        for bad_row in (
+            f"{now},lead,G2-waiver,,理由,通知档\n",
+            "not-a-timestamp,lead,G2-waiver,坏时间,理由,通知档\n",
+            f"{now},lead,G2-waiver,坏档位,理由,越权档\n",
+        ):
+            csv_path.write_text(header + bad_row, encoding="utf-8")
+            rc, out = run(csv_path, "--json")
+            assert rc == 5 and json.loads(out)["verdict"] == "CONTENT_VIOLATION", \
+                f"内容违规应 EXIT=5: {bad_row.strip()} | {out[:200]}"
+
+
+def test_baseline_anchor_roundtrip() -> None:
+    """P2-7（2026-11-09 · 遗留清理轮）：包外基线锚只读对账的退出码契约。
+
+    锁定「双测试文件同覆」的包外兜底：锚一致 → 0；哈希/字节漂移或文件缺失
+    → 5；锚畸形（缺 files / 路径逃逸）→ 3；且对账全程**不改包内任何文件**。
+    锚路径由 --anchors 传入，测试自包含（不依赖审计区真实锚文件）。
+    """
+    script = PKG / "scripts" / "check_baseline_anchors.py"
+    rels = ("tests/test_contract_guard.py", "tests/test_vendor_core.py",
+            "tests/test_gate_fuzz.py", "scripts/check_gates.py")
+    before = {r: (PKG / r).read_bytes() for r in rels}
+
+    def fresh_files() -> dict:
+        return {
+            r: {"sha256": hashlib.sha256((PKG / r).read_bytes()).hexdigest(),
+                "bytes": (PKG / r).stat().st_size}
+            for r in rels
+        }
+
+    with tempfile.TemporaryDirectory(prefix="baseline_anchor_") as td:
+        anchor = Path(td) / "anchors.json"
+
+        def run(obj) -> tuple[int, dict]:
+            anchor.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+            p = subprocess.run(
+                [sys.executable, str(script), "--anchors", str(anchor), "--json"],
+                capture_output=True, text=True, timeout=60)
+            out = p.stdout + p.stderr
+            assert "Traceback" not in out, f"对账脚本崩溃: {out[:300]}"
+            try:
+                rep = json.loads(out)
+            except json.JSONDecodeError:
+                raise AssertionError(f"--json 输出不可解析: {out[:300]}")
+            return p.returncode, rep
+
+        base = {"schema_version": 1, "generated": "2026-11-09T00:00:00",
+                "source": {"tag": "v1.5.8", "note": "self-contained test"},
+                "files": fresh_files()}
+        rc, rep = run(base)
+        assert rc == 0 and rep["verdict"] == "OK" and rep["matched"] == len(rels), \
+            f"一致锚应 EXIT=0: rc={rc} rep={rep}"
+
+        tampered = json.loads(json.dumps(base, ensure_ascii=False))
+        tampered["files"][rels[0]]["sha256"] = "0" * 64
+        rc, rep = run(tampered)
+        assert rc == 5 and rep["verdict"] == "DRIFT" \
+            and any(m["path"] == rels[0] for m in rep["mismatched"]), \
+            f"哈希漂移应 EXIT=5: rc={rc} rep={rep}"
+
+        absent = json.loads(json.dumps(base, ensure_ascii=False))
+        absent["files"]["scripts/does_not_exist.py"] = {"sha256": "0" * 64, "bytes": 1}
+        rc, rep = run(absent)
+        assert rc == 5 and "scripts/does_not_exist.py" in rep["missing"], \
+            f"文件缺失应判漂移 EXIT=5: rc={rc} rep={rep}"
+
+        rc, rep = run({"schema_version": 1})
+        assert rc == 3 and rep["verdict"] == "ANCHOR_SCHEMA_INVALID", \
+            f"缺 files 应 EXIT=3: rc={rc} rep={rep}"
+        rc, rep = run({"schema_version": 1,
+                       "files": {"../escape.py": {"sha256": "0" * 64, "bytes": 1}}})
+        assert rc == 3 and rep["verdict"] == "ANCHOR_SCHEMA_INVALID", \
+            f"路径逃逸应 EXIT=3: rc={rc} rep={rep}"
+
+    assert all((PKG / r).read_bytes() == b for r, b in before.items()), \
+        "对账脚本改动了包内文件（只读契约被破坏）"
+
+
 def main() -> int:
     ok_n = 0
     for name, art, wv, oc, expect in CASES:
@@ -550,14 +716,16 @@ def main() -> int:
     print(f"\nfuzz 用例 {len(CASES)} | 通过 {ok_n} | 失败 {len(CASES) - ok_n}")
     # 行为级用例（pytest 入口亦覆盖，此处供独立脚本运行）
     for fn in (test_g4_waiver_release, test_gate_mode_blocks, test_disposition_gate,
-               test_require_tag_gate, test_poll_hitlimit_and_manifest, test_legacy_package_check_fallback):
+               test_require_tag_gate, test_poll_hitlimit_and_manifest,
+               test_legacy_package_check_fallback, test_g3_fail_still_writes_report,
+               test_decision_log_audit, test_baseline_anchor_roundtrip):
         try:
             fn()
             print(f"  ✅ {fn.__name__}")
             ok_n += 1
         except AssertionError as e:
             print(f"  ❌ {fn.__name__}: {e}")
-    total = len(CASES) + 6
+    total = len(CASES) + 9
     print(f"\n合计 {total} | 通过 {ok_n} | 失败 {total - ok_n}")
     return 0 if ok_n == total else 1
 

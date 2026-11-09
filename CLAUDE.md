@@ -78,7 +78,7 @@
 
 ## 权威源唯一性
 - 阈值/前沿/检索源 → `skills/viral-evo-core/references/` 权威
-- 项目级快照/锚点/确认假说 → `research-ops/context_stack/` **三 .json 为真源**（.md 是渲染视图）
+- 项目级快照/锚点/确认假说 → `research-ops/context_stack/` **四 .json 为真源**（research_anchor / confirmed_hypotheses / method_library / knowledge_index；.md 是渲染视图。v1.5.8 订正：原「三 .json」为历史残留，与下方 v1.5.2 订正节及 `render_context_stack.py` RENDERERS 冲突）
 - 工作流触发表/角色映射 → 本文件权威
 
 ## Changelog
@@ -160,4 +160,17 @@
 - **两类门控分开（A-10 口径统一）**：team-lead「质量门控」段此前把**领域分析门**（数据质控/时间树/ML 树/正选择/引用）与**团队协作门**（G1–G5 脚本化）并列于同一清单，读者会误以为数据质控 = 数字溯源。现拆为 ① 领域分析门（任务内成员自查）/ ② 团队协作门（回传后主理人跑脚本），并明确数字溯源属 T1 收产出环节、**不是** WF4 Phase 1 的数据质控，两者互不替代。
 - **退出码勿跨脚本套用（A-11 口径统一）**：team-lead T1 段列的是 `check_gates.py` 退出码（0/3/5），T2 段列的是 `hypothesis_watch.py` 退出码（0/5/6/3），相邻两段并列易被误读为同一套契约。现显式声明两套退出码**不可互换、不可合并解读**，并在 T1/T2 两处各补本脚本的完整退出码表。
 - **回归基线再升级**：fuzz 用例 34 → **45**（新增 A-1 交叉核验族 11 例：谎报规避 / 漏回传 / 漏 anchor / 表述差异 / 存量链路 / 伪造升级 / sidecar 畸形），另加 3 个行为级用例，合计 **48/48 全绿**；`test_contract_guard.py` 增第 **7** 项「A-1 修复存活守卫」（生产链路 9 个锚点：装配参数 / sidecar 落盘 / 门禁读取 / 交叉比对 / 契约同步 / 主理人 MD 同步 / 回归用例）；L2 沙箱新增**真实链路**演练 8/8 全绿（装配 → spawn 产物 → 成员产出 → 门禁）。
+
+---
+
+## 当前口径订正（v1.5.8 · 2026-11-09 · 遗留 backlog 清理轮）
+
+> 本节为**追加订正**，不改写上方任何历史条目（守本文件第 4 行「禁止改写历史」）。历史 Changelog 的「下一步」「未推送」等表述仅作历史证据，当前执行以本节为准。
+
+- **decision_log 审计例行化已落地（v1.5.0 条目「下一步」销项）**：新增 `scripts/audit_decision_log.py`，是 `decision_log.csv` 的**首个脚本消费端**（此前全包 grep 消费端 = 0）。只读四查：结构 / 必填字段 / tier 白名单 / 陈旧阈值；退出码 `0 健康 / 3 结构失败 / 5 内容违规 / 6 陈旧提醒`，`--json` 供机器消费。用法：`python3 scripts/audit_decision_log.py <台账.csv> [--max-age-days 30] [--min-entries 1] [--json]`。
+- **消费端边界（诚实声明）**：脚本**不代写台账**（与 `check_gates.py`「只校验落盘台账」同口径），也不做「某次具体裁决是否有对应条目」的语义对账——台账 `decision` 为自由文本，机械匹配不可靠，该对账仍属主理人 T2 人工纪律（`docs/authorization_matrix.md` §四）。真实台账最后更新 2026-10-15（6 条），2026-11-09 实测默认 30 天阈值下为 `HEALTHY/EXIT=0`（25 天未超阈值）；收紧到 `--max-age-days 1` 才报 `STALE/EXIT=6`。**台账确已 25 天未更新**，属治理事实，应由 archivist 落盘新条目，不是脚本故障；阈值可按战线节奏调严，但脚本不改数据。
+- **`--require-tag` 默认值裁决（CHANGELOG v1.5.2 Known Issues「下一轮评估」销项）**：**保持默认关闭，不改代码**。依据：① `test_require_tag_gate` 已锁定默认关闭的向后兼容契约，翻转即破坏已发布行为；② 存量任务的多数权威源未打 `source_tag: authoritative`，翻转会误杀；③ 严审任务显式传 `--require-tag` 即可，收益不抵回归成本。
+- **CONTEXT_STACK 数量口径**：上方「权威源唯一性」节历史残留的「三 .json」已订正为**四 .json**，与 v1.5.2 订正节及 `render_context_stack.py` 的 RENDERERS 一致。
+- **G3 失败留痕**：`check_gates.py` 的 `EXIT=3`（artifact 缺失）现在也落 `<task_id>__gates.json`（verdict=FAIL / G3 ok=false）；退出码表不变，仅补报告，失败不再零留痕。
+- **包外基线锚（双文件同覆残余的兜底）**：`scripts/check_baseline_anchors.py --anchors <包外 JSON>` 对关键防线文件做 sha256 只读对账；锚文件落在审计区（包外），路径不硬编码。锚文件生成于 v1.5.8 定版后，若此后有正常改动需重新生成基线，勿直接改锚来「刷绿」。
 

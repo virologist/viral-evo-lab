@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-09T19:27:47",
- "file_count": 70,
+ "generated": "2026-11-09T22:37:57",
+ "file_count": 72,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "4fe6d0870203aca8",
+   "sha16": "5ce0b67375e8ed60",
    "bytes": 704
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "4d94ad5b9d7d2cd9",
+   "sha16": "f486ce0cccf7f4b9",
    "bytes": 6692
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "934b32ef953025f2",
+   "sha16": "102c3956274c0035",
    "bytes": 6721
   },
   ".gitignore": {
@@ -27,16 +27,16 @@
    "bytes": 61
   },
   ".learnings/LEARNINGS.md": {
-   "sha16": "0552642592737bde",
-   "bytes": 27153
+   "sha16": "ed8ce1cd20d650b1",
+   "bytes": 30713
   },
   "CHANGELOG.md": {
-   "sha16": "58bcb5e7ca0cdd77",
-   "bytes": 43469
+   "sha16": "bbc34202a42d99f3",
+   "bytes": 48230
   },
   "CLAUDE.md": {
-   "sha16": "f507089af7b23cdf",
-   "bytes": 18908
+   "sha16": "1a230764df6f4fe4",
+   "bytes": 21810
   },
   "CONTRIBUTING.md": {
    "sha16": "57102d910bc66799",
@@ -91,8 +91,8 @@
    "bytes": 5298
   },
   "agents/viral-evo-lab-team-lead.md": {
-   "sha16": "7cda93debd726bd5",
-   "bytes": 43994
+   "sha16": "c0a383c24610bccc",
+   "bytes": 44447
   },
   "avatars/.gitkeep": {
    "sha16": "e3b0c44298fc1c14",
@@ -151,16 +151,24 @@
    "bytes": 3979
   },
   "docs/authorization_matrix.md": {
-   "sha16": "a557a6e4d5f64002",
-   "bytes": 4692
+   "sha16": "acaf875ec9ee9d38",
+   "bytes": 5516
   },
   "scripts/assemble_spawn_prompt.py": {
    "sha16": "49b773cb4627bacc",
    "bytes": 36703
   },
+  "scripts/audit_decision_log.py": {
+   "sha16": "2699672da8dd256a",
+   "bytes": 9156
+  },
+  "scripts/check_baseline_anchors.py": {
+   "sha16": "a00fbb7389cafc74",
+   "bytes": 6990
+  },
   "scripts/check_gates.py": {
-   "sha16": "9c0305fe38cc64cd",
-   "bytes": 35835
+   "sha16": "c4374ab73cc86117",
+   "bytes": 36794
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
@@ -263,16 +271,16 @@
    "bytes": 7139
   },
   "tests/test_contract_guard.py": {
-   "sha16": "4371ea3f940eff09",
-   "bytes": 16324
+   "sha16": "9e79d35042a112f9",
+   "bytes": 18967
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "aa3cd1e706648a7a",
-   "bytes": 30615
+   "sha16": "16f9cacab7bca517",
+   "bytes": 39686
   },
   "tests/test_vendor_core.py": {
-   "sha16": "bf3de3a3e8c21cdd",
-   "bytes": 13811
+   "sha16": "61268341ef9ac348",
+   "bytes": 14054
   },
   "vendor/shared-core/VENDOR.json": {
    "sha16": "ab3df020b0f07ed8",
