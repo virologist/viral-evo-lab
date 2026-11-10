@@ -11,7 +11,7 @@
 
 用法：
     python3 scripts/gen_integrity_manifest.py            # 生成并覆盖 integrity_manifest.json
-    python3 scripts/gen_integrity_manifest.py --check    # 只校验不写（exit 1 = 清单过期）
+    python3 scripts/gen_integrity_manifest.py --check    # 只校验不写（exit 1 = 清单过期；2 = git 不可用）
 
 幂等性：同状态文件树两次运行 diff 为空。
 """

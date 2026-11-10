@@ -22,6 +22,8 @@ shared-core 分发与防漂移门禁（v3.4.2 P0-1 配套，2026-10-15 适配至
       且输出含全部成员 ID（真执行，非静态断言）
   V6  冒烟：联邦缺失模拟（SHIM 隔离目录）——把包拷到临时目录跑，仍须退出码 0
       （证明 git clone 态开箱可用；这是 P0-1 的验收核心）
+  V7  守卫互锚：test_contract_guard.py 存活 + 守卫项断言数下限 + 行为金丝雀
+      （真加载守卫并注入畸形 manifest，第 3 项须真实 FAIL，防语义空壳化）
 
 用法：
   python3 tests/test_vendor_core.py [--expert-dir 路径] [--json]
@@ -195,7 +197,7 @@ def run_checks(expert_dir):
     # 保留锚字符串 → V7 仍 PASS，已实验证实）。现加两层行为锚：
     #   ① 金丝雀：importlib 真加载 guard 模块，动态注入畸形 manifest 后
     #     调 _checks()，断言第 3 项真实 FAIL（行为≠恒真）；
-    #   ② 守卫断言数下限 ≥ 9（v1.5.8 新增第 9 项后实测 14；空壳 return 1 条即被抓）。
+    #   ② 守卫断言数下限 ≥ 11（v1.5.10 新增第 11 项后实测约 18；空壳 return 1 条即被抓）。
     import importlib.util
     guard_rel = os.path.join("tests", "test_contract_guard.py")
     guard_path = os.path.join(expert_dir, guard_rel)
@@ -211,14 +213,15 @@ def run_checks(expert_dir):
             "A-1 修复存活守卫",            # 第 7 项标题（守卫版本未回退）
             "P0 修复存活守卫",             # 第 9 项标题（v1.5.8 修改被整体回退即 FAIL）
             "ADR/G6/B-5 修复存活守卫",     # 第 10 项标题（v1.5.9 清理轮被整体回退即 FAIL）
+            "当前口径一致性守卫",           # 第 11 项标题（v1.5.10 文档口径订正被整体回退即 FAIL）
         ]
         missing = [n for n in needles if n not in gsrc]
-        # ② 项数下限（R1；v1.5.9 由 9 提至 10）：恒真空壳通常 return 1 条；
-        # 真实守卫 10 项 × (正常 + 异常兜底) ≈ 16 条断言，留抽稀余量只拦删减。
+        # ② 项数下限（R1；v1.5.10 由 10 提至 11）：恒真空壳通常 return 1 条；
+        # 真实守卫 11 项 × (正常 + 异常兜底) ≈ 18 条断言，留抽稀余量只拦删减。
         # 三轮🟢7：删除死变量 m_cnt（原 re.search 结果从未使用）
         cnt_anchors = sum(gsrc.count(p) for p in ('out.append((True', 'out.append((False', "out.append((not bad"))
-        if cnt_anchors < 10:
-            missing.append(f"守卫项断言数仅 {cnt_anchors}（<10）——疑语义空壳化")
+        if cnt_anchors < 11:
+            missing.append(f"守卫项断言数仅 {cnt_anchors}（<11）——疑语义空壳化")
         # ① 金丝雀（R1）：真加载 + 畸形输入下第 3 项必须真实 FAIL
         if not missing:
             try:

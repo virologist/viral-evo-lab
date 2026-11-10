@@ -4,6 +4,31 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.10] - 2026-11-10（L3 盲检 R5 · 当前口径一致性补正与防复发）
+
+> 版本口径：v1.5.9 §15 宣布「零挂账」，但独立只读盲检实证**不成立**——代码已升到 G1-G6，而 CLI help、权威门表、主理人活跃 T1 条款仍写 G1-G5 五门，cron 锁注释仍写已废弃的 mkdir 目录锁，fuzz docstring 用例数停在 v1.5.8，且全量测试仍全绿。根因是 v1.5.9 守卫第 10 项只锚「脚本存在」，未锚「权威文档的当前口径」。本版补 5 项口径 + 1 项防复发守卫，不重开 v1.5.7 已闭环的 L3 收敛判据。
+
+### Fixed
+- **CLI help**：`scripts/check_gates.py` argparse description `G1-G5` → `G1-G6 一条命令全查（G6 抽查留痕默认 SKIP，--require-evidence-check 可启用）`。
+- **权威门表**：`skills/viral-evo-core/references/quality-gates.md` 补 G6 行（≥2 条 lead evidence_check / 默认 SKIP 写 `skipped_gates` / 启用后 FAIL）、补「G6 默认不强制」与退出码口径、frontmatter `last_updated` 2026-10-14 → 2026-11-10。
+- **主理人操作规程**：`agents/viral-evo-lab-team-lead.md` 三处活跃条款（质量门控 §2 定义、T1 清单、全门禁一条命令）由「G1–G5 五门齐查」统一为「G1–G6 六门齐查」并补 G6 启用条件——这是 v1.5.9 文档真化清单**漏掉**的文件。
+- **cron 锁注释**：`scripts/cron_watch.sh` 头部「mkdir 原子锁」→「noclobber（O_EXCL）文件锁」，退出码契约补「锁冲突跳过 EXIT=0 / poll 其它退出码透传」，与同文件 :45 修复后实现一致。
+- **fuzz docstring**：补 v1.5.10 当前基线段（行为级 9→15、45 CASES + 15 = 60/60、`total = len(CASES) + 15`），明确上方 v1.5.8 段为历史记录。
+- **文字残留**：`test_vendor_core.py` 头部补 V7 检查项、注释「≥9 / 14」→「≥11 / ≈18」；`gen_integrity_manifest.py` 用法补 `exit 2 = git 不可用`。
+
+### Added
+- **守卫第 11 项「当前口径一致性守卫」**：正/负双向锚锁定 5 个文件的当前口径（G1-G6 / G6 门表行 / 六门齐查 / noclobber / `len(CASES) + 15`），并显式禁止旧口径字符串（`五门齐查` / `mkdir 原子锁` / `last_updated: 2026-10-14`）回潮。
+- **`test_current_wording_guard` 行为级用例**：①真跑 `--help` 断言含 G1-G6；②真加载守卫断言当前包第 11 项 PASS；③复制整包改回旧口径，**断言第 11 项真实 FAIL**（防恒真）；④正则比对 docstring 与 `main()` 的用例数一致。
+- **V7 互锚升级**：项数下限 10 → 11 + 第 11 项标题锚；守卫头部「校验十项」→「十一项」。
+
+### Changed
+- 四处 version = **1.5.10**；`integrity_manifest.json` 重生成；包外锚受控刷新；SOP 三处 T-D1 历史行追加销项索引（不改写历史文本）。
+
+### 终验
+pytest **18 passed** ｜ fuzz **60/60**（45+15）｜ 守卫 **11/11** ｜ V7 **7/7** ｜ contracts / scope / manifest / 21 脚本编译+help 全绿 ｜ CLI `--help` 含 G1-G6 ｜ 包外锚 21/21 且 `source.commit == HEAD`。
+
+---
+
 ## [1.5.9] - 2026-11-10（「裁决与真实未完成」清理轮 · 七项全部闭合）
 
 > 版本口径：v1.5.8 的 §14 收轮把 1 项裁决与 6 项真实未完成列为「不施工 / 不代写 / mitigated」。本版按用户「妥善完成裁决与真实未完成，直至全部任务完成」的显式授权，把**全部 7 项转为施工项并闭合**；不重开 v1.5.7 已闭环的 L3 盲检循环。v1.5.8 的「明确不做」三条理由在本版失效，已逐条给出实现与边界。

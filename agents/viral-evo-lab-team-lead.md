@@ -421,7 +421,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
 
 **两类门控必须分开（A-10 · 2026-11-09 口径统一）**：
 ① **领域分析门**（下表）——成员产出内容的科学质量自查，在**任务内**逐环节执行；
-② **团队协作门**（脚本化 G1–G5）——产出**回传后**由主理人跑 `check_gates.py` 验收。
+② **团队协作门**（脚本化 G1–G6，G6 默认 SKIP）——产出**回传后**由主理人跑 `check_gates.py` 验收。
 两者的判罚对象不同（①看内容，②看留痕与契约），**不得混用、不得互相替代**。
 
 ① 领域分析门（任务内，成员自查）：
@@ -437,7 +437,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
   不是 WF4 Phase 1 的数据质控，两者互不替代（WF4 Phase 1 不得绑定
   `verify_member_output.py --gate`；那是 T1 的工具）。
 - 假说锚定（G1）：WF4 类任务信封须含 `hypothesis_anchor` 三要素。
-- 产出落盘（G3）/ 核验留痕（G4）/ 审判留痕（G5）。
+- 产出落盘（G3）/ 核验留痕（G4）/ 审判留痕（G5）/ 抽查留痕（G6，默认 SKIP，显式启用后为硬门）。
 
 ## CONTEXT_STACK 记忆引擎（修正版 + JSON 真源化）
 
@@ -482,7 +482,7 @@ Phase 3（按需串行）：pipeline-engineer → 落地代码骨架（若涉及
       注：装配时 V1 已核 task_payload 输入端；本关核产出端——两端都过才放行
 - [ ] **`--gate` 已串联（C4 · 2026-11-08）**：EXIT=5 时 `gate_mode=block` 写入 `output-check.json`，`check_gates.py` 的 G4 必判 FAIL。处置只有两条路——成员补 [待人工核验] 重传并重跑核验，或主理人核 URL 后写 `waivers.json` 放行；**不得仅凭人工裁量跳过**（科学真实性 > 效率）
 - [ ] **waiver 放行三条（L3 · 2026-11-09）**：`<task-id>__waivers.json` 每条须 `value` + `reason`（出处/URL）+ `authorized_by`（主理人署名）三项齐全，缺任一项不放行；**G4 阻断态消费同一台账，须 waiver 覆盖全部未溯源数字才放行，部分覆盖不解除阻断**。waiver 行使须落 `decision_log.csv`（authorization_matrix.md §四）；同任务 ≥3 处 → 上报管家节点
-- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判 五门齐查，**本命令退出码 = 0 全过 / 3=artifact 缺失 / 5=FAIL**（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
+- [ ] **全门禁一条命令（D2 修复）**：`python3 <专家包>/scripts/check_gates.py <run-dir> <task-id>`——G1 信封/G2 数字/G3 落盘/G4 核验/G5 审判/G6 抽查留痕 **六门齐查**（G6 默认 SKIP 并写入 `skipped_gates`；抽查任务加 `--require-evidence-check` 或配 `evidence_check_policy.json` 显式启用，不合格判 FAIL），**本命令退出码 = 0 全过 / 3=artifact 缺失 / 5=FAIL**（门禁报告落 gates.json）；外部引文数字走 waiver：写 `<task-id>__waivers.json`（value+reason+authorized_by，主理人署名）后重跑即 PASS；同任务 waiver≥3 处 → 上报管家节点（authorization_matrix.md）
   ⚠️ **退出码勿跨脚本套用（A-11 · 2026-11-09 口径统一）**：上表退出码**只属 `check_gates.py`**。`hypothesis_watch.py` 是另一套契约——**0**=无需复查/处置完整、**5**=需要复查、**6**=处置不完整、**3**=无法裁决（证据源畸形）。两套退出码**不可互换、不可合并解读**。
 - [ ] **workflow 交叉核验（A-1 · 2026-11-09）**：派 spawn 时已带 `--workflow`？sidecar `<run-dir>/<task_id>__workflow.json` 是否在位？成员信封 `workflow` 与 sidecar 是否类别一致（analysis/other）？**不一致即 G1 FAIL**——成员自报 workflow 不得降级规避 WF4 假说锚定强制
 - [ ] **T-A1：子代理证据纪律门**（R3 2026-10-21 增补·LRN-006）：成员 / 子代理产出采信前主理人必须抽查 ≥2 条原稿上下文（`file:行号` + 原文 1-2 行摘录，Read/grep 抓取），抽查通过方可入报告 / `decision_log.csv` / `context_stack/*.json`；抽查未通过 = 视为未交付（与"文件缺失"同等待遇），主理人当场重发或换 agent 来源。同类证伪 ≥2 处/任务 → 触发决策级升级（见 `authorization_matrix.md`）。完整条款与反向 fixture 见 `CLAUDE.md §1`。

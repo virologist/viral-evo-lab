@@ -9,7 +9,7 @@
       手工救火两次后，本守卫把「分发后的包是否仍处于正确状态」变成常态
       自动判定：任一不符即 FAIL，并给出恢复命令。
 
-校验十项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
+校验十一项（每项独立异常兜底，守卫自身不得因畸形输入崩溃）：
   1. test_vendor_core.py 的包名与 pytest 入口  → 抓 A2 回退
   2. 四处 version 一致性                        → 抓版本叙事漂移
   3. integrity_manifest.json 与磁盘 + git ls-files 一致
@@ -27,6 +27,9 @@
  10. ADR/G6/B-5 修复存活守卫（v1.5.9 · 2026-11-10）→ 抓「裁决与真实未完成」清理轮的
      资产被整体回退：裁决机器消费端 / G6 抽查硬门 / 语义对账 / 锚受控刷新 / cron 资产
      （含五组行为级回归）
+ 11. 当前口径一致性守卫（v1.5.10 · 2026-11-10）  → 抓「代码已升级但权威文档/CLI 仍写旧口径」
+     （L3 盲检实证：v1.5.9 门表/主理人条款/CLI help 仍称 G1-G5 五门、cron 锁注释
+       仍称已废弃的 mkdir 目录锁、fuzz docstring 用例数过期，而全量测试仍全绿）
   （互锚补强：test_vendor_core.py V7 反向锚定本文件存活——空壳化本守卫会被 V7 抓住，
     双向互锚收窄「旧基线覆盖」攻击面至双文件同时覆盖；包外基线锚见
     scripts/check_baseline_anchors.py + 审计区 BASELINE_ANCHORS.json）
@@ -364,6 +367,52 @@ def _checks_at(pkg_root: Path) -> list[tuple[bool, str]]:
                     if not bad else "; ".join(bad)))
     except (OSError, UnicodeError) as e:
         out.append((False, f"ADR/G6/B-5 修复存活守卫：校验失败 {type(e).__name__}: {e}"))
+
+    # 11. 当前口径一致性守卫（v1.5.10 · 2026-11-10 · L3 盲检 R5 加固）
+    #   根因：第 10 项只锚「新脚本存在」，未锚「权威文档 / CLI 的当前口径」——
+    #   代码升到 G1-G6 后，CLI help、quality-gates.md 门表、主理人 T1 条款
+    #   仍写 G1-G5 五门，cron 锁注释仍写已废弃的 mkdir 目录锁，fuzz docstring
+    #   用例数停在 v1.5.8，而全量测试仍全绿。本项把「当前口径」固化为
+    #   正/负双向存活锚；可用 _checks_at(临时旧版包根) 反向验证非恒真。
+    try:
+        bad = []
+        positive = (
+            ("scripts/check_gates.py", ("G1-G6 一条命令全查", "--require-evidence-check")),
+            ("skills/viral-evo-core/references/quality-gates.md",
+             ("| G6 抽查留痕 |", "G6 默认不强制")),
+            ("agents/viral-evo-lab-team-lead.md",
+             ("G1–G6", "六门齐查", "--require-evidence-check")),
+            ("scripts/cron_watch.sh", ("noclobber（O_EXCL）文件锁", "锁冲突跳过")),
+            ("tests/test_gate_fuzz.py",
+             ("v1.5.10", "len(CASES) + 15", "def test_current_wording_guard")),
+        )
+        for rel, needles in positive:
+            p = PKG / rel
+            if not p.is_file():
+                bad.append(f"{rel} 缺失（当前口径无法核验）")
+                continue
+            s = p.read_text(encoding="utf-8")
+            for needle in needles:
+                if needle not in s:
+                    bad.append(f"{rel} 缺当前口径锚 {needle!r}")
+        negative = (
+            ("agents/viral-evo-lab-team-lead.md", ("五门齐查",)),
+            ("scripts/cron_watch.sh", ("mkdir 原子锁",)),
+            ("skills/viral-evo-core/references/quality-gates.md",
+             ("last_updated: 2026-10-14",)),
+        )
+        for rel, needles in negative:
+            p = PKG / rel
+            if not p.is_file():
+                continue
+            s = p.read_text(encoding="utf-8")
+            for needle in needles:
+                if needle in s:
+                    bad.append(f"{rel} 回退为旧口径 {needle!r}")
+        out.append((not bad, "当前口径一致性守卫（G1-G6 / noclobber / 用例数 · 正反向锚）"
+                    if not bad else "; ".join(bad)))
+    except (OSError, UnicodeError) as e:
+        out.append((False, f"当前口径一致性守卫：校验失败 {type(e).__name__}: {e}"))
 
     return out
 

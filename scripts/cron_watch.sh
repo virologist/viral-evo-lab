@@ -7,13 +7,14 @@
 # 本脚本只做调度适配，不重写巡检判定（单一事实源 = poll_run_dir.py）：
 #   - 从 spawn_manifest.jsonl 汇总活跃 task_id，逐个跑 --from-manifest 巡检
 #   - 结构化结果追加到 <state-dir>/cron_watch.jsonl + 文本日志
-#   - mkdir 原子锁防并发 cron 叠加；只读判定，不改任何产出文件
+#   - noclobber（O_EXCL）文件锁防并发 cron 叠加；只读判定，不改任何产出文件
 # 边界：不自动修复、不重派、不发外部通知；跨会话告警的推送通道未排期。
 #
 # 用法：
 #   bash scripts/cron_watch.sh --run-dir <dir> --state-dir <dir>
 #        [--task-id <T-xxx>|--all] [--pkg-root <包根>]
-# 退出码：0 = 全部巡检 PASS；5 = 至少一个任务 NOT_READY；3 = 参数/环境错误
+# 退出码：0 = 全部巡检 PASS（含锁冲突跳过）；5 = 至少一个任务 NOT_READY；
+#         3 = 参数/环境错误；poll_run_dir.py 的其它退出码原样透传
 
 set -u
 

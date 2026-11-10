@@ -23,13 +23,22 @@ L3（2026-11-09）：补「行为断言」层——原套件只断言不崩溃�
 
 v1.5.8（2026-11-09 · 遗留 backlog 清理轮）：行为级用例 6 → **9**，
       新增三组「生产者-消费者闭环」回归——G3 FAIL 早退落盘 / decision_log
-      只读审计退出码与不代写 / 包外基线锚对账；main() 的 total 同步。
+      只读审计退出码与不代写 / 包外基线锚对账；当时的 main() total 同步。
+
+v1.5.10（2026-11-10 · 当前口径补正）：行为级用例 9 → **15**，共 **60/60**
+      （45 CASES + 15 行为级）。v1.5.9 新增五组裁决/门禁/对账/锚刷新/cron
+      回归（9→14）；v1.5.10 再补一组「当前口径一致性」守卫回归（14→15）。
+      main() 的 total = len(CASES) + 15 —— 本段为当前基线，上方 v1.5.8
+      段属历史记录，不得据其推断当前用例数。
 
 运行：python3 tests/test_gate_fuzz.py  或  pytest tests/ -q
 """
 import hashlib
+import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -998,6 +1007,53 @@ def test_cron_b5_assets() -> None:
             f"巡检结果须落盘: rc={p.returncode} {p.stdout} {p.stderr}"
 
 
+def test_current_wording_guard() -> None:
+    """v1.5.10（L3 盲检 R5）：当前口径一致性守卫的正 / 反向行为回归。
+
+    背景：v1.5.9 代码已升到 G1-G6，但 CLI help、quality-gates.md 权威门表、
+    主理人 T1 条款仍写五门，cron 锁注释仍写已废弃的 mkdir 目录锁，本文件
+    docstring 用例数停在 v1.5.8——而全量测试仍全绿。本用例真跑 --help、
+    真加载守卫，并用「旧口径」包副本反向验证第 11 项确会 FAIL（防恒真），
+    最后校验 docstring 与 main() 声明的用例数一致。
+    """
+    # 1) CLI 真跑：--help 必须声明六门
+    h = subprocess.run([sys.executable, str(CHECK_GATES), "--help"],
+                       capture_output=True, text=True, timeout=30)
+    assert h.returncode == 0 and "G1-G6" in h.stdout, \
+        f"CLI help 回退为旧口径: rc={h.returncode} {h.stdout[:200]}"
+
+    # 2) 真加载守卫：当前包第 11 项须 PASS
+    guard_path = PKG / "tests" / "test_contract_guard.py"
+    spec = importlib.util.spec_from_file_location("_wording_guard", guard_path)
+    assert spec is not None and spec.loader is not None, "守卫模块无法加载"
+    gmod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gmod)
+    res = gmod._checks_at(PKG)
+    assert len(res) == 11, f"守卫项数应为 11，实测 {len(res)}"
+    assert res[10][0], f"当前包第 11 项须 PASS：{res[10][1]}"
+
+    # 3) 反向金丝雀：把包复制一份并改回旧口径，第 11 项必须真实 FAIL
+    with tempfile.TemporaryDirectory(prefix="wording_guard_") as td:
+        fake = Path(td) / "pkg"
+        shutil.copytree(PKG, fake, ignore=shutil.ignore_patterns(
+            ".git", ".pytest_cache", "__pycache__"))
+        cg = fake / "scripts" / "check_gates.py"
+        cg.write_text(cg.read_text(encoding="utf-8").replace(
+            "G1-G6 一条命令全查", "G1-G5 一条命令全查"), encoding="utf-8")
+        bad_res = gmod._checks_at(fake)
+        assert len(bad_res) == 11, f"守卫项数异常：{len(bad_res)}"
+        assert not bad_res[10][0], \
+            f"金丝雀失败：旧口径 fixture 下第 11 项仍 PASS（恒真嫌疑）：{bad_res[10][1]}"
+
+    # 4) docstring 与 main() 用例数口径一致（防「补了新段但 total 没同步」复发）
+    src = (PKG / "tests" / "test_gate_fuzz.py").read_text(encoding="utf-8")
+    m_total = re.search(r"total = len\(CASES\) \+ (\d+)", src)
+    m_doc = re.search(r"v1\.5\.10.*?（45 CASES \+ (\d+) 行为级）", src, re.S)
+    assert m_total and m_doc and m_total.group(1) == m_doc.group(1), \
+        (f"docstring 与 main() 用例数不一致: total={m_total and m_total.group(1)} "
+         f"doc={m_doc and m_doc.group(1)}")
+
+
 def main() -> int:
     ok_n = 0
     for name, art, wv, oc, expect in CASES:
@@ -1012,14 +1068,14 @@ def main() -> int:
                test_decision_log_audit, test_baseline_anchor_roundtrip,
                test_decision_records_guard, test_g6_evidence_gate,
                test_reconcile_decisions, test_anchor_refresh_guard,
-               test_cron_b5_assets):
+               test_cron_b5_assets, test_current_wording_guard):
         try:
             fn()
             print(f"  ✅ {fn.__name__}")
             ok_n += 1
         except AssertionError as e:
             print(f"  ❌ {fn.__name__}: {e}")
-    total = len(CASES) + 14
+    total = len(CASES) + 15
     print(f"\n合计 {total} | 通过 {ok_n} | 失败 {total - ok_n}")
     return 0 if ok_n == total else 1
 

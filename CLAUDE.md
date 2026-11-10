@@ -187,3 +187,14 @@
 - **P4 B-5 / V2 销项**：`cron_watch.sh` + `install_cron_watch.sh` 资产就绪，安装器 **dry-run 默认**，未执行 `--install`、系统 crontab 零改动；V2 联邦真源归属实证为 `https://github.com/virologist/my-experts-plugins.git`（`shared-core/`），结论见审计区 `VENDOR_PROVENANCE.md`，`VENDOR.json` 的 `upstream_repo` 口径偏差按联邦红线不擅改。
 - **回归基线**：fuzz 45 CASES + 14 行为级 = **59/59**；守卫 **10/10**；V7 下限 10；pytest 全绿；四处 version = **1.5.9**。
 
+---
+
+## 当前口径补正（v1.5.10 · 2026-11-10 · L3 盲检 R5）
+
+> 本节为**追加订正**，不改写上方任何历史条目。v1.5.9 §15 的「零挂账」结论经独立只读盲检实证**不成立**；下列口径覆盖上节的「回归基线 59/59、守卫 10/10、version 1.5.9」。
+
+- **「零挂账」为何失真**：v1.5.9 守卫第 10 项只锚「新脚本存在」，没有锚「权威文档 / CLI 的当前口径」。代码升到 G1-G6 后，`check_gates.py --help`、`skills/viral-evo-core/references/quality-gates.md` 门表、`agents/viral-evo-lab-team-lead.md` 活跃 T1 条款仍写 G1-G5 五门；`cron_watch.sh` 头部仍写已废弃的 mkdir 目录锁；`test_gate_fuzz.py` docstring 停在 v1.5.8——而全部测试仍全绿。**4 个 🔴 + 1 个自认残留已全部订正**。
+- **防复发机制**：`tests/test_contract_guard.py` 新增第 11 项「当前口径一致性守卫」（正/负双向锚）；`tests/test_gate_fuzz.py` 新增 `test_current_wording_guard`（真跑 `--help` + 真加载守卫 + 旧口径整包 fixture 反向断言 FAIL + docstring/total 数字一致性）；`test_vendor_core.py` V7 下限 10 → 11。今后「代码升级但文档留在旧版」不再能全绿通过。
+- **当前基线**：fuzz 45 CASES + 15 行为级 = **60/60**；守卫 **11/11**；V7 7/7；pytest **18 passed**；四处 version = **1.5.10**。
+- **历史文本纪律不变**：CHANGELOG / CLAUDE 中带版本标题的历史条目仍保留原样；本次只订正**无版本标注的活跃条款**，SOP 历史行以「追加销项索引」处理。
+

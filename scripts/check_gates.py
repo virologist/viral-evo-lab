@@ -453,7 +453,7 @@ def _g4_waiver_hit(unverified: list, waivers: dict) -> tuple[bool, list[str]]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="团队级脚本化门禁：G1-G5 一条命令全查")
+    ap = argparse.ArgumentParser(description="团队级脚本化门禁：G1-G6 一条命令全查（G6 抽查留痕默认 SKIP，--require-evidence-check 可启用）")
     ap.add_argument("run_dir")
     ap.add_argument("task_id")
     ap.add_argument("--sources", nargs="*", default=None, help="权威源（默认自动探测）")

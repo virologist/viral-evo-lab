@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-10-14
+last_updated: 2026-11-10
 ---
 
 # 质量门控阈值表（默认配置）
@@ -34,11 +34,12 @@ last_updated: 2026-10-14
 | G3 产出落盘 | `<task-id>__<member>.md` 存在 | 同上 |
 | G4 核验留痕 | output-check.json 已生成；`gate_mode=block` 且 verdict≠PASS 时判 FAIL，须由 waivers.json 人工放行 | 同上 |
 | G5 审判留痕 | checklist.json 已生成（T0/T1 凭证） | 同上 |
+| G6 抽查留痕 | `spawn_manifest.jsonl` ≥2 条 `evidence_check`（actor=lead，含 `file:行号` + 原文摘录 + reason） | 同上；**默认 SKIP** 并写入 `skipped_gates`（不伪装 PASS），`--require-evidence-check` 或 `evidence_check_policy.json` 启用后形式要件不合格判 FAIL |
 | 假说治理 | 活跃假说无"晚于池更新的 fatal/severe 证伪"积压 | `scripts/hypothesis_watch.py`（T2 必跑） |
 | 契约完整 | manifest 一致 + agents 9 + skills 1 契约条款在位 | `scripts/validate_contracts.py` |
 | 叙事边界 | 包内无项目特定事件污染 | `scripts/check_scope.py` |
 
-全部门禁 **EXIT=0 全过 / 3 artifact 缺失 / 5 门禁 FAIL**，可串联 CI；报告落 `<run-dir>/<task-id>__gates.json`。
+全部门禁 **EXIT=0 全过 / 3 artifact 缺失 / 5 门禁 FAIL**，可串联 CI；报告落 `<run-dir>/<task-id>__gates.json`。**G6 默认不强制**（ADR-002）：未启用时以 `SKIP` 记入 `skipped_gates`，不得伪装成 PASS；启用后形式要件不合格统一 `EXIT=5`。脚本只验形式要件，抽查语义真伪归主理人 T1 人工。
 
 **waiver 放行口径（L3 · 2026-11-09）**：G2 与 G4 共用 `<task-id>__waivers.json`；每条须 `value` + `reason` + `authorized_by` 三项齐全，缺任一项不放行（防自我授权/空口放行）。G4 阻断态须 waiver 覆盖**全部**未溯源数字才放行，部分覆盖不解除阻断。行使须落 `decision_log.csv`。
 
