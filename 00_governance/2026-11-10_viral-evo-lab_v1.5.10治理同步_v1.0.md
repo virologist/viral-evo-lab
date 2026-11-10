@@ -47,3 +47,7 @@ pytest **18 passed** ｜ fuzz **60/60**（45 CASES + 15 行为级）｜ 守卫 *
 - 系统 crontab **零改动**；包内脚本**永不代写台账**，语义逐条终裁属人工 T2；`--require-tag` 保持默认关闭（ADR-001）。
 - 包外锚刷新仍为人工 ACK 动作（ACK+reason+干净工作区+commit 溯源）；联邦 shared-core / vendor 副本未改。
 - 带版本标题的历史条目（CHANGELOG v1.5.9 及更早、CLAUDE 历史节、SOP 历史表）按「禁止改写历史」保留原样；本轮只订正**无版本标注的活跃条款**，历史行以追加销项索引处理。
+
+---
+
+> ⚠️ **v1.5.11 订正（2026-11-10，追加不改写历史）**：上文「防复发机制」中 ③「复制整包改回旧口径」与 ④「正则比对 docstring 与 `main()` 用例数一致」两句是 v1.5.10 时点声称，独立只读终验盲检实证与实现不符——③只回退 1 个文件 1 个锚，④ `re.search` 命中 docstring 自己（改 `main()` 的 total 断言仍通过），且 `last_updated` 当前值缺正向锚。v1.5.11 已全部修复：锚清单提为守卫模块级 `WORDING_POSITIVE` / `WORDING_NEGATIVE` 单一事实源、第 11 项抽 `check_current_wording()`、新增 `_wording_counts()` 只从 `main()` 体内取 total、反向用例扩为逐锚回退（13 正向 + 3 负向共 16 次）。当前口径见 `2026-11-10_viral-evo-lab_v1.5.11治理同步_v1.0.md` 与 `viral-evo-lab-audit/AUDIT_STATE.md` §17。
