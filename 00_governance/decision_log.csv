@@ -10,3 +10,5 @@ ts,actor,decision_type,decision,rationale,tier
 2026-11-10T06:47:27+08:00,lead,governance,决策台账语义对账改机器辅助+包外锚受控刷新,reconcile_decisions.py 只出候选与 DRAFT 且拒写台账；check_baseline_anchors.py --refresh 须 ACK+reason+干净工作区+commit 溯源（ADR-003/004）,通知档
 2026-11-10T06:47:27+08:00,lead,external-dependency,V2 联邦真源归属核实销项,真源=my-experts-plugins 仓 shared-core/assemble_spawn_prompt.py；三方 sha256 3c3648f1 一致；VENDOR.json upstream_repo 为口径偏差且按红线不擅改,通知档
 2026-11-10T06:47:27+08:00,lead,monitoring,P4 B-5 cron 巡检资产落地：系统调度不自动安装,cron_watch.sh + install_cron_watch.sh 就绪（dry-run 默认）；未执行 --install，crontab 零改动；实测 rmdir 被拒故改 noclobber 文件锁,通知档
+2026-11-10T21:32:27+08:00,lead,process-decision,v1.5.9「零挂账」结论经独立只读盲检证伪，4🔴+1 自认残留全部补正并定版 v1.5.10,代码已升 G1-G6 但 CLI help / 权威门表 / 主理人 T1 条款仍写五门、cron 锁注释仍写已废弃 mkdir、fuzz docstring 停在 v1.5.8；根因是守卫只锚脚本存在、未锚文档当前口径。收轮节自认残留不得靠标注降级为边界,通知档
+2026-11-10T21:32:27+08:00,lead,gate-hardening,存活锚必须覆盖消费端文档 / CLI 的当前口径，宣布零挂账前必跑独立只读盲检,tests/test_contract_guard.py 第 11 项正反向锚 + test_current_wording_guard（--help 真跑 / 守卫真加载 / 旧口径整包 fixture 反向 FAIL / docstring 与 total 数字一致）+ V7 下限 10→11；LRN-027,通知档
