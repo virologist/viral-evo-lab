@@ -72,7 +72,8 @@ WORDING_POSITIVE = (
      ("G1–G6", "六门齐查", "--require-evidence-check")),
     ("scripts/cron_watch.sh", ("noclobber（O_EXCL）文件锁", "锁冲突跳过")),
     ("tests/test_gate_fuzz.py",
-     ("v1.5.10", "len(CASES) + 15", "def test_current_wording_guard")),
+     ("v1.5.10", "len(CASES) + 15", "def test_current_wording_guard",
+      "CURRENT_BASELINE")),
 )
 WORDING_NEGATIVE = (
     ("agents/viral-evo-lab-team-lead.md", ("五门齐查",)),

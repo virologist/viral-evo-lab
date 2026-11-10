@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-10T22:34:40",
+ "generated": "2026-11-10T23:09:19",
  "file_count": 79,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "4f2c1d4ee4c6e0b9",
+   "sha16": "4eca8b19ffa51316",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "4b1a6ea1c058c7f1",
+   "sha16": "54d1999cff7c6384",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "4be1e16260527a6e",
+   "sha16": "df21db17aa8e7e62",
    "bytes": 6722
   },
   ".gitignore": {
@@ -27,16 +27,16 @@
    "bytes": 61
   },
   ".learnings/LEARNINGS.md": {
-   "sha16": "bfd63a46718f2987",
-   "bytes": 38024
+   "sha16": "bd99f50533e80e60",
+   "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "8ce6564ec1e29284",
-   "bytes": 58807
+   "sha16": "857130fbf84d2182",
+   "bytes": 60543
   },
   "CLAUDE.md": {
-   "sha16": "e02b46425c89ed0f",
-   "bytes": 27685
+   "sha16": "8412c2c388a01f7f",
+   "bytes": 29110
   },
   "CONTRIBUTING.md": {
    "sha16": "57102d910bc66799",
@@ -299,12 +299,12 @@
    "bytes": 7139
   },
   "tests/test_contract_guard.py": {
-   "sha16": "223b4aa695f745fb",
-   "bytes": 25338
+   "sha16": "1eff113f863de843",
+   "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "7ad34faec2a86d95",
-   "bytes": 61922
+   "sha16": "bf3cb4501b5e4391",
+   "bytes": 63569
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

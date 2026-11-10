@@ -39,7 +39,17 @@ v1.5.11（2026-11-10 · 终验盲检 R6 加固）：用例数不变，仍为 45 
       必被抓」反向断言；      ③反向金丝雀扩为逐锚回退（5 文件 13 个正向锚
       摘除 + 3 个旧口径串注入），逐项断言第 11 项 FAIL；锚清单直接取守卫
       模块的 WORDING_* 常量（单一事实源），只调 check_current_wording()
-      并只复制被检 5 文件，实测 157s → 约 10s。本节为当前基线。
+      并只复制被检 5 文件，实测 157s → 约 10s。本段为 v1.5.11 时点基线。
+
+v1.5.12（2026-11-10 · 终验盲检 R7 收敛）：用例数不变。第三次盲检指出
+      `_wording_counts()` 的 doc 正则用「v1.5.x 跨行 …（45 CASES + N 行为级）」
+      宽匹配，实际命中 v1.5.10 **历史段**，自称「当前基线」的上段数字被改成 14
+      仍会全绿。现改为显式机器锚 `CURRENT_BASELINE = 45 CASES + N 行为级`，
+      `_wording_counts` 只认本锚；并补「仅改当前基线声明数字必被抓」反向
+      断言。守卫正向锚 13 → 14（加 CURRENT_BASELINE 存活锚），逐锚回退
+      16 → 17 次。**当前基线以本锚为准。**
+      当前基线机器锚（唯一被 _wording_counts 读取）：
+      CURRENT_BASELINE = 45 CASES + 15 行为级 = 60/60
 
 运行：python3 tests/test_gate_fuzz.py  或  pytest tests/ -q
 """
@@ -1017,16 +1027,19 @@ def test_cron_b5_assets() -> None:
 
 
 def _wording_counts(src: str) -> tuple:
-    """返回 (main() 的 total 数字, docstring 当前基线声明的行为级数字)。
+    """返回 (main() 的 total 数字, CURRENT_BASELINE 机器锚声明的行为级数字)。
 
-    v1.5.11 终验盲检实证：不能对全文 `re.search` 取 total——docstring 里
-    也写了同一句话，会先命中自己，形成「校验了 docstring 自己」的假防线
-    （实测把 main() 改成 +14 断言仍通过）。故 total 只在 main() 体内取。
+    v1.5.11：total 不能对全文 `re.search` —— docstring 里也写了同一句话，
+    会先命中自己（实测把 main() 改成 +14 断言仍通过），故只在 main() 体内取。
+    v1.5.12：doc 不能用 `v1.5.x … （45 CASES + N 行为级）` 宽匹配——实测
+    命中 v1.5.10 **历史段**，自称「当前基线」的新段数字改了仍全绿；改为只读
+    显式 `CURRENT_BASELINE = 45 CASES + N 行为级` 机器锚。
     """
     main_src = src.rsplit("def main()", 1)[-1]
     m_total = re.search(r"total = len\(CASES\) \+ (\d+)", main_src)
-    docs = re.findall(r"v1\.5\.\d+.*?（45 CASES \+ (\d+) 行为级）", src, re.S)
-    return (m_total.group(1) if m_total else None, docs[-1] if docs else None)
+    m_doc = re.search(r"CURRENT_BASELINE\s*=\s*45 CASES \+ (\d+) 行为级", src)
+    return (m_total.group(1) if m_total else None,
+            m_doc.group(1) if m_doc else None)
 
 
 def test_current_wording_guard() -> None:
@@ -1039,8 +1052,8 @@ def test_current_wording_guard() -> None:
     ③在临时整包副本上**逐锚回退**（摘除每个正向锚 / 注入每个旧口径串，
       清单直接取守卫模块的 WORDING_POSITIVE / WORDING_NEGATIVE 单一事实源），
       逐项断言第 11 项真实 FAIL（防恒真、防漏锚、防两处清单漂移）；
-    ④从 main() 体内取 total 与 docstring 比对，并反向验证「仅改 main()
-      的 total 会被抓到」。
+    ④从 main() 体内取 total、从 CURRENT_BASELINE 机器锚取 doc 数字，
+      比对并双向反验（仅改 main() / 仅改机器锚，都必须被抓到）。
     """
     # 1) CLI 真跑：--help 必须声明六门
     h = subprocess.run([sys.executable, str(CHECK_GATES), "--help"],
@@ -1104,6 +1117,15 @@ def test_current_wording_guard() -> None:
     t2, d2 = _wording_counts(bad_src)
     assert t2 != d2, \
         "反向失败：仅改 main() 的 total 未被抓到（疑只读 docstring 自证）"
+    # 反向 B（v1.5.12）：仅改「当前基线」机器锚数字，也必须被抓到
+    # ——第三次盲检实证：宽正则会命中 v1.5.10 历史段，改本锚仍全绿。
+    m_base = re.search(r"(CURRENT_BASELINE\s*=\s*45 CASES \+) (\d+)( 行为级)", src)
+    assert m_base, "当前基线机器锚缺失（_wording_counts 无法取到 doc 数字）"
+    bad_doc = (src[:m_base.start(2)] + str(int(m_base.group(2)) + 1)
+               + src[m_base.end(2):])
+    t3, d3 = _wording_counts(bad_doc)
+    assert t3 != d3, \
+        "反向失败：仅改 CURRENT_BASELINE 数字未被抓到（疑命中历史段）"
 
 
 def main() -> int:

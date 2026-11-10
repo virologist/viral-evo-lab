@@ -4,6 +4,23 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.12] - 2026-11-10（终验盲检 R7 · 收敛冻结）
+
+> 第三次独立盲检又抓到 1🔴 + 1🟡：①`_wording_counts()` 的 doc 正则用跨版本宽匹配，实际命中 v1.5.10 **历史段**；自称「当前基线」的 v1.5.11 段数字改成 14 仍全绿（与前两轮同构的覆盖缺口），且 §17 / helper docstring 写「取当前基线声明」属不实声称；②`AUDIT_STATE.md` §16/§17 的「research-ops commit 见本文件终验记录」是悬空引用。本版全部补齐并再次终验。
+
+### Fixed
+- **机器锚**：`test_gate_fuzz.py` docstring 新增唯一被读取的 `CURRENT_BASELINE = 45 CASES + 15 行为级 = 60/60`；`_wording_counts()` 的 doc 数字改为只读该锚（`CURRENT_BASELINE\s*=\s*45 CASES \+ (\d+) 行为级`），不再用跨版本宽正则。
+- **双向反验**：第 4 步补「仅改 `CURRENT_BASELINE` 数字必被抓」反向断言；实测三态 `('15','15')` / 改 main `('14','15')` / 改机器锚 `('15','16')`。
+- **守卫锚同步**：`WORDING_POSITIVE` 的 fuzz 条目增 `CURRENT_BASELINE` 存活锚，正向锚 13 → **14**，逐锚回退 16 → **17** 次（单一事实源自动覆盖，fuzz 代码无需改）。
+- **消除 SyntaxWarning**：docstring 内不再写含反斜杠的正则字面量。
+- **悬空引用**：`AUDIT_STATE.md` §16 / §17 的 research-ops commit 指引改为真实历史 hash `303c42e` / `49135e5`；v1.5.12 治理同步文档发布链落最终 hash。
+
+### Changed
+- 四处 version = **1.5.12**；`integrity_manifest.json` 重生成；包外锚受控刷新；LEARNINGS +1（LRN-029）；决策台账 +1 条真实裁决。
+- 用例数不变：fuzz **60/60**、守卫 **11/11**、V7 **7/7**、pytest **18 passed**。
+
+---
+
 ## [1.5.11] - 2026-11-10（终验盲检 R6 · 防线自审漏洞补齐）
 
 > 版本口径：v1.5.10 的独立终验盲检**再次证伪「零挂账」**——这次抓的不是旧口径残留，而是本轮新防线自身的 3 个洞。v1.5.10 [Added] 段 ③④ 的声称与实现不符（③只回退 1 个锚却写「整包改回旧口径」；④`re.search` 命中 docstring 自己却写「比对 `main()`」），属新写入的假陈述。本节为当前口径，[1.5.10] 段保留为历史记录。
