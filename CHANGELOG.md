@@ -4,6 +4,25 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.11] - 2026-11-10（终验盲检 R6 · 防线自审漏洞补齐）
+
+> 版本口径：v1.5.10 的独立终验盲检**再次证伪「零挂账」**——这次抓的不是旧口径残留，而是本轮新防线自身的 3 个洞。v1.5.10 [Added] 段 ③④ 的声称与实现不符（③只回退 1 个锚却写「整包改回旧口径」；④`re.search` 命中 docstring 自己却写「比对 `main()`」），属新写入的假陈述。本节为当前口径，[1.5.10] 段保留为历史记录。
+
+### Fixed
+- **正向锚补日期**：守卫第 11 项增加 `last_updated: 2026-11-10` 正向锚；实测把日期改成任意非 `2026-10-14` 的旧值不再能全绿通过。
+- **自证假防线修复**：`tests/test_gate_fuzz.py` 新增 `_wording_counts(src)`，`total` 只在 `main()` 函数体内取（原全文 `re.search` 先命中 docstring 里的同一句话），并新增反向断言「仅改 `main()` 的 total 必被抓到」。实测改成 `+14` 立刻暴露。
+- **反向覆盖补全**：`test_current_wording_guard` 第 3 步由「只改 1 个文件 1 个锚」扩为**逐锚回退**——5 文件 13 个正向锚逐个摘除 + 3 个旧口径串逐个注入，共 16 次，每次都断言第 11 项真实 FAIL。
+- **单一事实源 + 提速**：`WORDING_POSITIVE` / `WORDING_NEGATIVE` 提为 `test_contract_guard.py` 模块级常量，守卫与反向用例共用；新增 `check_current_wording(pkg_root)` 独立函数，`_checks_at` 第 11 项直接 append 其返回值，**接线由行为级用例断言**（`res[10] == check_current_wording(PKG)`）。反向用例只调该函数并只复制被检 5 文件，实测 **157s → 约 10s**（`pytest --durations` 单次实测），不必 16 次跑完整守卫的 git / sha / 冒烟；全套 18 passed。
+
+### Changed
+- 四处 version = **1.5.11**；`integrity_manifest.json` 重生成；包外锚受控刷新；`.learnings/LEARNINGS.md` +1（LRN-028）。
+- 用例数不变：fuzz **60/60**（45 CASES + 15 行为级）、守卫 **11/11**、V7 **7/7**、pytest **18 passed**。
+
+### 终验
+pytest **18 passed** ｜ fuzz **60/60** ｜ 守卫 **11/11** ｜ V7 **7/7** ｜ contracts / scope / manifest `--check` 全绿 ｜ 21 脚本编译+help ｜ 四处 version=1.5.11 ｜ 台账 HEALTHY ｜ 包外锚 21/21 且 `source.commit == HEAD`。
+
+---
+
 ## [1.5.10] - 2026-11-10（L3 盲检 R5 · 当前口径一致性补正与防复发）
 
 > 版本口径：v1.5.9 §15 宣布「零挂账」，但独立只读盲检实证**不成立**——代码已升到 G1-G6，而 CLI help、权威门表、主理人活跃 T1 条款仍写 G1-G5 五门，cron 锁注释仍写已废弃的 mkdir 目录锁，fuzz docstring 用例数停在 v1.5.8，且全量测试仍全绿。根因是 v1.5.9 守卫第 10 项只锚「脚本存在」，未锚「权威文档的当前口径」。本版补 5 项口径 + 1 项防复发守卫，不重开 v1.5.7 已闭环的 L3 收敛判据。

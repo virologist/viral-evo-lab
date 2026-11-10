@@ -30,6 +30,8 @@
  11. 当前口径一致性守卫（v1.5.10 · 2026-11-10）  → 抓「代码已升级但权威文档/CLI 仍写旧口径」
      （L3 盲检实证：v1.5.9 门表/主理人条款/CLI help 仍称 G1-G5 五门、cron 锁注释
        仍称已废弃的 mkdir 目录锁、fuzz docstring 用例数过期，而全量测试仍全绿）
+     v1.5.11：逻辑抽为模块级 check_current_wording()，锚清单提为
+     WORDING_POSITIVE / WORDING_NEGATIVE 单一事实源，供反向用例共用
   （互锚补强：test_vendor_core.py V7 反向锚定本文件存活——空壳化本守卫会被 V7 抓住，
     双向互锚收窄「旧基线覆盖」攻击面至双文件同时覆盖；包外基线锚见
     scripts/check_baseline_anchors.py + 审计区 BASELINE_ANCHORS.json）
@@ -58,6 +60,58 @@ VERSION_FILES = (
 )
 RECOVER = ("git checkout <本包最新 commit> -- tests/test_vendor_core.py && "
            "git add -A && python3 scripts/gen_integrity_manifest.py")
+
+# 当前口径锚清单（v1.5.11 · 单一事实源）
+# 守卫第 11 项与 test_gate_fuzz.py::test_current_wording_guard 的逐锚回退
+# 共用同一份清单：新增锚时反向用例自动覆盖，杜绝「两处清单漂移导致漏验」。
+WORDING_POSITIVE = (
+    ("scripts/check_gates.py", ("G1-G6 一条命令全查", "--require-evidence-check")),
+    ("skills/viral-evo-core/references/quality-gates.md",
+     ("| G6 抽查留痕 |", "G6 默认不强制", "last_updated: 2026-11-10")),
+    ("agents/viral-evo-lab-team-lead.md",
+     ("G1–G6", "六门齐查", "--require-evidence-check")),
+    ("scripts/cron_watch.sh", ("noclobber（O_EXCL）文件锁", "锁冲突跳过")),
+    ("tests/test_gate_fuzz.py",
+     ("v1.5.10", "len(CASES) + 15", "def test_current_wording_guard")),
+)
+WORDING_NEGATIVE = (
+    ("agents/viral-evo-lab-team-lead.md", ("五门齐查",)),
+    ("scripts/cron_watch.sh", ("mkdir 原子锁",)),
+    ("skills/viral-evo-core/references/quality-gates.md",
+     ("last_updated: 2026-10-14",)),
+)
+
+
+def check_current_wording(pkg_root: Path) -> tuple[bool, str]:
+    """守卫第 11 项的独立实现（v1.5.11）：校验权威文档 / CLI 的当前口径。
+
+    单独成函数供 test_gate_fuzz.py 的「逐锚回退」复用——反向用例只调本函数，
+    不必 16 次跑完整 _checks_at（实测 157s，含 git ls-files / sha / 冒烟）。
+    _checks_at 第 11 项直接 append 本函数结果，接线由行为级用例断言。
+    """
+    try:
+        bad = []
+        for rel, needles in WORDING_POSITIVE:
+            p = pkg_root / rel
+            if not p.is_file():
+                bad.append(f"{rel} 缺失（当前口径无法核验）")
+                continue
+            s = p.read_text(encoding="utf-8")
+            for needle in needles:
+                if needle not in s:
+                    bad.append(f"{rel} 缺当前口径锚 {needle!r}")
+        for rel, needles in WORDING_NEGATIVE:
+            p = pkg_root / rel
+            if not p.is_file():
+                continue
+            s = p.read_text(encoding="utf-8")
+            for needle in needles:
+                if needle in s:
+                    bad.append(f"{rel} 回退为旧口径 {needle!r}")
+        return (not bad, "当前口径一致性守卫（G1-G6 / noclobber / 用例数 · 正反向锚）"
+                if not bad else "; ".join(bad))
+    except (OSError, UnicodeError) as e:
+        return (False, f"当前口径一致性守卫：校验失败 {type(e).__name__}: {e}")
 
 
 def _sha(path: Path) -> str:
@@ -373,46 +427,9 @@ def _checks_at(pkg_root: Path) -> list[tuple[bool, str]]:
     #   代码升到 G1-G6 后，CLI help、quality-gates.md 门表、主理人 T1 条款
     #   仍写 G1-G5 五门，cron 锁注释仍写已废弃的 mkdir 目录锁，fuzz docstring
     #   用例数停在 v1.5.8，而全量测试仍全绿。本项把「当前口径」固化为
-    #   正/负双向存活锚；可用 _checks_at(临时旧版包根) 反向验证非恒真。
-    try:
-        bad = []
-        positive = (
-            ("scripts/check_gates.py", ("G1-G6 一条命令全查", "--require-evidence-check")),
-            ("skills/viral-evo-core/references/quality-gates.md",
-             ("| G6 抽查留痕 |", "G6 默认不强制")),
-            ("agents/viral-evo-lab-team-lead.md",
-             ("G1–G6", "六门齐查", "--require-evidence-check")),
-            ("scripts/cron_watch.sh", ("noclobber（O_EXCL）文件锁", "锁冲突跳过")),
-            ("tests/test_gate_fuzz.py",
-             ("v1.5.10", "len(CASES) + 15", "def test_current_wording_guard")),
-        )
-        for rel, needles in positive:
-            p = PKG / rel
-            if not p.is_file():
-                bad.append(f"{rel} 缺失（当前口径无法核验）")
-                continue
-            s = p.read_text(encoding="utf-8")
-            for needle in needles:
-                if needle not in s:
-                    bad.append(f"{rel} 缺当前口径锚 {needle!r}")
-        negative = (
-            ("agents/viral-evo-lab-team-lead.md", ("五门齐查",)),
-            ("scripts/cron_watch.sh", ("mkdir 原子锁",)),
-            ("skills/viral-evo-core/references/quality-gates.md",
-             ("last_updated: 2026-10-14",)),
-        )
-        for rel, needles in negative:
-            p = PKG / rel
-            if not p.is_file():
-                continue
-            s = p.read_text(encoding="utf-8")
-            for needle in needles:
-                if needle in s:
-                    bad.append(f"{rel} 回退为旧口径 {needle!r}")
-        out.append((not bad, "当前口径一致性守卫（G1-G6 / noclobber / 用例数 · 正反向锚）"
-                    if not bad else "; ".join(bad)))
-    except (OSError, UnicodeError) as e:
-        out.append((False, f"当前口径一致性守卫：校验失败 {type(e).__name__}: {e}"))
+    #   正/负双向存活锚（v1.5.11 逻辑移至模块级 check_current_wording()，
+    #   供逐锚回退复用；接线由 test_current_wording_guard 断言）。
+    out.append(check_current_wording(PKG))
 
     return out
 

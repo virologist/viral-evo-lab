@@ -28,8 +28,18 @@ v1.5.8（2026-11-09 · 遗留 backlog 清理轮）：行为级用例 6 → **9**
 v1.5.10（2026-11-10 · 当前口径补正）：行为级用例 9 → **15**，共 **60/60**
       （45 CASES + 15 行为级）。v1.5.9 新增五组裁决/门禁/对账/锚刷新/cron
       回归（9→14）；v1.5.10 再补一组「当前口径一致性」守卫回归（14→15）。
-      main() 的 total = len(CASES) + 15 —— 本段为当前基线，上方 v1.5.8
-      段属历史记录，不得据其推断当前用例数。
+      main() 的 total = len(CASES) + 15 —— 本段为 v1.5.10 时点基线，
+      上方 v1.5.8 段属历史记录，不得据其推断当前用例数。
+
+v1.5.11（2026-11-10 · 终验盲检 R6 加固）：用例数不变，仍为 45 CASES +
+      15 行为级 = 60/60。修正本套件的三处自审漏洞——①守卫第 11 项补
+      `last_updated: 2026-11-10` 正向锚（防日期换成任意旧值仍全绿）；
+      ② `_wording_counts()` 改为只在 `main()` 函数体内取 total（原全文
+      re.search 先命中 docstring 自己，属自证），并加「仅改 main() total
+      必被抓」反向断言；      ③反向金丝雀扩为逐锚回退（5 文件 13 个正向锚
+      摘除 + 3 个旧口径串注入），逐项断言第 11 项 FAIL；锚清单直接取守卫
+      模块的 WORDING_* 常量（单一事实源），只调 check_current_wording()
+      并只复制被检 5 文件，实测 157s → 约 10s。本节为当前基线。
 
 运行：python3 tests/test_gate_fuzz.py  或  pytest tests/ -q
 """
@@ -38,7 +48,6 @@ import importlib.util
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -1007,14 +1016,31 @@ def test_cron_b5_assets() -> None:
             f"巡检结果须落盘: rc={p.returncode} {p.stdout} {p.stderr}"
 
 
+def _wording_counts(src: str) -> tuple:
+    """返回 (main() 的 total 数字, docstring 当前基线声明的行为级数字)。
+
+    v1.5.11 终验盲检实证：不能对全文 `re.search` 取 total——docstring 里
+    也写了同一句话，会先命中自己，形成「校验了 docstring 自己」的假防线
+    （实测把 main() 改成 +14 断言仍通过）。故 total 只在 main() 体内取。
+    """
+    main_src = src.rsplit("def main()", 1)[-1]
+    m_total = re.search(r"total = len\(CASES\) \+ (\d+)", main_src)
+    docs = re.findall(r"v1\.5\.\d+.*?（45 CASES \+ (\d+) 行为级）", src, re.S)
+    return (m_total.group(1) if m_total else None, docs[-1] if docs else None)
+
+
 def test_current_wording_guard() -> None:
-    """v1.5.10（L3 盲检 R5）：当前口径一致性守卫的正 / 反向行为回归。
+    """v1.5.10 建 / v1.5.11 加固：当前口径一致性守卫的正 / 反向行为回归。
 
     背景：v1.5.9 代码已升到 G1-G6，但 CLI help、quality-gates.md 权威门表、
     主理人 T1 条款仍写五门，cron 锁注释仍写已废弃的 mkdir 目录锁，本文件
-    docstring 用例数停在 v1.5.8——而全量测试仍全绿。本用例真跑 --help、
-    真加载守卫，并用「旧口径」包副本反向验证第 11 项确会 FAIL（防恒真），
-    最后校验 docstring 与 main() 声明的用例数一致。
+    docstring 用例数停在 v1.5.8——而全量测试仍全绿。
+    本用例：①真跑 --help；②真加载守卫断言当前包第 11 项 PASS；
+    ③在临时整包副本上**逐锚回退**（摘除每个正向锚 / 注入每个旧口径串，
+      清单直接取守卫模块的 WORDING_POSITIVE / WORDING_NEGATIVE 单一事实源），
+      逐项断言第 11 项真实 FAIL（防恒真、防漏锚、防两处清单漂移）；
+    ④从 main() 体内取 total 与 docstring 比对，并反向验证「仅改 main()
+      的 total 会被抓到」。
     """
     # 1) CLI 真跑：--help 必须声明六门
     h = subprocess.run([sys.executable, str(CHECK_GATES), "--help"],
@@ -1031,27 +1057,53 @@ def test_current_wording_guard() -> None:
     res = gmod._checks_at(PKG)
     assert len(res) == 11, f"守卫项数应为 11，实测 {len(res)}"
     assert res[10][0], f"当前包第 11 项须 PASS：{res[10][1]}"
+    assert hasattr(gmod, "WORDING_POSITIVE") and hasattr(gmod, "WORDING_NEGATIVE"), \
+        "守卫未暴露锚清单常量（单一事实源缺失）"
+    assert res[10] == gmod.check_current_wording(PKG), \
+        "守卫第 11 项未接线到 check_current_wording()（抽函数后接线被摘）"
 
-    # 3) 反向金丝雀：把包复制一份并改回旧口径，第 11 项必须真实 FAIL
+    # 3) 逐锚回退：每个正向锚被摘除、每个旧口径串被注入，第 11 项都须 FAIL
     with tempfile.TemporaryDirectory(prefix="wording_guard_") as td:
         fake = Path(td) / "pkg"
-        shutil.copytree(PKG, fake, ignore=shutil.ignore_patterns(
-            ".git", ".pytest_cache", "__pycache__"))
-        cg = fake / "scripts" / "check_gates.py"
-        cg.write_text(cg.read_text(encoding="utf-8").replace(
-            "G1-G6 一条命令全查", "G1-G5 一条命令全查"), encoding="utf-8")
-        bad_res = gmod._checks_at(fake)
-        assert len(bad_res) == 11, f"守卫项数异常：{len(bad_res)}"
-        assert not bad_res[10][0], \
-            f"金丝雀失败：旧口径 fixture 下第 11 项仍 PASS（恒真嫌疑）：{bad_res[10][1]}"
+        # check_current_wording() 只读锚清单里的 5 个文件，无需复制整包；
+        # 完整守卫的接线已由第 2 步在真实包上验证，此处只测第 11 项行为。
+        for rel in sorted({r for r, _ in gmod.WORDING_POSITIVE} |
+                          {r for r, _ in gmod.WORDING_NEGATIVE}):
+            dst = fake / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes((PKG / rel).read_bytes())
+        for rel, needles in gmod.WORDING_POSITIVE:
+            fp = fake / rel
+            orig = fp.read_bytes()
+            for needle in needles:
+                fp.write_text(orig.decode("utf-8").replace(needle, "⟦锚已摘除⟧"),
+                              encoding="utf-8")
+                r = gmod.check_current_wording(fake)
+                assert not r[0], \
+                    f"锚 {rel}:{needle!r} 被摘除后第 11 项仍 PASS（漏锚 / 恒真嫌疑）: {r[1]}"
+            fp.write_bytes(orig)
+        for rel, needles in gmod.WORDING_NEGATIVE:
+            fp = fake / rel
+            orig = fp.read_bytes()
+            for old in needles:
+                fp.write_text(orig.decode("utf-8") + f"\n{old}\n", encoding="utf-8")
+                r = gmod.check_current_wording(fake)
+                assert not r[0], \
+                    f"旧口径串 {old!r} 注入 {rel} 后第 11 项仍 PASS（负锚失效）: {r[1]}"
+            fp.write_bytes(orig)
 
-    # 4) docstring 与 main() 用例数口径一致（防「补了新段但 total 没同步」复发）
+    # 4) docstring 与 main() 用例数一致；反向验证「仅改 main() total」会被抓
     src = (PKG / "tests" / "test_gate_fuzz.py").read_text(encoding="utf-8")
-    m_total = re.search(r"total = len\(CASES\) \+ (\d+)", src)
-    m_doc = re.search(r"v1\.5\.10.*?（45 CASES \+ (\d+) 行为级）", src, re.S)
-    assert m_total and m_doc and m_total.group(1) == m_doc.group(1), \
-        (f"docstring 与 main() 用例数不一致: total={m_total and m_total.group(1)} "
-         f"doc={m_doc and m_doc.group(1)}")
+    total_n, doc_n = _wording_counts(src)
+    assert total_n and doc_n and total_n == doc_n, \
+        f"docstring 与 main() 用例数不一致: total={total_n} doc={doc_n}"
+    head, tail = src.rsplit("def main()", 1)
+    bad_src = head + "def main()" + tail.replace(
+        f"total = len(CASES) + {total_n}",
+        f"total = len(CASES) + {int(total_n) + 1}", 1)
+    t2, d2 = _wording_counts(bad_src)
+    assert t2 != d2, \
+        "反向失败：仅改 main() 的 total 未被抓到（疑只读 docstring 自证）"
 
 
 def main() -> int:
