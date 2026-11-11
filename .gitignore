@@ -17,3 +17,7 @@ desktop.ini
 
 # 临时 scratch
 scratch/exports/
+
+# Python 运行缓存
+__pycache__/
+*.pyc
