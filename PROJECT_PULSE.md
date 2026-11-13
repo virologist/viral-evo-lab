@@ -1,7 +1,9 @@
-# PROJECT_PULSE — H5Nx 病毒演化项目热缓存
-> 创建：2026-10-14（v2.0 进化方案 R3）
-> 维护：每轮任务结束我更新（≤30s），你只需 30 秒读完即可接手
-> 上次更新：2026-10-14 11:15
+# PROJECT_PULSE — H5Nx 病毒演化项目热缓存（历史快照）
+
+> ⚠️ **本文已停止维护**（最后更新 2026-10-14 11:15，2026-11-13 体检确认）。下方状态是该日期的快照，**不代表当前实况**。
+> 当前活跃状态以 `CLAUDE.md` §项目快照 / `DATA_PATHS.md` 为准。
+> **已知口径冲突（待人工裁决，本文不擅改）**：§1 称「v6.5 是当前投稿版」；`CLAUDE.md` §项目快照称「H5Nx v7.0 终稿已存在（v5.1 是过程稿）」。两者未经人工确认前，都不作权威引用。
+> 创建：2026-10-14（v2.0 进化方案 R3）｜原维护约定「每轮任务结束更新（≤30s）」实际未持续执行。
 
 ## 1. 主任务状态（一行）
 **H5Nx v5.1 投 EMI 稿件：v6.5 已提交 P0 修复 + 红队 38 findings 闭环 77%**——v6.5 是当前投稿版（v6.4 已在 git 历史）。
@@ -21,7 +23,7 @@
 | 1 | D' 公式量纲错（D 用格子数/概率标度分母） | 09-30 错 2 次 | V1b 反推实现已固化 | ❌（已防） |
 | 2 | 比对列≠残基编号（含 gap） | 09-30 | coordinate-mapping.md 三铁律 | ❌（已防） |
 | 3 | csv BOM 致 KeyError | 10-14 | redteam_tools.py 用 utf-8-sig | ❌（已防） |
-| 4 | git add . 误提交运行时文件（.pending-preview-session） | 10-14 | push_all.sh 计划（见 §6）| ❌（待建） |
+| 4 | git add . 误提交运行时文件（.pending-preview-session） | 10-14 | `scripts/push_all.sh` v2 已落地（`9acbe1d`，2026-11-08） | ✅ 已防（2026-11-13 订正） |
 | 5 | 04_H5 CLAUDE.md 索引漏更新（M19-M21 漏登） | 10-14 | 已补 + 补审计 | ❌（已补） |
 
 ## 4. 今日已完成（实绩）✅
@@ -39,7 +41,7 @@
 - force push 完成（ed9b320...4afed19 forced update）；旧历史安全网=远端分支 `backup-pre-git-slim-20261014`（ed9b320）+ 仓库外备份 `Research/.git_backup_04H5_20261014`（545M，验证稳定后可删）
 - 保留：NA_N6/NA_N8 position_map（被 r4_Glyco_num.ipynb 引用）、原始数据（xls/xlsx/ipynb）、协作内容（溱湖/90_collab）
 
-## 6. 待建机制（方案 3/4/5）
-- ⏳ `scripts/push_all.sh`（三仓库 push 一条命令）— 待建
-- ⏳ `PROJECT_PULSE.md` 开机仪式（30 秒读）— **本文件即首版**
-- ⏳ audits 月目录化（37 文件 → `2026-10/2026-09/` 分流）— 待建
+## 6. 待建机制订正（2026-11-13 全项目体检核实，原 ⏳ 状态已变）
+- ✅ `scripts/push_all.sh` — **已建并升级 v2**（commit `9acbe1d`，2026-11-08）：三仓一站式 push、TLS HTTP/1.1 重试、`--auto` 无人值守。原文「待建」已失效。
+- ⚠️ `PROJECT_PULSE.md` 开机仪式 — 本文件即首版，但维护未持续（见头部失效标注），不宜再作为「30 秒接手入口」；改用 `CLAUDE.md` §项目快照。
+- ✅ audits 月目录化 — **方案未采用，问题已由 2026-11-08 重组消化**：历史诊断文件整体归档至 `_archive/diagnostics_legacy/`，`01_diagnostics/` 现为 5 个活跃文件（见 `agent-harness-sop/REORG_MANIFEST.md`）。
