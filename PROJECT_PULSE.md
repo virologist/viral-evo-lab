@@ -44,4 +44,4 @@
 ## 6. 待建机制订正（2026-11-13 全项目体检核实，原 ⏳ 状态已变）
 - ✅ `scripts/push_all.sh` — **已建并升级 v2**（commit `9acbe1d`，2026-11-08）：三仓一站式 push、TLS HTTP/1.1 重试、`--auto` 无人值守。原文「待建」已失效。
 - ⚠️ `PROJECT_PULSE.md` 开机仪式 — 本文件即首版，但维护未持续（见头部失效标注），不宜再作为「30 秒接手入口」；改用 `CLAUDE.md` §项目快照。
-- ✅ audits 月目录化 — **方案未采用，问题已由 2026-11-08 重组消化**：历史诊断文件整体归档至 `_archive/diagnostics_legacy/`，`01_diagnostics/` 现为 5 个活跃文件（见 `agent-harness-sop/REORG_MANIFEST.md`）。
+- ✅ audits 月目录化 — **方案未采用，问题由 2026-11-08 重组消化**：旧 v1/v2 诊断稿 2 份归档至 `_archive/diagnostics_legacy/`（`../agent-harness-sop/CLEANUP_CHECKLIST.md` §四 [C] + commit `6735309`）；`01_diagnostics/` 现 4 份报告 + README。**引证订正（2026-11-14 独立复核）**：原引 `REORG_MANIFEST.md` 对 audits / 月目录 / `01_diagnostics` / `git mv` 零命中且相对路径不解析，已撤下；原「整体归档」措辞收窄为「旧 v1/v2 两份」。

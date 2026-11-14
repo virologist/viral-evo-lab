@@ -19,7 +19,8 @@
 | `context_stack/` | 跨轮记忆五主题（逻辑）：锚点/假说池/方法库/约束/门控；**json 为真源、md 为渲染视图**，另含扩展索引 | 主理人每轮按需增量更新 |
 | `_archive/` | 历史留痕归档区（`harness_runs_legacy/` / `memory_archive_legacy/` / `diagnostics_legacy/`），只读证据链，不删 | archivist |
 
-> 归档去向：`_harness_runs/` 原为 harness 运行产物目录，2026-11-08 已整体 `git mv` 入 `_archive/harness_runs_legacy/`（见 `agent-harness-sop/REORG_MANIFEST.md`），残留空壳已清理。历史报告里 `_harness_runs/...` 路径引用保留为证据链原文，实际文件在归档区。
+> 归档去向：`_harness_runs/` 原为 harness 运行产物目录，2026-11-08 已 `git mv` 入 `_archive/harness_runs_legacy/`，残留空壳已清理；历史报告里 `_harness_runs/...` 引用保留为证据链原文，实物在归档区。
+> 证据锚（2026-11-14 独立复核订正）：`../agent-harness-sop/CLEANUP_CHECKLIST.md` §四 [A] 的 `[x]` 确认 + research-ops commit `6735309`（归档历史 trace/记忆/旧诊断稿）/ `a0d641c`（修平 `_archive` 嵌套）；实物见 `_archive/harness_runs_legacy/{T-20261015-M2,T-20261021-D}/`。**原引 `REORG_MANIFEST.md` 已撤下**——该文件对本次归档零命中（仅记录删除空子目录 `T-DIAG-TEST`），且从本目录出发的相对路径不解析。
 
 ## 读写铁律
 1. 每轮任务结束自动更新 context_stack/ 对应文件；用户明确修正 → 立即覆盖写入
