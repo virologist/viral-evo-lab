@@ -9,3 +9,4 @@ RESEARCH_OPS_DIR 指向真实项目目录。仓内仅保留本说明。
 生产权威源建议在文件头部 3 行内加 `source_tag: authoritative` 标记，配合
 verify_numbers.py `load_sources(..., require_tag=True)` 使用，未带 tag 的文件
 不进 grep 池（T-C4 · LRN-005 防线机制闸）。
+- **保留策略（2026-11-15 独立复核补）**：权威源池目录（防复发机制核心），保留；仓内仅此说明，生产权威源建议在文件头部加 `source_tag: authoritative`。

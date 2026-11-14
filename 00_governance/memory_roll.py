@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 R8: memory 滚动裁剪
-- 30 天前的当日 .md → 蒸馏进 research-ops/MEMORY.md 后归档入 _memory_archive/
+- 30 天前的当日 .md → 蒸馏进 .workbuddy/memory/MEMORY.md 后归档入 research-ops/_archive/memory_archive_legacy/files/
 - 防 1 年后 1MB+ 单边膨胀
 - 蒸馏原则：保留所有项目级长期事实（战线/防线/底线）+ 当日临时事件精简摘要
 """
@@ -21,12 +21,12 @@ memory_roots = {
     # B 仓 (04_H5/.workbuddy/memory) 显式排除：科研主线资产, 本 thread 不碰
     # 历史蒸馏文已存 _memory_archive/B_*.md 作为占位, 不重复蒸馏
 }
-archive_root = WS / "research-ops/_memory_archive"
-archive_root.mkdir(parents=True, exist_ok=True)
+archive_root = WS / "research-ops/_archive/memory_archive_legacy/files"
+# 注：旧 _memory_archive/ 已于 2026-11-08 归档删除；统一落 _archive/memory_archive_legacy/files/。
+# mkdir 仅在 --apply 时执行（2026-11-15 修复：原无条件 mkdir 使 dry-run 也会写盘，破坏 clean 工作区）。
 
 distilled_count = 0
 for label, mdir in memory_roots.items():
-    pass  # 显式只动 ws 范围
     if not mdir.exists():
         print(f"  [skip] {label}: {mdir} 不存在")
         continue
@@ -43,17 +43,18 @@ for label, mdir in memory_roots.items():
         commits = " ".join(sorted(set(commit_hash))[:8])
         head = t.split("\n", 1)[1] if "\n" in t else ""
         first_para = t.split("\n\n", 1)[0]
-        # 归档
+        # 归档（仅 --apply 时写盘；dry-run 只打印计划，零副作用）
         arch_file = archive_root / f"{label}_{f.stem}.md"
-        arch_file.write_text(
-            f"# 蒸馏归档 {f.stem}（{label}，{d:%Y-%m-%d}）\n\n"
-            f"## 标题段\n{first_para}\n\n"
-            f"## 涉及 commit\n{commits}\n\n"
-            f"## 原文路径\n{f}\n",
-            encoding="utf-8"
-        )
-        print(f"  [{label}] {f.stem} → 蒸馏归档（{len(t)}字 → ~{arch_file.stat().st_size}字）")
+        print(f"  [{label}] {f.stem} → 拟蒸馏归档（{len(t)}字；--apply 后落 {arch_file}）")
         if APPLY:
+            archive_root.mkdir(parents=True, exist_ok=True)
+            arch_file.write_text(
+                f"# 蒸馏归档 {f.stem}（{label}，{d:%Y-%m-%d}）\n\n"
+                f"## 标题段\n{first_para}\n\n"
+                f"## 涉及 commit\n{commits}\n\n"
+                f"## 原文路径\n{f}\n",
+                encoding="utf-8"
+            )
             f.unlink()
             print(f"    🗑  删 {f.name}")
         distilled_count += 1

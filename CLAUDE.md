@@ -10,12 +10,12 @@
 - **病毒/对象**：H5Nx clade 2.3.4.4（主线，G70/G140 协同标记对 + clade-founder confounding 方法学贡献）+ H10 禽流感（重构，10 主图+7 附图）+ H1N1/H3N8 猪流感（PB2-M631L/PA-T97I）
 - **数据规模**：H5Nx 2543 条 HA + 2365 条 NA 中国序列（GISAID 2019-2023）；cd995 子集 640 HA + 582 NA
 - **核心叙事（v5.1 重定位）**：clade-host confounding 量化案例为核心方法学贡献；G140 = 4h clade 定义性糖基化标记；无湿实验，纯干实验
-- **当前阶段**：H5Nx v7.0 终稿已存在（v5.1 是过程稿）；EMI 投稿三件套就绪；**唯一 P0 = GISAID 致谢表（用户行为）**；H10 稿件重构；H1N1 投稿准备
+- **当前阶段**（2026-11-15 版本分类订正）：**manuscript=v6.5（投稿中，唯一事实真源 04_H5/paper/current/H5Nx_v6.5.md）**；**deck=v7.0（H5Nx_v7.0_终稿_中文版.pptx 派生演示稿，非 manuscript）**；**analysis-anchor=v5.1（叙事重定位里程碑）**。EMI 投稿三件套就绪；**唯一 P0 = GISAID 致谢表（用户行为）**；H10 稿件重构；H1N1 投稿准备
 - **下一动作**：GISAID 致谢表导出（用户）→ 清 8 项 P0 全 ✅ → 投稿
 - **关键约束**：无实验室 / 无研究生 / 经费极紧 / 干实验优先 / 算力 Ubuntu24 (A5000 24G)
 
 ## 活跃战线与状态
-- H5Nx：[v7.0 终稿 + EMI 投稿三件套就绪] / 目标 EMI (Original Article)，VE 备
+- H5Nx：[manuscript v6.5 投稿中 + deck v7.0 终稿 PPTX + EMI 投稿三件套就绪] / 目标 EMI (Original Article)，VE 备
 - H10：[稿件重构 10+7 图] / 目标 CAS 1区 virology / 锚点待补
 - H1N1：[投稿准备] / 致病性证据链汇总 / 锚点待补
 

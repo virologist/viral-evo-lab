@@ -3,7 +3,7 @@
 > 维护者：archivist；更新触发：路径变更 / 新增数据资产。
 > 建档：2026-09-11（首次建立，指针从空骨架接上真实实验台）
 
-## H5Nx 主项目（v3.8c 锁，8+14 图，EMI 投稿中）
+## H5Nx 主项目（manuscript v6.5 锁，deck v7.0 PPTX 终稿，8+14 图，EMI 投稿中；v3.8c 已在 04_H5 真本退役）
 
 ### 根路径
 ```
@@ -20,7 +20,7 @@ MSTAT=$SUP/M_statistical        # M01-M16 统计模块链
 DDRY=$SUP/D_drylab              # D01-D13 结构-功能干实验
 SSUP=$SUP/S_supplement          # S01-S07 投稿增补材料
 TREE=$BASE/04_Treetime/HA_cd995_align.newick
-MANUS=$BASE/paper/current/H5Nx_v5.1_final_EID_ready.docx
+MANUS=$BASE/paper/current/H5Nx_v6.5.md   # manuscript 唯一事实真源（真本 04_H5/CLAUDE.md §C 锁；.docx 由 pandoc 派生）
 PPATCH=$BASE/paper/patches
 PAUDIT=$BASE/docs/audits
 FIGMAIN=$BASE/Figures/main       # 正文定稿图 Fig1-8（投稿唯一正式出口）
@@ -37,7 +37,7 @@ CONDA_BIO=/Users/biodog/miniconda3/envs/bio/bin/python
 5. `$BASE/docs/WRITING_ROADMAP.md` + `REVIEWER_PREP.md` + `DATA_AVAILABILITY.md`（投稿三件套）
 6. `$BASE/CLAUDE.md §J`（8 项 P0 状态报告）
 
-### 锚点数字（与 manuscript v3.8c 锁定）
+### 锚点数字（与 manuscript v6.5 锁定）
 - ANCHOR_N = "n=2,543 curated clade 2.3.4.4 HA dataset (manuscript P36)"
 - ANCHOR_STAT = "G70 (mature 54) PGLS β=+2.006, p_bonf=0.0056 (R phyloglm)"
 - ANCHOR_GISAID_N = "n=2,763 中国 clade 2.3.4 全集 (Figure 1 数据源)"
