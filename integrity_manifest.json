@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-10T23:09:19",
+ "generated": "2026-11-15T08:01:29",
  "file_count": 79,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "4eca8b19ffa51316",
+   "sha16": "63cd12a1bccc87c0",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "54d1999cff7c6384",
+   "sha16": "1fface1bf6521bae",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "df21db17aa8e7e62",
+   "sha16": "29f4fd3ae3a108e3",
    "bytes": 6722
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "857130fbf84d2182",
-   "bytes": 60543
+   "sha16": "d84b5e61dcc9beb7",
+   "bytes": 62605
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
@@ -203,8 +203,8 @@
    "bytes": 6361
   },
   "scripts/hypothesis_watch.py": {
-   "sha16": "b201a34cbae9d055",
-   "bytes": 15514
+   "sha16": "ac79423e0ec2b7b6",
+   "bytes": 16048
   },
   "scripts/install_cron_watch.sh": {
    "sha16": "2ad7aad9a46c4895",
@@ -303,8 +303,8 @@
    "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "bf3cb4501b5e4391",
-   "bytes": 63569
+   "sha16": "401b3e9044d97d61",
+   "bytes": 66908
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

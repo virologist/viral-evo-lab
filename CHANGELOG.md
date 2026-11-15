@@ -4,6 +4,22 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.13] - 2026-11-15（R2 新轮 · T-C3 时区 canonicalize 修正）
+
+> 用户授权开 R2 新轮：冻结包 v1.5.12（`deb1560`）经独立复核（2026-11-14，`independent-review-r2`）确认唯一实质性代码缺陷为 T-C3——`hypothesis_watch.py` 的 `parse_dt()` 对带偏移时间输入（Z/+0000/-05:00）静默丢弃偏移量，导致 late_fatal 漏报与 age_days 偏差。设计文档旧处方（裸 `astimezone()` / 字节切）经实证为回归源，已 superseded（见 `agent-harness-sop/02-design/架构设计文档.md` 处方消歧段，`c93e4ab`）。
+
+### Fixed
+- **T-C3 时区 canonicalize**：`scripts/hypothesis_watch.py` 的 `parse_dt()` 将 `dt.replace(tzinfo=None)` 改为 `dt.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)`——显式 canonicalize 到 +08:00 再转 naive，消除 Z/+0000/-05:00 输入静默丢偏移（实测 Z 04:00→12:00 naive、旧实现误为 04:00；-05:00 07:00→20:00 naive、旧实现误为 07:00）。全程仅在 `dt` 已带 tzinfo 时调用 `astimezone`，绝不对 naive dt 裸调用，避免与 `datetime.now()` naive 触发 naive/aware `TypeError` 打碎 EXIT 契约。同步补 `timezone` 导入与行内注释。
+
+### Added
+- **T-C3 回归测试**：`tests/test_gate_fuzz.py` 新增 `test_tc3_timezone_canonicalize()`，两层断言——①单元层 `parse_dt` 对四种时区输入产出确定 +08 naive；②端到端构造「`last_updated=+08 23:00` + `closed_date=Z 16:00`（=次日 00:00 +08）」场景，旧实现 EXIT=0（漏报），修复后必须 EXIT=5 报出。行为级用例 15 → **16**，CURRENT_BASELINE 机器锚同步 `45 CASES + 16 行为级 = 61/61`。
+
+### Changed
+- 四处 version = **1.5.13**；`integrity_manifest.json` 重生成（捕获 hypothesis_watch.py / test_gate_fuzz.py / 三处 version 文件哈希变化）；包外锚受控刷新；用例数：fuzz **61/61**、守卫 **11/11**、V7 **7/7**、pytest **19 passed**。
+- R2 盲检重启计数：连续两轮独立零🔴 才宣布收敛冻结（待 R2_SUMMARY.md 收轮）。
+
+---
+
 ## [1.5.12] - 2026-11-10（终验盲检 R7 · 收敛冻结）
 
 > 第三次独立盲检又抓到 1🔴 + 1🟡：①`_wording_counts()` 的 doc 正则用跨版本宽匹配，实际命中 v1.5.10 **历史段**；自称「当前基线」的 v1.5.11 段数字改成 14 仍全绿（与前两轮同构的覆盖缺口），且 §17 / helper docstring 写「取当前基线声明」属不实声称；②`AUDIT_STATE.md` §16/§17 的「research-ops commit 见本文件终验记录」是悬空引用。本版全部补齐并再次终验。

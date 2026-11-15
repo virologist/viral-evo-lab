@@ -39,7 +39,7 @@ import csv
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -65,9 +65,14 @@ def parse_dt(s):
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S+08:00", "%Y-%m-%d"):
         try:
             dt = datetime.strptime(s.strip(), fmt)
-            # 统一为 naive 本地时间（台账与假说池同为 +08:00，混比会 TypeError）
+            # T-C3（R2 · 2026-11-15）：显式 canonicalize 到 +08:00 再转 naive。
+            # 旧实现直接 dt.replace(tzinfo=None) 对 Z/+0000/-05:00 等带偏移输入
+            # 静默丢弃偏移量 → 与 datetime.now()（+08 naive）混比时 late_fatal 漏报、
+            # age_days 偏差 8h。显式指定目标时区（不依赖系统本地时区，确定性），
+            # 且全程仅在 dt 已带 tzinfo 时调用 astimezone，绝不对 naive dt 裸调用
+            # astimezone()（否则会触发 naive/aware TypeError 打碎 EXIT 契约）。
             if dt.tzinfo is not None:
-                dt = dt.replace(tzinfo=None)
+                dt = dt.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
             return dt
         except (ValueError, TypeError):
             continue

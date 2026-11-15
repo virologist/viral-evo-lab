@@ -49,7 +49,7 @@ v1.5.12（2026-11-10 · 终验盲检 R7 收敛）：用例数不变。第三次�
       断言。守卫正向锚 13 → 14（加 CURRENT_BASELINE 存活锚），逐锚回退
       16 → 17 次。**当前基线以本锚为准。**
       当前基线机器锚（唯一被 _wording_counts 读取）：
-      CURRENT_BASELINE = 45 CASES + 15 行为级 = 60/60
+      CURRENT_BASELINE = 45 CASES + 16 行为级 = 61/61
 
 运行：python3 tests/test_gate_fuzz.py  或  pytest tests/ -q
 """
@@ -437,6 +437,61 @@ def test_disposition_gate() -> None:
         rc, out = run()
         assert rc == 5, f"畸形 state 下 fatal 不得漏报（应 EXIT=5 REVIEW_REQUIRED），实为 {rc}"
         assert "H-99" in out, "畸形 state 下 fatal finding 必须被报出"
+
+
+def test_tc3_timezone_canonicalize() -> None:
+    """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
+    不得静默丢弃偏移量。旧实现 dt.replace(tzinfo=None) 对 Z/+0000/-05:00 丢 8h，
+    导致 late_fatal 漏报、age_days 偏差。两层断言：
+
+      ① 单元层：parse_dt 对四种时区输入产出确定的 +08 naive 时间；
+      ② 端到端：构造 `last_updated=+08 23:00` + `closed_date=Z 16:00`
+         （=次日 00:00 +08）场景——旧实现把 closed_date 的 UTC 16:00 误当
+         naive 16:00（vs 池 23:00）判「早于」→ 漏报 late_fatal（EXIT=0）；
+         修复后 canonicalize 到 +08 判次日 00:00 > 23:00 → 必报 REVIEW_REQUIRED(5)。
+    """
+    hw_path = PKG / "scripts" / "hypothesis_watch.py"
+    spec = importlib.util.spec_from_file_location("_hw_tc3", hw_path)
+    assert spec is not None and spec.loader is not None, "hypothesis_watch 无法加载"
+    hw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hw)
+    from datetime import datetime as _dt
+
+    # ① 单元层：带偏移输入 → 确定的 +08 naive（不再依赖系统本地时区）
+    assert hw.parse_dt("2026-11-10T04:00:00Z") == _dt(2026, 11, 10, 12, 0, 0), \
+        "Z(UTC 04:00) 须 canonicalize 为 +08 12:00（旧实现误为 04:00）"
+    assert hw.parse_dt("2026-11-10T04:00:00+0000") == _dt(2026, 11, 10, 12, 0, 0), \
+        "+0000 须 canonicalize 为 +08 12:00"
+    assert hw.parse_dt("2026-11-10T07:00:00-05:00") == _dt(2026, 11, 10, 20, 0, 0), \
+        "-05:00(07:00) 须 canonicalize 为 +08 20:00（旧实现误为 07:00）"
+    assert hw.parse_dt("2026-11-10T12:00:00+08:00") == _dt(2026, 11, 10, 12, 0, 0), \
+        "+08:00 输入须保持不变"
+    assert hw.parse_dt("2026-11-10") == _dt(2026, 11, 10, 0, 0, 0), \
+        "纯日期 → 午夜 naive"
+    assert hw.parse_dt(123) is None and hw.parse_dt("garbage") is None, \
+        "非字符串/坏串 → None（不崩、不静默）"
+
+    # ② 端到端：旧实现 EXIT=0（漏报），修复后必须 EXIT=5
+    with tempfile.TemporaryDirectory(prefix="tc3_tz_") as td:
+        d = Path(td)
+        ro = d / "ro"
+        (ro / "context_stack").mkdir(parents=True)
+        (ro / "00_governance").mkdir(parents=True)
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text(json.dumps({
+            "last_updated": "2026-11-10T23:00:00+08:00",
+            "active_hypotheses": [{"id": "H-1", "status": "active", "claim": "c"}]}) + "\n",
+            encoding="utf-8")
+        (ro / "00_governance" / "redteam_ledger.csv").write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n"
+            "H-99,fatal,closed,2026-11-10T16:00:00Z,证伪晚于假说池更新\n",
+            encoding="utf-8")
+        p = subprocess.run([sys.executable, str(hw_path), "--research-ops", str(ro)],
+                           capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, f"hypothesis_watch 崩溃: {out[:300]}"
+        assert p.returncode == 5, \
+            f"T-C3 修复后须报 late_fatal(EXIT=5)，实为 {p.returncode}（漏报回归！）"
+        assert "H-99" in out, "late_fatal finding 必须被报出"
 
 
 def test_gate_mode_blocks() -> None:
@@ -1137,7 +1192,8 @@ def main() -> int:
     print(f"\nfuzz 用例 {len(CASES)} | 通过 {ok_n} | 失败 {len(CASES) - ok_n}")
     # 行为级用例（pytest 入口亦覆盖，此处供独立脚本运行）
     for fn in (test_g4_waiver_release, test_gate_mode_blocks, test_disposition_gate,
-               test_require_tag_gate, test_poll_hitlimit_and_manifest,
+               test_tc3_timezone_canonicalize, test_require_tag_gate,
+               test_poll_hitlimit_and_manifest,
                test_legacy_package_check_fallback, test_g3_fail_still_writes_report,
                test_decision_log_audit, test_baseline_anchor_roundtrip,
                test_decision_records_guard, test_g6_evidence_gate,
@@ -1149,7 +1205,7 @@ def main() -> int:
             ok_n += 1
         except AssertionError as e:
             print(f"  ❌ {fn.__name__}: {e}")
-    total = len(CASES) + 15
+    total = len(CASES) + 16
     print(f"\n合计 {total} | 通过 {ok_n} | 失败 {total - ok_n}")
     return 0 if ok_n == total else 1
 
