@@ -18,7 +18,6 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
 
@@ -148,14 +147,27 @@ def main() -> int:
             print(f"  ⏭ {stem}: JSON 缺失")
             missing.append(f"{stem}.json")
             continue
+        # R2 回补（2026-11-15）：原实现只捕 JSONDecodeError，而渲染函数用
+        # d['last_updated'] / h['id'] 等直接索引，JSON 顶层为 list 或字段缺失时
+        # 抛 TypeError/KeyError → traceback + EXIT=1，破坏退出码契约（实测 3 种
+        # 畸形输入全部复现）。统一按「真源结构异常」转契约码 3。
         try:
             d = json.loads(jp.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            print(f"  ❌ {stem}: JSON 解析失败 {e}")
+            if not isinstance(d, dict):
+                raise TypeError(f"顶层须为对象（实为 {type(d).__name__}）")
+            rendered = fn(d)
+        except (json.JSONDecodeError, OSError, UnicodeError,
+                KeyError, TypeError, AttributeError, IndexError) as e:
+            print(f"  ❌ {stem}: 真源结构异常 {type(e).__name__}: {e}")
             rc = 3
             continue
-        rendered = fn(d)
-        if mp.is_file() and mp.read_text(encoding="utf-8") == rendered:
+        try:
+            unchanged = mp.is_file() and mp.read_text(encoding="utf-8") == rendered
+        except (OSError, UnicodeError) as e:
+            print(f"  ❌ {stem}: md 视图读取失败 {type(e).__name__}: {e}")
+            rc = 3
+            continue
+        if unchanged:
             print(f"  ⏭ {stem}.md 内容未变，跳过写入（防 OneDrive 写放大）")
         else:
             _g = _load_guard()

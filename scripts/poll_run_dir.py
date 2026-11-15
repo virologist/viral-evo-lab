@@ -168,6 +168,15 @@ def main() -> int:
         print("⚠ 同时传入 --expected 与 --from-manifest：以 --expected 为准（manifest 忽略）", file=sys.stderr)
     if args.expected:
         expected = [m.strip() for m in args.expected.split(",") if m.strip()]
+        # R2 回补：与 --from-manifest 的成员 ID 白名单对齐（[a-z0-9][a-z0-9-]*），
+        # 防止含 "/" / ".." 的成员名被拼进 f"{task_id}__{member}.md" 指向包外路径。
+        _allowed = set("abcdefghijklmnopqrstuvwxyz0123456789-")
+        bad = [m for m in expected
+               if not m or m[0] == "-" or any(c not in _allowed for c in m)]
+        if bad:
+            print(f"❌ --expected 含非法成员 ID: {bad}（仅允许 [a-z0-9][a-z0-9-]*）",
+                  file=sys.stderr)
+            return 5
     elif args.from_manifest:
         expected, err = load_expected_from_manifest(run_dir)
         if expected is None:

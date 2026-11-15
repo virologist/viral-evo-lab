@@ -493,6 +493,86 @@ def test_tc3_timezone_canonicalize() -> None:
             f"T-C3 修复后须报 late_fatal(EXIT=5)，实为 {p.returncode}（漏报回归！）"
         assert "H-99" in out, "late_fatal finding 必须被报出"
 
+    # ── R2 回补回归集合（③④⑤⑥）──────────────────────────────────────
+    # 刻意复用本函数而非新增行为级函数：不动 CURRENT_BASELINE 机器锚
+    # （45 CASES + 16 行为级 = 61）与守卫第 11 项的计数相等校验——
+    # 历史 v1.5.10/11/12 三次因计数联动返工，此处保持计数不变。
+    import os as _os
+    from datetime import timedelta as _td
+
+    # ③ 跨 TZ 裁决一致性（🔴-1）。以 now_canonical() 动态构造边界时间戳，
+    #    使「回退到 datetime.now()」时 +08 侧 age_days=15 / UTC 侧=14 → 裁决翻转；
+    #    修复后两侧同基准，必须同判 5。动态基准避免时间炸弹。
+    with tempfile.TemporaryDirectory(prefix="tc3_env_") as td:
+        d = Path(td)
+        ro = d / "ro"
+        (ro / "context_stack").mkdir(parents=True)
+        (ro / "00_governance").mkdir(parents=True)
+        boundary = (hw.now_canonical() - _td(days=15, hours=4)).strftime("%Y-%m-%dT%H:%M:%S")
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text(json.dumps({
+            "last_updated": boundary + "+08:00", "active_hypotheses": []}) + "\n",
+            encoding="utf-8")
+        (ro / "00_governance" / "redteam_ledger.csv").write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n", encoding="utf-8")
+        rcs = []
+        for tz in ("Asia/Shanghai", "UTC"):
+            p = subprocess.run([sys.executable, str(hw_path), "--research-ops", str(ro)],
+                               capture_output=True, text=True, timeout=60,
+                               env=dict(_os.environ, TZ=tz))
+            assert "Traceback" not in (p.stdout + p.stderr), f"{tz} 下 hypothesis_watch 崩溃"
+            rcs.append((tz, p.returncode))
+        assert [c for _, c in rcs] == [5, 5], \
+            f"跨 TZ 裁决翻转（回退前 +08=5 / UTC=0）: {rcs}"
+
+    # ④ naive ISO 不得静默吞掉证伪发现（🔴-2）
+    assert hw.parse_dt("2026-11-10T12:00:00") == _dt(2026, 11, 10, 12, 0, 0), \
+        "无偏移 ISO datetime 须按 +08 naive 解析"
+    assert hw.parse_dt("2026-11-10 12:00:00") == _dt(2026, 11, 10, 12, 0, 0), \
+        "空格分隔 datetime 须按 +08 naive 解析"
+    with tempfile.TemporaryDirectory(prefix="tc3_naive_") as td:
+        d = Path(td)
+        ro = d / "ro"
+        (ro / "context_stack").mkdir(parents=True)
+        (ro / "00_governance").mkdir(parents=True)
+        fresh = (hw.now_canonical() - _td(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text(json.dumps({
+            "last_updated": fresh + "+08:00", "active_hypotheses": []}) + "\n",
+            encoding="utf-8")
+        closed = (hw.now_canonical() - _td(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        (ro / "00_governance" / "redteam_ledger.csv").write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n"
+            f"H-77,fatal,closed,{closed},naive-iso-证伪发现\n", encoding="utf-8")
+        p = subprocess.run([sys.executable, str(hw_path), "--research-ops", str(ro)],
+                           capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, f"naive ISO 场景崩溃: {out[:300]}"
+        assert p.returncode == 5 and "H-77" in out, \
+            f"naive ISO closed_date 被静默吞掉（EXIT={p.returncode}）"
+
+    # ⑤ render_context_stack 畸形 JSON 须走契约码 3，不得 traceback（🔴-3）
+    with tempfile.TemporaryDirectory(prefix="tc3_render_") as td:
+        d = Path(td)
+        ro = d / "ro"
+        (ro / "context_stack").mkdir(parents=True)
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text(
+            "[]\n", encoding="utf-8")
+        render = PKG / "scripts" / "render_context_stack.py"
+        p = subprocess.run([sys.executable, str(render), "--research-ops", str(ro),
+                            "--which", "hyp"], capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, f"畸形 JSON 仍触发 traceback: {out[:300]}"
+        assert p.returncode == 3, f"畸形 JSON 须 EXIT=3，实为 {p.returncode}"
+
+    # ⑥ gen_integrity_manifest --help 只读，不得刷新 generated 写盘（🟠-1）
+    gen = PKG / "scripts" / "gen_integrity_manifest.py"
+    manifest = PKG / "integrity_manifest.json"
+    before = manifest.read_bytes()
+    p = subprocess.run([sys.executable, str(gen), "--help"],
+                       capture_output=True, text=True, timeout=60)
+    assert p.returncode == 0 and "usage" in p.stdout.lower(), \
+        f"--help 须打印帮助且 EXIT=0: {p.returncode} {p.stdout[:200]}"
+    assert manifest.read_bytes() == before, "--help 不得写盘（否则可静默洗白基线）"
+
 
 def test_gate_mode_blocks() -> None:
     """L3（2026-11-09）：gate_mode 行为回归——阻断信号必须传导。

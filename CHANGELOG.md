@@ -4,6 +4,26 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.14] - 2026-11-15（R2 第二轮盲检证伪 · 回补轮）
+
+> **收敛判定：v1.5.13 不收敛。** R2 第一轮独立盲检 ZERO 🔴（PASS），第二轮独立盲检（换 lite 模型突破 429）返回 **FAIL / 3🔴**；三条均已由主代理用独立 `/tmp` 夹具复现确认。按 R2 铁律「连续两轮独立零🔴 才冻结」，连续零🔴 计数归零，回补后重启盲检轮。1.5.13 段有关收敛预期的表述属历史原文，保留不改，以本段作证伪标注。
+
+### Fixed
+- **🔴-1 时区基准未闭环（T-C3 残留）**：v1.5.13 只修 `parse_dt()` 输入侧，`age_days`（`:269`）与 `reviewed_at` 复核（`:172`）仍用 `datetime.now()`（系统本地 naive），与 canonicalize 后的 +08 naive 混比。实测同一合法 UTC 输入在 `+0800` 下 15 天 / EXIT=5、`TZ=UTC` 下 14 天 / EXIT=0 裁决翻转。新增 `now_canonical()` 统一比较基准，并订正 `:71` 注释「不依赖系统本地时区」此前不实的声称。
+- **🔴-2 naive ISO 静默吞掉证伪发现**：`parse_dt()` 仅认 3 种格式，`2026-11-10T12:00:00` 返回 None，台账 `:260` 直接 `continue` 且无 warning。实测仅差一个 `Z` 后缀即由 1 条 / EXIT=5 变 0 条 / EXIT=0。新增两种 naive 格式，并对「非空但无法解析」的 `closed_date` 输出 stderr warning。
+- **🔴-3 render_context_stack 破坏 EXIT 契约**：`main()` 只捕 `JSONDecodeError`，渲染函数用 `d['last_updated']` / `h['id']` 直接索引，3 种畸形 JSON 全部 traceback + EXIT=1。改为顶层类型校验 + 扩面异常捕获，统一契约码 **EXIT=3**；`md.read_text()` 亦纳入保护；删除未使用的 `datetime` 导入。
+- **🟠-1 gen_integrity_manifest `--help` 静默写盘**：`main()` 仅判断 `"--check" in sys.argv`，任何未知参数（含 `--help`、拼错的 `--chek`）都落入「重生成并覆盖」分支——第二轮盲检实测 `--help` 把 `generated` 从 `08:01:29` 刷成 `09:42:44` 并污染工作树，等于可静默洗白基线。改用 `argparse`：`--help` 只读、未知参数报错 EXIT=2。订正 docstring「幂等性：两次运行 diff 为空」的不实声称。
+- **🟡-3 poll_run_dir `--expected` 缺白名单**：成员名直接拼入 `f"{task_id}__{member}.md"`，含 `/`/`..` 可指向包外。与 `--from-manifest` 对齐加 `[a-z0-9][a-z0-9-]*` 校验，非法 EXIT=5。
+- **工作区 `changes_summary.py`（research-ops）**：`m19_m20_m21_present` 用 `f"M{n}" in mods`，而 `mods` 来自 `findall(r"M(\d+[a-z]?)")` 不含 M 前缀 → 恒 False，§7 模块检查形同虚设。改为 `n in mods`；删除未用 `sys` 导入。
+
+### Added
+- **R2 回补回归集合**：在既有 `test_tc3_timezone_canonicalize()` 内追加 ③④⑤⑥ 四组断言（跨 TZ 裁决一致性 / naive ISO 不吞发现 / 畸形 JSON EXIT=3 / `--help` 只读不写盘）。**刻意复用现有函数**：保持 `45 CASES + 16 行为级 = 61/61` 机器锚与守卫第 11 项计数不变，规避历史 v1.5.10–12 三次计数联动返工。跨 TZ 与 naive 场景均以 `now_canonical()` 动态构造时间基准，无时间炸弹。
+
+### Changed
+- 四处 version = **1.5.14**；`integrity_manifest.json` 重生成；包外锚受控刷新（22 文件，含本轮改动的 5 个已跟踪资产）。
+- 全量验证：pytest **19 passed** / fuzz **45+61/61** / 守卫 **11/11** / manifest `--check` OK / 全量 `py_compile` 0 失败 / `--help` 只读 / 未知参数 EXIT=2 零写盘 / 白名单拦截 EXIT=5。
+- **R2 收敛计数重启为 0/2**；冻结判定以后续连续两轮独立零🔴 盲检为准，见 `viral-evo-lab-audit/R2_SUMMARY.md`。
+
 ## [1.5.13] - 2026-11-15（R2 新轮 · T-C3 时区 canonicalize 修正）
 
 > 用户授权开 R2 新轮：冻结包 v1.5.12（`deb1560`）经独立复核（2026-11-14，`independent-review-r2`）确认唯一实质性代码缺陷为 T-C3——`hypothesis_watch.py` 的 `parse_dt()` 对带偏移时间输入（Z/+0000/-05:00）静默丢弃偏移量，导致 late_fatal 漏报与 age_days 偏差。设计文档旧处方（裸 `astimezone()` / 字节切）经实证为回归源，已 superseded（见 `agent-harness-sop/02-design/架构设计文档.md` 处方消歧段，`c93e4ab`）。

@@ -12,11 +12,19 @@
 用法：
     python3 scripts/gen_integrity_manifest.py            # 生成并覆盖 integrity_manifest.json
     python3 scripts/gen_integrity_manifest.py --check    # 只校验不写（exit 1 = 清单过期；2 = git 不可用）
+    python3 scripts/gen_integrity_manifest.py --help     # 打印帮助（只读）
 
-幂等性：同状态文件树两次运行 diff 为空。
+R2 回补（2026-11-15）：原 main() 仅判断 "--check" in sys.argv，任何未知参数
+（含 --help、拼错的 --chek）都被静默忽略并落入「重生成并覆盖」分支——
+实测 --help 会刷新 generated 时间戳并写盘，等于可静默洗白基线。改用 argparse：
+--help 只读、未知参数直接报错（EXIT=2），不再误触写分支。
+
+幂等性：--check 为只读且状态不变时结果恒为 0；重生成每次刷新 generated 时间戳
+（故重生成本身不是「diff 为空」的幂等写，旧 docstring 该声称不实，已订正）。
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import subprocess
@@ -69,7 +77,12 @@ def build() -> dict:
 
 
 def main() -> int:
-    if "--check" in sys.argv:
+    ap = argparse.ArgumentParser(
+        description="完整性清单：以 git ls-files 为唯一真源生成/校验 integrity_manifest.json")
+    ap.add_argument("--check", action="store_true",
+                    help="只校验不写（EXIT 1 = 清单过期；2 = git 不可用）")
+    args = ap.parse_args()
+    if args.check:
         old = json.loads(MANIFEST.read_text(encoding="utf-8"))
         new = build()
         # 只比对文件字典内容，忽略 generated 时间戳

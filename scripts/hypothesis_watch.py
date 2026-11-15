@@ -53,6 +53,19 @@ def autodetect_research_ops() -> str:
     return ""
 
 
+def now_canonical() -> datetime:
+    """R2 回补（2026-11-15）：统一时间基准到 +08:00 naive。
+
+    parse_dt() 把带偏移输入 canonicalize 为 +08 naive，所有与之相减的
+    「当前时间」必须同基准。旧实现直接用 datetime.now()（系统本地 naive），
+    在 TZ != +08 的主机上 age_days / reviewed_at 复核静默偏差一个 UTC 偏移。
+    实测同一合法 UTC 输入在 +0800 下 EXIT=5、在 TZ=UTC 下翻转 EXIT=0。
+    用 datetime.now(tz) 取 aware 再 replace(tzinfo=None)；绝不对 naive dt
+    裸调 astimezone()（会触发 TypeError 打碎 EXIT 契约）。
+    """
+    return datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
+
+
 def parse_dt(s):
     """解析时间字符串；非字符串输入一律返回 None（不抛异常）。
 
@@ -62,14 +75,19 @@ def parse_dt(s):
     """
     if not isinstance(s, str):
         return None
-    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S+08:00", "%Y-%m-%d"):
+    # R2 回补：新增两种 naive ISO 格式。此前仅认带偏移/纯日期，
+    # "2026-11-10T12:00:00" 全不匹配 → None → 台账循环静默 continue，
+    # 一条 fatal/severe 证伪发现被吞掉（实测仅差一个 Z 后缀即 1 条→0 条）。
+    # naive 串按本包既有 +08 语境解释，与 canonicalize 后基准一致。
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S+08:00",
+                "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
             dt = datetime.strptime(s.strip(), fmt)
             # T-C3（R2 · 2026-11-15）：显式 canonicalize 到 +08:00 再转 naive。
             # 旧实现直接 dt.replace(tzinfo=None) 对 Z/+0000/-05:00 等带偏移输入
-            # 静默丢弃偏移量 → 与 datetime.now()（+08 naive）混比时 late_fatal 漏报、
-            # age_days 偏差 8h。显式指定目标时区（不依赖系统本地时区，确定性），
-            # 且全程仅在 dt 已带 tzinfo 时调用 astimezone，绝不对 naive dt 裸调用
+            # 静默丢弃偏移量 → 与 now_canonical()（+08 naive）混比时 late_fatal
+            # 漏报、age_days 偏差 8h。比较侧 now() 亦已统一到同基准（见上）。
+            # 仅在 dt 已带 tzinfo 时调用 astimezone，绝不对 naive dt 裸调用
             # astimezone()（否则会触发 naive/aware TypeError 打碎 EXIT 契约）。
             if dt.tzinfo is not None:
                 dt = dt.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
@@ -169,7 +187,7 @@ def check_disposition(state_p: Path, late_fatal: list, hyp_updated: datetime,
     notes.append("全部 fatal/severe 闭环发现已处置")
     if age_days > max_age:
         rev = parse_dt(obj.get("reviewed_at", ""))
-        if rev is None or rev < hyp_updated or (datetime.now() - rev).days > max_age:
+        if rev is None or rev < hyp_updated or (now_canonical() - rev).days > max_age:
             return False, [f"假说池 {age_days} 天未更新，reviewed_at 缺失/过期/早于池更新"] + notes
         notes.append(f"例行复核有效（reviewed_at={obj.get('reviewed_at')}）")
     return True, notes
@@ -258,6 +276,11 @@ def main() -> int:
         closed_raw = row.get("closed_date") or ""
         cd = parse_dt(closed_raw)
         if cd is None:
+            # R2 回补：非空但无法解析的 closed_date 不再静默吞掉——
+            # 该行本可能是 fatal/severe 证伪发现，漏读即门禁漏报。
+            if closed_raw:
+                print(f"⚠️  closed_date 无法解析，跳过该行: "
+                      f"finding_id={fid} closed_date={closed_raw!r}", file=sys.stderr)
             continue
         # H2 修复（审计 2026-10-15）：closed_date 为纯日期时按"同日即算晚于"（避免同日晚闭环漏报）
         if len(_row_str(closed_raw).strip()) <= 10:
@@ -266,7 +289,7 @@ def main() -> int:
         elif cd > hyp_updated:
             late_fatal.append(row)
 
-    age_days = (datetime.now() - hyp_updated).days
+    age_days = (now_canonical() - hyp_updated).days
     # T-B3 配套：漂移条目（含非 dict）已告警放行，此处须容错防 .get 崩溃
     active = [h for h in hyp.get("active_hypotheses", []) if isinstance(h, dict) and h.get("status") != "deprecated"]
     deprecated = [h for h in hyp.get("active_hypotheses", []) if isinstance(h, dict) and h.get("status") == "deprecated"]
