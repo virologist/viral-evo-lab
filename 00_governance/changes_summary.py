@@ -6,7 +6,7 @@ R7: 变更影响分析卡片（archivist 启动时跑 git diff --stat 自动列 
         + changes_summary_<date>.json（机器读）
 - 触发：4 仓任一有未提交/未推送时，或每周一次手动
 """
-import json, subprocess, sys
+import json, subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -45,7 +45,9 @@ def analyze(repo_name, repo_path):
             "type": "CLAUDE_M_check",
             "section_7_found": in_section_7,
             "modules_in_file": mods,
-            "m19_m20_m21_present": all(f"M{n}" in mods for n in ["19","20","21"])
+            # R2 全库排查修复：mods 来自 findall(r"M(\d+[a-z]?)")，元素不含 M 前缀，
+            # 原 f"M{n}" in mods 恒为 False（模块检查形同虚设）。
+            "m19_m20_m21_present": all(n in mods for n in ["19","20","21"])
         })
     return out
 
