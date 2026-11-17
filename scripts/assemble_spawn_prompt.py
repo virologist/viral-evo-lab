@@ -298,7 +298,8 @@ def load_plugin(expert_dir: Path) -> dict:
         if c.is_file():
             try:
                 return json.loads(c.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as e:
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                # R3.2：非 UTF-8 plugin.json 与解析失败同通道（既有码 3）。
                 log(f"❌ plugin.json 解析失败：{c} -> {e}")
                 sys.exit(3)
     log(f"❌ 未找到 plugin.json， searched: {[str(c) for c in candidates]}")
@@ -322,7 +323,13 @@ def load_member_md(expert_dir: Path, member_id: str) -> str:
     if not md.is_file():
         log(f"❌ 成员 MD 不存在：{md}")
         sys.exit(3)
-    return md.read_text(encoding="utf-8")
+    try:
+        return md.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        # R3.2（2026-11-17 第二轮盲检回补）：非 UTF-8 成员 MD 此前 traceback
+        # + EXIT=1。按「MD 无效」同通道转既有码 3。
+        log(f"❌ 成员 MD 非 UTF-8 编码，无法读取：{md}（{e}）")
+        sys.exit(3)
 
 
 def parse_frontmatter(md_text: str) -> tuple[dict, str]:
@@ -503,8 +510,15 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
     # 成员 MD 已去重——9 份复制粘贴段收敛为单一事实源，每 spawn 省 ~1.2KB 重复）
     tc = expert_dir / "skills/viral-evo-core/references/team-contract.md"
     if tc.is_file():
+        try:
+            tc_text = tc.read_text(encoding="utf-8").rstrip()
+        except UnicodeDecodeError as e:
+            # R3.2（2026-11-17 第二轮盲检回补）：非 UTF-8 契约正本此前 traceback
+            # + EXIT=1。契约注入属增强项（缺失时本就静默跳过），解码失败降级为
+            # 提示行，装配产物保持完整、EXIT 契约不破。
+            tc_text = f"（⚠ 契约正本非 UTF-8 无法注入：{e}）"
         lines.append("=" * 20 + " 团队契约（全员同版） " + "=" * 20)
-        lines.append(tc.read_text(encoding="utf-8").rstrip())
+        lines.append(tc_text)
         lines.append("=" * 20 + " 团队契约结束 " + "=" * 20)
         lines.append("")
 

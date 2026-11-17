@@ -106,7 +106,10 @@ def load_json_obj(path: Path) -> tuple[dict | None, str]:
     """
     try:
         raw = path.read_text(encoding="utf-8")
-    except OSError as e:
+    except (OSError, UnicodeDecodeError) as e:
+        # R3.2（2026-11-17 第二轮盲检回补）：非 UTF-8 JSON 池/处置台账此前
+        # UnicodeDecodeError traceback + EXIT=1（load_json_obj 是三消费点统一
+        # 入口，一处补齐全覆盖）。解码失败按「读取失败」同通道转契约码。
         return None, f"读取失败: {type(e).__name__}: {e}"
     try:
         obj = json.loads(raw)

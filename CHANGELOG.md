@@ -4,6 +4,23 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.17] - 2026-11-17（R3 盲检回补 · R3.2）
+
+> R3 重启第一轮盲检（v1.5.16）FAIL 3🔴——UnicodeDecodeError 捕获面同类残留 4 处裸读点（假说池/state/成员 MD/plugin.json+team-contract），主代理逐一独立复现。计数再归零，回补后重启。
+
+### Fixed
+- **🔴 hypothesis_watch `load_json_obj`**：捕获面补 `UnicodeDecodeError`（假说池+state 两消费点一处补齐全覆盖）→ 契约码 3。
+- **🔴 assemble_spawn_prompt `load_member_md`**：非 UTF-8 成员 MD → 既有「MD 无效」码 3。
+- **🔴 assemble_spawn_prompt `load_plugin`**：捕获面补 `UnicodeDecodeError` → 既有码 3。
+- **🔴 assemble_spawn_prompt team-contract 裸读**：契约注入属增强项，解码失败降级为提示行（装配完整、EXIT=0），与「缺失时静默跳过」既有语义对齐。
+
+### Added
+- **⑪ 回归断言**：五场景非 UTF-8 fixture 逐一断言契约码/降级行为 + 零 traceback（机器锚 61/61 不变）。
+- 如实登记：🟠 hypothesis_watch 畸形 state 两分支语义口径（主路径 6 / extract 分支 AttributeError）待统一；🟡 validate_contracts/check_decision_records 裸读双标——均未达 🔴 线，列入 backlog 不阻塞冻结。
+
+### Changed
+- 四处 version = **1.5.17**；manifest 重生成；包外锚受控刷新；全量验证 pytest **19** / fuzz **61/61** / 守卫 **11/11**。R3 计数再归零 0/2。
+
 ## [1.5.16] - 2026-11-17（R3 盲检回补 · R3.1）
 
 > R3 第一轮独立盲检（v1.5.15）FAIL 3🔴——同一根因（UnicodeDecodeError 未入捕获面）三实例，均由盲检以独立 fixture 首次复现、主代理独立复现确认。R3 收敛计数归零，本轮回补后重启。另如实声明：🟡 log_spawn 的 member 参数仍未校验（下游消费端兜底，CHANGELOG 1.5.15 口径有落差，已在 F2 语义上收窄为「task_id 已校验、member 未校验」）。

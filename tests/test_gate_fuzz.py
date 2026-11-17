@@ -677,6 +677,66 @@ def test_tc3_timezone_canonicalize() -> None:
         assert "Traceback" not in out, f"assemble 二进制任务包崩溃: {out[:200]}"
         assert p.returncode == 3, f"任务包无效须 EXIT=3，实为 {p.returncode}"
 
+        # ⑪ R3.2（2026-11-17 第二轮盲检回补）：JSON 池/处置台账/成员 MD/plugin.json/
+        # team-contract 五个裸读点——UnicodeDecodeError 须转契约码，零 traceback。
+        import shutil as _shutil
+        bad_bin = d / "bad.bin"
+        bad_bin.write_bytes(b"\x00\xff binary")
+
+        # a) hypothesis_watch JSON 池（load_json_obj 通道）
+        ro2 = d / "ro2"
+        (ro2 / "context_stack").mkdir(parents=True)
+        (ro2 / "00_governance").mkdir(parents=True)
+        (ro2 / "00_governance" / "redteam_ledger.csv").write_text("x\n", encoding="utf-8")
+        _shutil.copyfile(bad_bin, ro2 / "context_stack" / "confirmed_hypotheses.json")
+        p = subprocess.run([sys.executable, str(hw_path), "--research-ops", str(ro2)],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), "hw 假说池二进制崩溃"
+        assert p.returncode == 3, f"假说池非 UTF-8 须 EXIT=3，实为 {p.returncode}"
+
+        # b) hypothesis_watch state（load_json_obj 通道二）
+        (ro2 / "context_stack" / "confirmed_hypotheses.json").write_text(
+            '{"last_updated":"2026-11-16","active_hypotheses":[]}\n', encoding="utf-8")
+        _shutil.copyfile(bad_bin, ro2 / "00_governance" / "hypothesis_watch_state.json")
+        p = subprocess.run([sys.executable, str(hw_path), "--research-ops", str(ro2)],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), "hw state 二进制崩溃"
+        assert p.returncode in (0, 5, 6), f"state 畸形须保守契约码，实为 {p.returncode}"
+
+        # c/d/e) assemble：成员 MD / plugin.json / team-contract
+        y = d / "expert"
+        (y / ".codebuddy-plugin").mkdir(parents=True)
+        (y / "agents").mkdir()
+        (y / "skills/viral-evo-core/references").mkdir(parents=True)
+        (y / ".codebuddy-plugin" / "plugin.json").write_text(
+            '{"teamInfo":{"memberAgents":["phylo-analyst"]}}', encoding="utf-8")
+        _shutil.copyfile(bad_bin, y / "agents" / "phylo-analyst.md")
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "assemble_spawn_prompt.py"),
+                            "--member", "phylo-analyst", "--expert-dir", str(y)],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), "assemble 成员 MD 二进制崩溃"
+        assert p.returncode == 3, f"成员 MD 非 UTF-8 须 EXIT=3，实为 {p.returncode}"
+
+        (y / "agents" / "phylo-analyst.md").write_text("# m\n", encoding="utf-8")
+        _shutil.copyfile(bad_bin, y / ".codebuddy-plugin" / "plugin.json")
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "assemble_spawn_prompt.py"),
+                            "--member", "phylo-analyst", "--expert-dir", str(y)],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), "assemble plugin.json 二进制崩溃"
+        assert p.returncode == 3, f"plugin.json 非 UTF-8 须 EXIT=3，实为 {p.returncode}"
+
+        (y / ".codebuddy-plugin" / "plugin.json").write_text(
+            '{"teamInfo":{"memberAgents":["phylo-analyst"]}}', encoding="utf-8")
+        _shutil.copyfile(bad_bin, y / "skills/viral-evo-core/references/team-contract.md")
+        task_ok = d / "ok_task.md"
+        task_ok.write_text("# 任务\n内容\n", encoding="utf-8")
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "assemble_spawn_prompt.py"),
+                            "--member", "phylo-analyst", "--expert-dir", str(y),
+                            "--task-file", str(task_ok)],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), "assemble team-contract 二进制崩溃"
+        assert p.returncode == 0, f"契约非 UTF-8 应降级不阻断，实为 {p.returncode}"
+
 
 def test_gate_mode_blocks() -> None:
     """L3（2026-11-09）：gate_mode 行为回归——阻断信号必须传导。
