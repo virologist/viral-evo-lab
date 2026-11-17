@@ -640,6 +640,43 @@ def test_tc3_timezone_canonicalize() -> None:
     finally:
         gen_manifest.write_bytes(m_bak)
 
+    # ⑩ R3.1（2026-11-17 盲检回补）：非 UTF-8 输入三入口须走契约码，零 traceback。
+    #    同根因（UnicodeDecodeError 未入捕获面）三实例：check_gates sidecar /
+    #    hypothesis_watch 台账 / assemble_spawn_prompt --task-file。
+    with tempfile.TemporaryDirectory(prefix="r3_uni_") as td:
+        d = Path(td)
+        rd = d / "rd"
+        rd.mkdir()
+        (rd / "T-S__m.md").write_text("artifact\n", encoding="utf-8")
+        (rd / "T-S__workflow.json").write_bytes(b"\x00\xff binary sidecar")
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "check_gates.py"),
+                            str(rd), "T-S"], capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, f"check_gates 二进制 sidecar 崩溃: {out[:200]}"
+        assert p.returncode in (0, 3, 5), f"check_gates 须走契约码，实为 {p.returncode}"
+        assert (rd / "T-S__gates.json").is_file(), "G1 起点崩溃导致 gates.json 未落盘"
+
+        ro = d / "ro"
+        (ro / "context_stack").mkdir(parents=True)
+        (ro / "00_governance").mkdir(parents=True)
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text(
+            '{"last_updated":"2026-11-16","active_hypotheses":[]}\n', encoding="utf-8")
+        (ro / "00_governance" / "redteam_ledger.csv").write_bytes(b"\x00\xff binary ledger")
+        p = subprocess.run([sys.executable, str(hw_path), "--research-ops", str(ro)],
+                           capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, f"hypothesis_watch 二进制台账崩溃: {out[:200]}"
+        assert p.returncode == 3, f"证据源畸形须 EXIT=3，实为 {p.returncode}"
+
+        bad_tf = d / "bad_task.md"
+        bad_tf.write_bytes(b"\x00\xff binary task")
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "assemble_spawn_prompt.py"),
+                            "--member", "literature-scout", "--task-file", str(bad_tf)],
+                           capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, f"assemble 二进制任务包崩溃: {out[:200]}"
+        assert p.returncode == 3, f"任务包无效须 EXIT=3，实为 {p.returncode}"
+
 
 def test_gate_mode_blocks() -> None:
     """L3（2026-11-09）：gate_mode 行为回归——阻断信号必须传导。

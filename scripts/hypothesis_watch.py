@@ -262,7 +262,9 @@ def main() -> int:
     try:
         with led_p.open(encoding="utf-8-sig") as f:
             rows = list(csv.DictReader(f))
-    except (OSError, csv.Error) as e:
+    except (OSError, csv.Error, UnicodeDecodeError) as e:
+        # R3.1（2026-11-17 盲检回补）：非 UTF-8 台账此前 UnicodeDecodeError
+        # traceback + EXIT=1，违反「证据源畸形 → EXIT=3」契约（CSV 路径漏网）。
         print(f"❌ 台账读取失败: {type(e).__name__}: {e}", file=sys.stderr)
         return 3
     for row in rows:

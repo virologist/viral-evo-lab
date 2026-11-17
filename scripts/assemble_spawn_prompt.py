@@ -538,7 +538,8 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
                 inj.append(f"- 权威源：{hyp}")
                 inj.append("- 任务产出中的关键数字（n=/百分比/p=/D′值）必须能在权威源 CSV 中 grep 到；"
                            "找不到 = 标注[待人工核验]，禁止直接当作事实陈述")
-            except (OSError, json.JSONDecodeError) as e:
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+                # R3.1（2026-11-17 盲检回补）：非 UTF-8 假说池同前，跳过注入不炸装配。
                 log(f"confirmed_hypotheses.json 解析失败，跳过注入：{e}")
         if kidx.is_file():
             inj.append(f"- 知识地图（结论→证据链→文件路径）：{kidx}")
@@ -703,7 +704,13 @@ def main() -> int:
         if not tf.is_file():
             log(f"❌ 任务包文件不存在：{tf}")
             return 3
-        task_text = tf.read_text(encoding="utf-8")
+        try:
+            task_text = tf.read_text(encoding="utf-8")
+        except UnicodeDecodeError as e:
+            # R3.1（2026-11-17 盲检回补）：非 UTF-8 任务包此前 traceback + EXIT=1。
+            # 按既有「任务包不存在=3」同通道：读不了=任务包无效。
+            log(f"❌ 任务包非 UTF-8 编码，无法读取：{e}")
+            return 3
 
         if args.check_task_package:
             ok, problems, mode = check_task_package_auto(

@@ -4,6 +4,23 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.16] - 2026-11-17（R3 盲检回补 · R3.1）
+
+> R3 第一轮独立盲检（v1.5.15）FAIL 3🔴——同一根因（UnicodeDecodeError 未入捕获面）三实例，均由盲检以独立 fixture 首次复现、主代理独立复现确认。R3 收敛计数归零，本轮回补后重启。另如实声明：🟡 log_spawn 的 member 参数仍未校验（下游消费端兜底，CHANGELOG 1.5.15 口径有落差，已在 F2 语义上收窄为「task_id 已校验、member 未校验」）。
+
+### Fixed
+- **🔴 check_gates.py `load_workflow_sidecar`**：非 UTF-8 sidecar → UnicodeDecodeError traceback → G1 起点即崩、gates.json 不落盘、六门全失效。补捕获转「sidecar 解析失败」同通道（G1 FAIL 语义），gates.json 照常落盘。
+- **🔴 hypothesis_watch.py 台账读取**：非 UTF-8 台账 → traceback + EXIT=1，违反「证据源畸形 → EXIT=3」契约（CSV 路径漏网）。补 `UnicodeDecodeError` 入 `(OSError, csv.Error)` 捕获面 → EXIT=3。
+- **🔴 assemble_spawn_prompt.py 两入口**：`--task-file` 裸读与假说池注入裸读 → traceback + EXIT=1。前者转「任务包无效」既有码 3；后者并入既有跳过注入通道（不炸装配）。
+
+### Added
+- **⑩ 回归断言**（复用既有函数，机器锚 61/61 不变）：三入口非 UTF-8 fixture 逐一断言契约码 + 零 traceback + gates.json 落盘（check_gates）。
+
+### Changed
+- 四处 version = **1.5.16**；manifest 重生成；包外锚受控刷新。
+- 全量验证：pytest **19 passed** / fuzz **61/61** / 守卫 **11/11**。
+- R3 收敛计数重启 0/2（连续两轮独立零🔴 才冻结）。
+
 ## [1.5.15] - 2026-11-17（R3 回补轮 · F1/F2/B-3 闭合）
 
 > R2 重启第一轮盲检（v1.5.14）FAIL 2🔴 + 🟠1，按 R2_SUMMARY §5 建议开 R3 一次性闭合。B-2 字符集按呈报推荐 `[A-Za-z0-9][A-Za-z0-9_-]*` 落地（默认假设，与存量 T-20261015-M2/T-FUZZ 等完全兼容，可推翻）。

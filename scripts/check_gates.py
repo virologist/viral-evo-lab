@@ -164,7 +164,10 @@ def load_workflow_sidecar(run_dir: Path, task_id: str) -> tuple[dict | None, str
         return None, ""
     try:
         obj = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+        # R3.1（2026-11-17 盲检回补）：非 UTF-8 sidecar 此前 UnicodeDecodeError
+        # traceback → G1 起点即崩、gates.json 不落盘、六门全失效。解码失败按
+        # 「sidecar 解析失败」同通道处理（G1 FAIL 语义），不再炸主流程。
         return None, f"sidecar 解析失败: {type(e).__name__}: {e}"
     if not isinstance(obj, dict):
         return None, f"sidecar 顶层须为对象（实为 {type(obj).__name__}）"
