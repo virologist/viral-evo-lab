@@ -95,6 +95,15 @@ def main() -> int:
     ap.add_argument("--require-tag", action="store_true",
                     help="严审模式：透传 verify_numbers.load_sources，未标记权威源一律拒收（默认关闭，向后兼容）")
     args = ap.parse_args()
+    # R3（2026-11-17 · F2 修复）：task_id 拼路径前白名单校验——{task_id}__
+    # 直接进 glob/写盘文件名，含 "/" / ".." 可越界读写（盲检已复现读 run_dir 外
+    # 文件报 OK）。白名单 [A-Za-z0-9][A-Za-z0-9_-]* 与存量形态（T-20261015-M2、
+    # T-FUZZ 等）完全兼容；显式拒绝路径成分与 shell 元字符。
+    import re as _re
+    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.task_id):
+        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头）: "
+              f"{args.task_id!r}", file=sys.stderr)
+        return 2
 
     run_dir = Path(args.run_dir)
     if not run_dir.is_dir():

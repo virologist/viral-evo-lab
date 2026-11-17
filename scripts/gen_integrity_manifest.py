@@ -11,7 +11,7 @@
 
 用法：
     python3 scripts/gen_integrity_manifest.py            # 生成并覆盖 integrity_manifest.json
-    python3 scripts/gen_integrity_manifest.py --check    # 只校验不写（exit 1 = 清单过期；2 = git 不可用）
+    python3 scripts/gen_integrity_manifest.py --check    # 只校验不写（exit 1 = 清单过期；2 = git 不可用；3 = 清单损坏）
     python3 scripts/gen_integrity_manifest.py --help     # 打印帮助（只读）
 
 R2 回补（2026-11-15）：原 main() 仅判断 "--check" in sys.argv，任何未知参数
@@ -80,10 +80,19 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description="完整性清单：以 git ls-files 为唯一真源生成/校验 integrity_manifest.json")
     ap.add_argument("--check", action="store_true",
-                    help="只校验不写（EXIT 1 = 清单过期；2 = git 不可用）")
+                    help="只校验不写（EXIT 1 = 清单过期；2 = git 不可用；3 = 清单文件损坏/结构畸形）")
     args = ap.parse_args()
     if args.check:
-        old = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        try:
+            old = json.loads(MANIFEST.read_text(encoding="utf-8"))
+            if not isinstance(old, dict) or not isinstance(old.get("files"), dict):
+                raise ValueError("清单顶层须为对象且含 files 字典")
+        except (OSError, json.JSONDecodeError, ValueError) as e:
+            # B-3（R3 · 2026-11-17）：损坏清单此前直接 traceback + EXIT=1（与
+            # 「1 = 清单过期」撞车，语义混淆）。清单损坏 ≠ 过期，转独立契约码 3。
+            print(f"❌ integrity_manifest.json 损坏或结构畸形（{type(e).__name__}: {e}）"
+                  f"——请重生成：python3 scripts/{Path(sys.argv[0]).name}", file=sys.stderr)
+            return 3
         new = build()
         # 只比对文件字典内容，忽略 generated 时间戳
         if old.get("files") != new["files"]:

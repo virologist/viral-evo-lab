@@ -31,7 +31,7 @@ import argparse
 import csv
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # authorization_matrix.md §四 规定的六列；§三 有 tier=强制升级，台账实测另有通知档/执行档
@@ -44,14 +44,32 @@ EXIT_CONTENT = 5
 EXIT_STALE = 6
 
 
+def now_canonical() -> datetime:
+    """R3（2026-11-17 · F1 修复）：统一时间基准到 +08:00 naive。
+
+    与 hypothesis_watch.now_canonical 同范式（PK-R2-001）。旧实现
+    datetime.now().astimezone() 依赖系统本地时区，与 naive 输入按本地解释的
+    parse_ts 相减时，跨 TZ 主机 age_days 整数边界翻转（实测同一台账在 UTC 判
+    13 天 HEALTHY/EXIT=0、在 Asia/Shanghai 判 14 天 STALE/EXIT=6）。
+    """
+    return datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
+
+
 def parse_ts(raw: str) -> datetime | None:
-    """ISO8601 解析；兼容尾部 Z。naive 时间按本地时区处理（台账历史条目均无时区时）。"""
+    """ISO8601 解析（fromisoformat 原生支持 Z/+HH:MM 后缀）；返回 +08 naive。
+
+    R3（2026-11-17 · F1 修复）：旧实现 naive 输入裸调 d.astimezone() 按系统
+    本地时区解释 → 同一台账跨 TZ 裁决翻转（PK-R2-001 同构复发）。现改为：
+    aware 输入（Z/+00:00/-05:00 等）显式 canonicalize 到 +08:00 再转 naive；
+    naive 输入按本包既有 +08 语境直接解释（不依赖系统本地时区）。
+    绝不对 naive dt 裸调 astimezone()。
+    """
     try:
         d = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
     except (ValueError, TypeError, AttributeError):
         return None
-    if d.tzinfo is None:
-        d = d.astimezone()  # 依赖系统本地时区，避免与 aware 时间比较时抛 TypeError
+    if d.tzinfo is not None:
+        d = d.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
     return d
 
 
@@ -143,7 +161,8 @@ def audit(path: Path, min_entries: int, max_age_days: int | None,
     if parsed_times:
         rep["newest"] = max(parsed_times).isoformat(timespec="seconds")
         rep["oldest"] = min(parsed_times).isoformat(timespec="seconds")
-        age = (datetime.now().astimezone() - max(parsed_times)).days
+        # R3（F1）：比较基准与 parse_ts 输出同为 +08 naive，跨 TZ 主机裁决一致
+        age = (now_canonical() - max(parsed_times)).days
         rep["age_days"] = age
 
     # 结构层：条目数下限

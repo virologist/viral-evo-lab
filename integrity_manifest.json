@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-15T10:45:05",
+ "generated": "2026-11-17T14:16:03",
  "file_count": 79,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "b7058c1c6d5221b9",
+   "sha16": "58c458de00051345",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "9b6771bcd956a788",
+   "sha16": "88f466078d664ec0",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "b9f6398f157074fc",
+   "sha16": "7a83742d8874f599",
    "bytes": 6722
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "53e950abc424df74",
-   "bytes": 66262
+   "sha16": "737c2ea8096f5403",
+   "bytes": 68438
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
@@ -163,12 +163,12 @@
    "bytes": 6211
   },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "49b773cb4627bacc",
-   "bytes": 36703
+   "sha16": "0330dd0f87aaf3a1",
+   "bytes": 37197
   },
   "scripts/audit_decision_log.py": {
-   "sha16": "2699672da8dd256a",
-   "bytes": 9156
+   "sha16": "8a52b91e7add991b",
+   "bytes": 10185
   },
   "scripts/check_baseline_anchors.py": {
    "sha16": "689986667c35ef21",
@@ -179,8 +179,8 @@
    "bytes": 8464
   },
   "scripts/check_gates.py": {
-   "sha16": "71f0a9a11acbb3f3",
-   "bytes": 40435
+   "sha16": "226c246a3cef7311",
+   "bytes": 41084
   },
   "scripts/check_scope.py": {
    "sha16": "ceef1f53da27b57f",
@@ -195,8 +195,8 @@
    "bytes": 5412
   },
   "scripts/gen_integrity_manifest.py": {
-   "sha16": "e94910326383ea84",
-   "bytes": 4658
+   "sha16": "b819e9b89d9e334d",
+   "bytes": 5388
   },
   "scripts/guard_readonly.py": {
    "sha16": "f033b0f9657f89a9",
@@ -211,12 +211,12 @@
    "bytes": 2873
   },
   "scripts/log_spawn.py": {
-   "sha16": "c87b18e66c008378",
-   "bytes": 2723
+   "sha16": "de45de0fab19ee09",
+   "bytes": 3372
   },
   "scripts/poll_run_dir.py": {
-   "sha16": "76530f91e2dbf026",
-   "bytes": 11440
+   "sha16": "755085ace300b8cc",
+   "bytes": 12089
   },
   "scripts/reconcile_decisions.py": {
    "sha16": "4ca61cf5f337c46e",
@@ -235,16 +235,16 @@
    "bytes": 6620
   },
   "scripts/verify_member_output.py": {
-   "sha16": "2e52ec53f43b804d",
-   "bytes": 8382
+   "sha16": "883bcb5a79ae4b1b",
+   "bytes": 9031
   },
   "scripts/verify_numbers.py": {
    "sha16": "19f82cae28887db2",
    "bytes": 8508
   },
   "scripts/write_checklist.py": {
-   "sha16": "023ecd03203360ba",
-   "bytes": 3717
+   "sha16": "8852713731c93af8",
+   "bytes": 4367
   },
   "settings.json": {
    "sha16": "d74fcffe455cd1b8",
@@ -303,8 +303,8 @@
    "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "6892e4e8c10f2863",
-   "bytes": 71822
+   "sha16": "a9217674efe18088",
+   "bytes": 75645
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

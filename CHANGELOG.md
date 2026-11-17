@@ -4,6 +4,23 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.15] - 2026-11-17（R3 回补轮 · F1/F2/B-3 闭合）
+
+> R2 重启第一轮盲检（v1.5.14）FAIL 2🔴 + 🟠1，按 R2_SUMMARY §5 建议开 R3 一次性闭合。B-2 字符集按呈报推荐 `[A-Za-z0-9][A-Za-z0-9_-]*` 落地（默认假设，与存量 T-20261015-M2/T-FUZZ 等完全兼容，可推翻）。
+
+### Fixed
+- **🔴 F1 audit_decision_log 跨 TZ 裁决翻转**：`parse_ts` naive 输入裸 `astimezone()` 按系统本地时区解释 + `datetime.now().astimezone()` → 同一台账 UTC 判 13 天 HEALTHY/EXIT=0、Asia/Shanghai 判 14 天 STALE/EXIT=6（PK-R2-001 同构复发）。复用 `now_canonical()` 范式：aware 输入显式 canonicalize 到 +08 naive、naive 按 +08 语境解释、比较侧统一基准；实测三 TZ 环境 EXIT/age/verdict 完全一致。
+- **🔴 F2 task_id 路径穿越（6 脚本）**：`check_gates.py` / `verify_member_output.py` / `poll_run_dir.py` / `write_checklist.py` / `log_spawn.py` / `assemble_spawn_prompt.py(--task-id)` 在拼路径/落记录前统一白名单校验 `[A-Za-z0-9][A-Za-z0-9_-]*`；非法走各脚本参数错误码（2 或 5），实测 `../escape` 六连拒、零越界读写。log_spawn 虽只写 JSONL 记录不拼文件名，仍校验（防下游消费端把记录当路径）。
+- **🟠 B-3 gen_integrity_manifest --check 损坏清单**：`json.loads` 无保护 → traceback + EXIT=1（与「1=清单过期」撞车）。加捕获 + 顶层结构校验，转独立契约码 **EXIT=3**（清单损坏 ≠ 过期）；docstring 用法行与 --help 同步。
+
+### Added
+- **R3 回归集合**：`test_tc3_timezone_canonicalize` 内追加 ⑦F1 跨 TZ 一致性（动态时间基准）⑧F2 六脚本 `../escape` 负例（断言拒收码 + 零越界文件）⑨B-3 损坏清单 EXIT=3（finally 恢复）。仍保持 `45 CASES + 16 行为级 = 61/61` 机器锚不变。
+
+### Changed
+- 四处 version = **1.5.15**；`integrity_manifest.json` 重生成；包外锚受控刷新。
+- 全量验证：pytest **19 passed** / fuzz **61/61** / 守卫 **11/11** / manifest `--check` OK。
+- R3 收敛计数：连续两轮独立零🔴 盲检后冻结（见 `viral-evo-lab-audit/R3_SUMMARY.md`）。
+
 ## [1.5.14] - 2026-11-15（R2 第二轮盲检证伪 · 回补轮）
 
 > **收敛判定：v1.5.13 不收敛。** R2 第一轮独立盲检 ZERO 🔴（PASS），第二轮独立盲检（换 lite 模型突破 429）返回 **FAIL / 3🔴**；三条均已由主代理用独立 `/tmp` 夹具复现确认。按 R2 铁律「连续两轮独立零🔴 才冻结」，连续零🔴 计数归零，回补后重启盲检轮。1.5.13 段有关收敛预期的表述属历史原文，保留不改，以本段作证伪标注。

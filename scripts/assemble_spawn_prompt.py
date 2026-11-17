@@ -661,6 +661,14 @@ def main() -> int:
     ap.add_argument("--list-members", action="store_true",
                     help="列出白名单成员 ID 后退出")
     args = ap.parse_args()
+    # R3（2026-11-17 · F2 修复）：--task-id 可选；提供时拼 sidecar 文件名
+    # <task_id>__workflow.json，同受白名单约束（防 ../ 越界落盘）。
+    if args.task_id:
+        import re as _re
+        if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.task_id):
+            print(f"❌ --task-id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头）: "
+                  f"{args.task_id!r}", file=sys.stderr)
+            return 2
 
     expert_dir = resolve_expert_dir(args.expert_dir)
     plugin = load_plugin(expert_dir)

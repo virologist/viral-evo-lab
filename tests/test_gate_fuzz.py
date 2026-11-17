@@ -573,6 +573,73 @@ def test_tc3_timezone_canonicalize() -> None:
         f"--help 须打印帮助且 EXIT=0: {p.returncode} {p.stdout[:200]}"
     assert manifest.read_bytes() == before, "--help 不得写盘（否则可静默洗白基线）"
 
+    # ── R3 回补回归集合（⑦⑧⑨，2026-11-17）──────────────────────────
+    # 同策略：复用本函数追加断言，不动机器锚计数。
+    import re as _re2
+
+    # ⑦ F1：audit_decision_log naive 台账跨 TZ 裁决一致性。
+    #    回退形态：parse_ts 裸 astimezone() + now().astimezone() → UTC 判 13 天
+    #    HEALTHY/0、Shanghai 判 14 天 STALE/6。修复后三环境同 EXIT 同 age。
+    #    动态构造：ts=now-16d+8h 的 naive 串（age 恰在 13 阈值之上的边界区）。
+    adl_path = PKG / "scripts" / "audit_decision_log.py"
+    adl_spec = importlib.util.spec_from_file_location("_adl_r3", adl_path)
+    adl = importlib.util.module_from_spec(adl_spec)
+    adl_spec.loader.exec_module(adl)
+    ts_naive = (adl.now_canonical() - _td(days=16, hours=-8)).strftime("%Y-%m-%dT%H:%M:%S")
+    with tempfile.TemporaryDirectory(prefix="r3_f1_") as td:
+        d = Path(td)
+        (d / "decision_log.csv").write_text(
+            "ts,actor,decision_type,decision,rationale,tier\n"
+            f"{ts_naive},tester,route,approve,r3-f1-regression,通知档\n", encoding="utf-8")
+        rcs = []
+        for tz in ("UTC", "Asia/Shanghai"):
+            p = subprocess.run([sys.executable, str(adl_path), str(d / "decision_log.csv"),
+                                "--max-age-days", "13", "--json"],
+                               capture_output=True, text=True, timeout=60,
+                               env=dict(_os.environ, TZ=tz))
+            rep = json.loads(p.stdout)
+            rcs.append((tz, p.returncode, rep["age_days"], rep["verdict"]))
+        assert len({(c, a) for _, c, a, _ in rcs}) == 1, f"跨 TZ 裁决翻转: {rcs}"
+        # age=16±1（now-16d+8h 的 naive 串，跨日边界 ±1 属正常），核心断言=跨 TZ 一致 + STALE
+        assert rcs[0][3] == "STALE" and 15 <= rcs[0][2] <= 17, f"动态基准偏移: {rcs}"
+
+    # ⑧ F2：task_id 白名单——六脚本对 ../ 形态一律参数错误码，不产生越界文件。
+    with tempfile.TemporaryDirectory(prefix="r3_f2_") as td:
+        d = Path(td)
+        rd = d / "rd"
+        rd.mkdir()
+        (d.parent / "probe_marker").touch() if False else None
+        evil_dir = d / "escape"
+        evil_dir.mkdir()
+        probes = [  # (脚本, 参数样式, 期望 rc)
+            ("check_gates.py", 2, 2), ("verify_member_output.py", 2, 2),
+            ("poll_run_dir.py", 5, 5), ("write_checklist.py", 2, 2),
+            ("log_spawn.py", 2, 2),
+        ]
+        for script, _, want_rc in probes:
+            sp = PKG / "scripts" / script
+            p = subprocess.run([sys.executable, str(sp), str(rd), "../escape"],
+                               capture_output=True, text=True, timeout=60)
+            out = p.stdout + p.stderr
+            assert "Traceback" not in out, f"{script} 对恶意 task_id 崩溃: {out[:200]}"
+            assert p.returncode == want_rc, \
+                f"{script} 须拒收 ../escape（期望 {want_rc}），实为 {p.returncode}"
+        # 无越界文件落在 rd 与 escape 目录
+        assert not list(rd.iterdir()), "rd 被越界写入"
+        assert not list(evil_dir.iterdir()), "escape 目录被越界写入"
+
+    # ⑨ B-3：gen_integrity_manifest --check 对损坏清单走 EXIT=3，零 traceback。
+    gen_manifest = PKG / "integrity_manifest.json"
+    m_bak = gen_manifest.read_bytes()
+    try:
+        gen_manifest.write_bytes(b"{ broken")
+        p = subprocess.run([sys.executable, str(gen), "--check"],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 3 and "Traceback" not in p.stderr, \
+            f"损坏清单须 EXIT=3 无 traceback，实为 rc={p.returncode}"
+    finally:
+        gen_manifest.write_bytes(m_bak)
+
 
 def test_gate_mode_blocks() -> None:
     """L3（2026-11-09）：gate_mode 行为回归——阻断信号必须传导。
