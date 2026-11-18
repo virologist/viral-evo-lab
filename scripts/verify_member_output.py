@@ -100,8 +100,8 @@ def main() -> int:
     # 文件报 OK）。白名单 [A-Za-z0-9][A-Za-z0-9_-]* 与存量形态（T-20261015-M2、
     # T-FUZZ 等）完全兼容；显式拒绝路径成分与 shell 元字符。
     import re as _re
-    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.task_id):
-        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头）: "
+    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", args.task_id):
+        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头，长度 ≤128）: "
               f"{args.task_id!r}", file=sys.stderr)
         return 2
 
@@ -134,14 +134,23 @@ def main() -> int:
 
     all_unverified = []
     for art in artifacts:
-        text = art.read_text(encoding="utf-8", errors="ignore")
+        member = art.stem.split("__", 1)[1] if "__" in art.stem else art.stem
+        try:
+            text = art.read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeError) as e:
+            # R4.1：不可解码产出 fail-closed 记未溯源哨兵 → verdict=DEGRADE，
+            # 禁止吞字节当"无数字"而误判 PASS（G4 block 态据此拦截）。
+            print(f"🔴 {member}: 产出不可解码（{type(e).__name__}）——按未溯源计",
+                  file=sys.stderr)
+            all_unverified.append({"member": member, "kind": "decode_error",
+                                   "value": f"<不可解码:{type(e).__name__}>"})
+            continue
         nums = _vn.extract_numbers(text, min_digits=2)
         unverified = []
         for kind, val, _ in nums:
             cands = _vn.float_candidates(val)
             if not any(c in pool for c in cands):
                 unverified.append({"kind": kind, "value": val})
-        member = art.stem.split("__", 1)[1] if "__" in art.stem else art.stem
         if unverified:
             print(f"🔴 {member}: {len(unverified)} 个未溯源数字")
             for u in unverified[:5]:

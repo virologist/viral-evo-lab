@@ -4,6 +4,21 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.19] - 2026-11-18（R4.1 盲检回补轮 · 用户裁决全修）
+
+> R4 两轮独立盲检均报🔴（通用盲检 2🔴 / 对抗性盲检 6🔴），主代理逐条独立复现后坐实 4 类真缺陷、厘清误报与 fail-close 安全方向。用户裁决「全修 + 重开盲检」「UTF-16 全包统一改严格读」。R4 收敛计数归零，本轮回补后重启两轮零🔴盲检。
+
+### Fixed
+- **🔴 标注跨成员串味（门禁绕过）**：`check_gates.py` G2 的 `marked_vals`（全局 set）与 G4 的 `_pending_manual_marked`（遍历全部 artifact）均不记录标注来源，任一成员 `[待人工核验]` 可洗白另一成员引用同一未标注数字 → G2/G4 误判 PASS。改为标注按 artifact 分桶（`marked_by_art`）+ G4 按 `unverified[].member` 定位来源产出，缺 member 时 fail-closed 不放行。
+- **🔴 包外锚退出码语义错配**：`check_baseline_anchors.py` 把 commit/history 与 HEAD 不一致塞进 `structural_errors` → EXIT=3 `ANCHOR_SCHEMA_INVALID`；契约表 `:46` 明定属「漂移」EXIT=5。新增 `drift_errors` 单列，走 EXIT=5 `DRIFT` 且继续 files 对账（不再提前 return 丢明细）。同步 `test_anchor_refresh_guard`「改锚刷绿」断言 3→5。
+- **🔴 超长 task_id 崩溃**：`write_checklist.py` 等六脚本白名单只管字符不管长度，5000 字符 task_id 拼路径触发 `OSError: File name too long` → traceback EXIT=1。六脚本 task_id 正则 `{0,127}`、member `{0,63}` 加长度上限，非法统一走参数码 2。
+- **🔴 UTF-16 fail-open（17 处）**：全包 `errors="ignore"` 静默吞字节使 UTF-16/BOM 畸形输入解码为空 → 数字核验 `PASS checked=0`、契约校验误放行。7 脚本 17 处统一改严格 `utf-8-sig` + 捕获 `UnicodeError` → 各自契约码/fail-closed（verify_numbers 产出不可解码=3；verify_member_output 记未溯源哨兵→DEGRADE；check_gates 不可解码产出并入 G2 FAIL；validate_contracts/check_decision_records/check_scope/assemble 走既有失败分支）。
+
+### Changed
+- 两处文档措辞同步：`verify_numbers` 契约码 3 扩为「产出缺失/不可解码」；`log_spawn`/六脚本错误文案补「长度 ≤128」。
+- 四处 version = **1.5.19**；manifest 重生成；包外锚待受控刷新；全量验证 pytest **19** / fuzz **61/61** / 守卫 **11/11**。R4.1 计数归零 0/2，待两轮独立盲检。
+- 澄清：R4 自身改动经主代理复现是干净的；上述 4 类🔴多为 v1.5.2/L3 历史遗留，其中 UTF-16 有 2 处系 R4 backlog④ 引入/放大，已一并根治。
+
 ## [1.5.18] - 2026-11-18（R4 backlog 清理轮 · 冻结后非阻塞项）
 
 > R3 收敛冻结（v1.5.17 / 连续两轮零🔴）后按用户「接续」授权开 R4 收尾轮，清 R3_SUMMARY §4 backlog 中不改变行为契约的六项。全程机器锚复用既有 `test_tc3_timezone_canonicalize`，45 CASES + 16 行为级 = 61/61 零联动；R4 改动须重新走两轮独立盲检才恢复冻结。

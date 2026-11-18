@@ -44,8 +44,9 @@ def check_file(p: Path) -> list:
     if p.suffix.lower() not in (".md", ".py"):
         return hits
     try:
-        text = p.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
+        text = p.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        # R4.1：不可解码文件跳过检测（fail-closed 不报命中；不吞字节伪造干净）
         return hits
     for lineno, line in enumerate(text.splitlines(), 1):
         # 排除纯注释行（脚本自身含 PPMID 等黑名单词会自检）

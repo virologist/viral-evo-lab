@@ -29,7 +29,11 @@ verify_numbers.py —— 成员产出关键数字核验关卡（V 层 · R12 202
     3. 每个数字在权威源集合（*.csv/*.json/*.md 的文本拼接）中做精确 grep
     4. 输出：found / not_found 两清单 + 退出码（0=全found或无数字；5=有not_found）
 
-退出码：0 = 通过；3 = 产出文件缺失；5 = 存在未溯源数字（envelope 应降级 partial）
+退出码：0 = 通过；3 = 产出文件缺失/不可解码（证据源不可用）；5 = 存在未溯源数字（envelope 应降级 partial）
+
+R4.1（2026-11-18 · backlog D）：全包禁用 errors="ignore" 静默吞字节——UTF-16/BOM
+等畸形编码若被吞成空文本会让「未溯源数字」误放行（fail-open）。一律严格 utf-8-sig
+解码 + 捕获 UnicodeError：产出解码失败→契约码 3；权威源解码失败→跳过该源（不进池）。
 """
 import argparse
 import json
@@ -107,8 +111,9 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
 
     def tagged(f: Path) -> bool:
         try:
-            return "source_tag: authoritative" in "".join(f.read_text(encoding="utf-8", errors="ignore").splitlines()[:3])
-        except OSError:
+            return "source_tag: authoritative" in "".join(f.read_text(encoding="utf-8-sig").splitlines()[:3])
+        except (OSError, UnicodeError):
+            # R4.1：解码失败视为无标记（fail-closed，该源不进权威池）
             return False
 
     for sp in paths:
@@ -122,8 +127,9 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
                     if require_tag and not tagged(f):
                         continue
                     try:
-                        chunks.append(f.read_text(encoding="utf-8", errors="ignore"))
-                    except OSError:
+                        chunks.append(f.read_text(encoding="utf-8-sig"))
+                    except (OSError, UnicodeError):
+                        # R4.1：畸形源跳过，不静默吞字节进池
                         pass
         else:
             ok_suffix2 = (".csv", ".json", ".md", ".txt") if allow_md else (".csv", ".json")
@@ -133,7 +139,11 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
                 continue
             if require_tag and not tagged(p):
                 continue
-            chunks.append(p.read_text(encoding="utf-8", errors="ignore"))
+            try:
+                chunks.append(p.read_text(encoding="utf-8-sig"))
+            except (OSError, UnicodeError):
+                # R4.1：畸形源跳过（单文件路径分支）
+                pass
     return "\n".join(chunks)
 
 def main() -> int:
@@ -156,7 +166,12 @@ def main() -> int:
     if not art.is_file():
         print(f"[verify_numbers] 产出文件不存在: {art}", file=sys.stderr)
         return 3
-    text = art.read_text(encoding="utf-8", errors="ignore")
+    try:
+        text = art.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as e:
+        # R4.1：产出不可解码 = 证据源不可用（契约码 3），禁止吞字节后误判 PASS
+        print(f"[verify_numbers] 产出文件不可解码: {type(e).__name__}: {e}", file=sys.stderr)
+        return 3
     nums = extract_numbers(text, args.min_digits)
     pool = load_sources(args.sources, args.exclude, args.allow_md, require_tag=args.require_tag)
 

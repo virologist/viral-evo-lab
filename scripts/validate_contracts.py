@@ -45,8 +45,9 @@ SKILL_CONTRACTS = {
 def check_agent(agent_path: Path) -> list[dict]:
     """返回该 agent 缺失的契约条款列表。"""
     try:
-        text = agent_path.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
+        text = agent_path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
+        # R4.1：不可解码 fail-closed 报读取错误（不吞字节伪造契约齐全）
         return [{"contract": "FILE_READ_ERROR", "missing_pattern": ""}]
     miss = []
     for name, pat in CONTRACTS.items():
@@ -61,8 +62,8 @@ def check_skill(skill_md: Path) -> list[dict]:
     references/*.md 按需加载，不强检（避免过度扩散）。
     """
     try:
-        text = skill_md.read_text(encoding="utf-8", errors="ignore")
-    except OSError:
+        text = skill_md.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError):
         return [{"contract": "FILE_READ_ERROR", "missing_pattern": ""}]
     miss = []
     for name, pat in SKILL_CONTRACTS.items():
@@ -78,8 +79,8 @@ def check_manifests(base: Path) -> list[dict]:
     for mf in (".codebuddy-plugin/plugin.json", ".claude-plugin/plugin.json"):
         p = base / mf
         try:
-            versions[mf] = json.loads(p.read_text(encoding="utf-8", errors="ignore")).get("version", "?")
-        except (OSError, json.JSONDecodeError) as e:
+            versions[mf] = json.loads(p.read_text(encoding="utf-8-sig")).get("version", "?")
+        except (OSError, UnicodeError, json.JSONDecodeError) as e:
             miss.append({"contract": f"{mf} 读取失败", "missing_pattern": str(e)})
     if len(set(versions.values())) > 1:
         miss.append({"contract": "双 manifest version 不一致",
@@ -125,7 +126,13 @@ def main() -> int:
     # ③ 团队契约正本（R2-5：成员层抽走的全员同版内容在此验收）
     tc = base / "skills/viral-evo-core/references/team-contract.md"
     if tc.is_file():
-        tct = tc.read_text(encoding="utf-8", errors="ignore")
+        try:
+            tct = tc.read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeError):
+            # R4.1：不可解码算正本缺失（fail-closed，不吞字节伪造齐全）
+            print(f"❌ skills/team-contract.md: 不可解码（无法验收正本条款）")
+            total_missing += len(TEAM_CONTRACT)
+            tct = ""
         miss = []
         for name, pat in TEAM_CONTRACT.items():
             if not re.search(pat, tct, re.M | re.I):

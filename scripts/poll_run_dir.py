@@ -108,7 +108,7 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
                 # 白名单 [a-z0-9-]+ 与 9 名成员 ID 形态精确对齐（一剑封喉：
                 # 空格/大写/路径成分/特殊字符全部拦掉，消除跨平台大小写分裂）
                 if (len(m) > 64  # 四轮🟢3：长度上限（防超长标识符进文件名）
-                        or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", m)):
+                        or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", m)):
                     bad += 1
                     continue
                 members.append(m)
@@ -161,8 +161,8 @@ def main() -> int:
     # 文件报 OK）。白名单 [A-Za-z0-9][A-Za-z0-9_-]* 与存量形态（T-20261015-M2、
     # T-FUZZ 等）完全兼容；显式拒绝路径成分与 shell 元字符。
     import re as _re
-    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.task_id):
-        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头）: "
+    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", args.task_id):
+        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头，长度 ≤128）: "
               f"{args.task_id!r}", file=sys.stderr)
         return 5
 

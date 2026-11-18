@@ -189,12 +189,19 @@ def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str]
     可解除该数字的阻断（但仍须在 G2 明细中可见，不静默消失）。
 
     返回 (已标注数量, 摘要)。仅对该数字本身放行，不放行整份 artifact。
+
+    R4.1（backlog A · 2026-11-18）：修复跨成员标注串味——原实现遍历**所有**
+    artifact 文本找标注，任一成员的标注可放行另一成员未标注的相同数字（G4
+    误判 PASS）。unverified 条目带 `member` 字段（verify_member_output 落盘），
+    现按 member 精确定位来源 artifact（`{task_id}__{member}.md`），只在该产出
+    自身标注里匹配；缺 member / 找不到对应 artifact 时 fail-closed 不放行。
     """
     if not isinstance(unverified, list) or not unverified:
         return 0, ""
     try:
-        texts = {a.name: a.read_text(encoding="utf-8", errors="ignore") for a in artifacts}
-    except OSError:
+        texts = {a.name: a.read_text(encoding="utf-8-sig") for a in artifacts}
+    except (OSError, UnicodeError):
+        # R4.1：任一 artifact 不可解码 → 无法证明标注属于成员，fail-closed 不放行
         return 0, ""
     # 标注形态：数字与标记可被空白/标点分隔（"n=777 [待人工核验]" / "n=777（待人工核验）"）
     marker_pat = re.compile(
@@ -207,8 +214,16 @@ def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str]
         val = str(u.get("value", "")).strip()
         if not val:
             continue
+        # R4.1：只认「该数字所属成员」的产出标注，缺 member 无法确定来源则不放行
+        member = str(u.get("member", "")).strip()
+        if not member:
+            continue
+        own = [txt for name, txt in texts.items()
+               if name.endswith(f"__{member}.md")]
+        if not own:
+            continue
         hit = False
-        for text in texts.values():
+        for text in own:
             for m in marker_pat.finditer(text):
                 if m.group("num") != val:
                     continue
@@ -243,9 +258,10 @@ def check_envelope(art: Path, sidecar_wf: str = "", sidecar_note: str = "") -> t
         - 无 sidecar（存量链路）→ 退回「只信信封」旧行为，不误阻断存量产出
     """
     try:
-        head = art.read_text(encoding="utf-8", errors="ignore")[:ENVELOPE_SKIP_CHARS]
-    except OSError as e:
-        return False, f"读取失败: {e}"
+        head = art.read_text(encoding="utf-8-sig")[:ENVELOPE_SKIP_CHARS]
+    except (OSError, UnicodeError) as e:
+        # R4.1：解码失败≠无信封，fail-closed 判 G1 FAIL（不吞字节伪造通过）
+        return False, f"读取失败: {type(e).__name__}: {e}"
     # 信封可能是独立 JSON 行/块——逐行尝试解析含 agent_id 的 JSON 对象
     for line in head.splitlines():
         line = line.strip().rstrip(",")
@@ -470,8 +486,8 @@ def main() -> int:
     # 文件报 OK）。白名单 [A-Za-z0-9][A-Za-z0-9_-]* 与存量形态（T-20261015-M2、
     # T-FUZZ 等）完全兼容；显式拒绝路径成分与 shell 元字符。
     import re as _re
-    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.task_id):
-        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头）: "
+    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", args.task_id):
+        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头，长度 ≤128）: "
               f"{args.task_id!r}", file=sys.stderr)
         return 2
 
@@ -610,16 +626,34 @@ def main() -> int:
         # 使该数字在 G2 侧不再计 FAIL（与 G4 同口径）。
         # 关键：标注是**逐数字**放行，不是整份 artifact 免检——
         # 未标注的数字照常 FAIL，可见性不受影响。
-        marked_vals: set[str] = set()
+        # R4.1（backlog A · 2026-11-18）：标注绑定**所属 artifact**——原实现用全局
+        # set 收集所有 artifact 的标注数字，任一成员的标注可「洗白」另一成员引用
+        # 同一数字却未标注的产出（G2/G4 误判 PASS，门禁绕过）。改为 dict 按 art.name
+        # 分桶，放行时只认「本 artifact 自己标注过的数字」。
+        marked_by_art: dict[str, set[str]] = {}
+        # R4.1（backlog D）：不可解码 artifact 不静默跳过（跳过=当无数字=fail-open），
+        # 单独记账，最后并入 G2 FAIL（fail-closed）。
+        decode_failed: list[str] = []
         for art in artifacts:
-            text = art.read_text(encoding="utf-8", errors="ignore")
+            bucket: set[str] = set()
+            try:
+                text = art.read_text(encoding="utf-8-sig")
+            except (OSError, UnicodeError) as e:
+                decode_failed.append(f"{art.name}({type(e).__name__})")
+                marked_by_art[art.name] = bucket
+                continue
             for m in re.finditer(
                     r"(?P<num>\d{1,6}(?:\.\d+)?)\s*[^\n]{0,40}?\[?\s*待人工核验\s*\]?", text, re.I):
                 seg = text[max(0, m.start() - 60):m.end() + 40]
                 if "待人工核验" in seg:
-                    marked_vals.add(m.group("num"))
+                    bucket.add(m.group("num"))
+            marked_by_art[art.name] = bucket
         for art in artifacts:
-            text = art.read_text(encoding="utf-8", errors="ignore")
+            try:
+                text = art.read_text(encoding="utf-8-sig")
+            except (OSError, UnicodeError):
+                continue   # 已记入 decode_failed，下面并入 G2 FAIL
+            own_marked = marked_by_art.get(art.name, set())
             for kind, val, _ in vmo._vn.extract_numbers(text, min_digits=2):
                 cands = vmo._vn.float_candidates(val)
                 if not any(c in pool for c in cands):
@@ -638,18 +672,22 @@ def main() -> int:
                     )
                     if hit_waiver:
                         waived_n += 1   # R2-2：人工放行台账内的数字不计 FAIL
-                    elif val in marked_vals:
-                        # L3（2026-11-09 · A-5）：成员已在产出中显式标 [待人工核验]
+                    elif val in own_marked:
+                        # L3（2026-11-09 · A-5）：成员已在**本产出**中显式标 [待人工核验]
                         # ——文档承诺的处置路径①。该数字不计 FAIL（但明细中可见）。
+                        # R4.1：own_marked 仅含本 artifact 的标注，跨成员借用不再放行。
                         marked_n += 1
                     else:
                         unverified_n += 1
                         unverified_detail.append(f"{kind}:{val}")
-        g2_ok = unverified_n == 0
+        g2_ok = unverified_n == 0 and not decode_failed
         if g2_ok and waived_n == 0 and marked_n == 0:
             detail = "全部溯源"
         else:
             parts = []
+            if decode_failed:
+                parts.append(f"{len(decode_failed)} 份产出不可解码（无法核验）: "
+                             f"{', '.join(decode_failed[:3])}")
             if waived_n:
                 parts.append(f"{waived_n} 个经 waiver 人工放行（见 waivers.json）")
             if marked_n:

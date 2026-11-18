@@ -48,8 +48,8 @@ def main() -> int:
     # R4（backlog②）：member 拼进 spawn__{member}.md 文件名 + JSONL 记录，
     # 与 task_id 同受白名单约束（消费端 poll_run_dir 已有白名单，此处闭合生产端）。
     import re as _re
-    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.member):
-        print(f"❌ member 含非法字符（仅允许 [a-z0-9][a-z0-9-]*，与消费端白名单对齐）: "
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", args.member):
+        print(f"❌ member 含非法字符（仅允许 [a-z0-9][a-z0-9-]*，长度 ≤64，与消费端白名单对齐）: "
               f"{args.member!r}", file=sys.stderr)
         return 2
     # R3（2026-11-17 · F2 修复）：task_id 拼路径前白名单校验——{task_id}__
@@ -57,8 +57,8 @@ def main() -> int:
     # 文件报 OK）。白名单 [A-Za-z0-9][A-Za-z0-9_-]* 与存量形态（T-20261015-M2、
     # T-FUZZ 等）完全兼容；显式拒绝路径成分与 shell 元字符。
     import re as _re
-    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.task_id):
-        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头）: "
+    if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", args.task_id):
+        print(f"❌ task_id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头，长度 ≤128）: "
               f"{args.task_id!r}", file=sys.stderr)
         return 2
 

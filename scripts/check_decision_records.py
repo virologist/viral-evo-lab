@@ -61,9 +61,12 @@ RULE_ANCHORS: dict[str, dict[str, tuple[str, ...]]] = {
 
 
 def _read_text(path: Path) -> str:
-    """统一读文本：BOM 与 UTF-8 变体由 utf-8-sig 兜住。"""
-    # R4（backlog④）：utf-8-sig 顺带剥 BOM；errors="ignore" 对齐包内宽松读口径
-    return path.read_text(encoding="utf-8-sig", errors="ignore")
+    """统一读文本：utf-8-sig 剥 BOM；不可解码抛 UnicodeError 由调用方走契约码。
+
+    R4.1（backlog D）：撤销 R4 的 errors="ignore"——吞字节会让畸形裁决/锚点文件
+    被静默跳过校验（fail-open）。三处调用方均已捕获 (OSError, UnicodeError)。
+    """
+    return path.read_text(encoding="utf-8-sig")
 
 
 def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:

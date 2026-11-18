@@ -240,8 +240,9 @@ def _auto_verify_payload(expert_dir: Path, payload: str, research_ops: str) -> d
             for f in sorted(pth.rglob("*")):
                 if f.suffix.lower() in (".csv", ".json") and f.is_file():
                     try:
-                        pool_chunks.append(f.read_text(encoding="utf-8", errors="ignore"))
-                    except OSError:
+                        pool_chunks.append(f.read_text(encoding="utf-8-sig"))
+                    except (OSError, UnicodeError):
+                        # R4.1：畸形注入源跳过，不吞字节进上下文
                         pass
     pool = "\n".join(pool_chunks)
     unverified = []
@@ -680,8 +681,8 @@ def main() -> int:
     # <task_id>__workflow.json，同受白名单约束（防 ../ 越界落盘）。
     if args.task_id:
         import re as _re
-        if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.task_id):
-            print(f"❌ --task-id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头）: "
+        if not _re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", args.task_id):
+            print(f"❌ --task-id 含非法字符（仅允许字母/数字/下划线/连字符，且不以 _- 开头，长度 ≤128）: "
                   f"{args.task_id!r}", file=sys.stderr)
             return 2
 

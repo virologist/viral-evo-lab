@@ -102,6 +102,9 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
         "missing": [],
         "mismatched": [],
         "structural_errors": [],
+        # R4.1（backlog B · 2026-11-18）：commit/history 不一致属契约表明文定义的
+        # 「漂移」(EXIT=5)，不是结构失败(EXIT=3)。单列字段，与文件哈希漂移同判。
+        "drift_errors": [],
         "verdict": "",
     }
 
@@ -124,14 +127,15 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
     head = _git_head(pkg_root)
     if isinstance(src, dict) and head:
         if src.get("commit") and src["commit"] != head:
-            rep["structural_errors"].append(
+            # R4.1：归 drift（契约表 :46「commit 与 history 不一致」= 漂移 EXIT=5）
+            rep["drift_errors"].append(
                 f"锚 source.commit={str(src['commit'])[:7]}… 与 git HEAD={head[:7]}… 不符"
                 "（疑改锚刷绿或忘记 --refresh）")
         hist = obj.get("refresh_history")
         if isinstance(hist, list) and hist:
             last = hist[-1] if isinstance(hist[-1], dict) else {}
             if last.get("to_commit") not in (None, head):
-                rep["structural_errors"].append(
+                rep["drift_errors"].append(
                     "refresh_history 末条 to_commit 与 HEAD 不一致（刷新链断裂）")
 
     if obj.get("schema_version") != 1:
@@ -174,7 +178,9 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
     if rep["structural_errors"]:
         rep["verdict"] = "ANCHOR_SCHEMA_INVALID"
         return EXIT_STRUCT, rep
-    if rep["missing"] or rep["mismatched"]:
+    # R4.1：commit/history 漂移与文件哈希漂移同判 EXIT=5；仍已完成上面全部 files
+    # 对账（给出 matched/mismatched 明细），不再提前 return 丢失可见性。
+    if rep["drift_errors"] or rep["missing"] or rep["mismatched"]:
         rep["verdict"] = "DRIFT"
         return EXIT_DRIFT, rep
     rep["verdict"] = "OK"

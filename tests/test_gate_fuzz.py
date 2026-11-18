@@ -800,6 +800,42 @@ def test_gate_mode_blocks() -> None:
         assert g4_ok("block", "PASS") is True, "阻断态 PASS 应判 PASS"
         assert g4_ok("warn", "DEGRADE") is True, "warn 态不因阻断信号判 FAIL（向后兼容）"
 
+        # R4.1（backlog A）：[待人工核验] 标注必须绑定所属成员，禁止跨成员洗白。
+        with tempfile.TemporaryDirectory(prefix="manual_mark_") as td2:
+            rd = Path(td2)
+            src2 = rd / "src"
+            src2.mkdir()
+            (src2 / "truth.csv").write_text("123456\n", encoding="utf-8")  # 不含 777777
+            env_s = json.dumps(BASE_ENV) + "\n"
+            (rd / f"{TASK_ID}__alice.md").write_text(
+                env_s + "样本 n=777777 [待人工核验]\n", encoding="utf-8")
+            (rd / f"{TASK_ID}__bob.md").write_text(
+                env_s + "样本 n=777777\n", encoding="utf-8")  # 同数字，未标注
+            # 场景①：bob 的未溯源数字（仅 alice 标注）→ G2 必须 FAIL
+            (rd / f"{TASK_ID}__output-check.json").write_text(json.dumps({
+                "task_id": TASK_ID, "artifact_mtimes": {},
+                "unverified": [{"member": "bob", "kind": "n_eq", "value": "777777"}],
+                "verdict": "DEGRADE", "gate_mode": "block"}, ensure_ascii=False),
+                encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(CHECK_GATES), str(rd), TASK_ID, "--sources", str(src2)],
+                capture_output=True, text=True, timeout=60)
+            g2 = _read_gates(rd).get("G2", False)
+            g4 = _read_gates(rd).get("G4", False)
+            assert g2 is False and g4 is False, \
+                "跨成员标注串味：alice 的标注不得洗白 bob 未标注的同数字（G2/G4 须 FAIL）"
+            # 场景②：数字所属成员自己标注（alice）→ 可放行，证明不是一刀切全 FAIL
+            (rd / f"{TASK_ID}__output-check.json").write_text(json.dumps({
+                "task_id": TASK_ID, "artifact_mtimes": {},
+                "unverified": [{"member": "alice", "kind": "n_eq", "value": "777777"}],
+                "verdict": "DEGRADE", "gate_mode": "block"}, ensure_ascii=False),
+                encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(CHECK_GATES), str(rd), TASK_ID, "--sources", str(src2)],
+                capture_output=True, text=True, timeout=60)
+            assert _read_gates(rd).get("G4", False) is True, \
+                "成员标注自己的数字应放行（G4 PASS），防止修成全 FAIL 误伤"
+
 
 def test_require_tag_gate() -> None:
     """C3（2026-11-08）：产出端 require_tag 闸行为级守卫——未标记源必须被拒。
@@ -829,6 +865,26 @@ def test_require_tag_gate() -> None:
         assert run(True, untagged) == 5, "未标记源在 --require-tag 下必须被拒（DEGRADE）"
         assert run(True, tagged) == 0, "已标记源在 --require-tag 下应放行（PASS）"
         assert run(False, untagged) == 0, "默认关闭开关时须向后兼容"
+
+        # R4.1（backlog D）：UTF-16/畸形编码产出必须 fail-closed（契约码 3），
+        # 禁止 errors="ignore" 吞字节造成「PASS checked=0」误放行（fail-open）。
+        bad = d / "utf16.md"
+        bad.write_bytes(b"\xff\xfe" + "样本 n=7777 。\n".encode("utf-16-le"))
+        rc = subprocess.run([sys.executable, str(vn), str(bad), "--sources", str(src)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"UTF-16 产出须不可解码 EXIT=3（不得吞字节误放行），实为 {rc}"
+
+        # R4.1（backlog C）：超长 task_id 拼路径不得触发 OSError traceback（EXIT=1）；
+        # 六脚本白名单加长度上限后须统一走参数非法码（2）。
+        wc = PKG / "scripts" / "write_checklist.py"
+        long_id = "T-" + "a" * 5000
+        p = subprocess.run([sys.executable, str(wc), str(d), long_id,
+                            "--items", "3", "--passed", "3"],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), \
+            "超长 task_id 不得抛未捕获 OSError traceback"
+        assert p.returncode in (2, 5), \
+            f"超长 task_id 应走参数非法码（2），实为 {p.returncode}"
 
 
 def test_poll_hitlimit_and_manifest() -> None:
@@ -1037,6 +1093,16 @@ def test_baseline_anchor_roundtrip() -> None:
         rc, rep = run(base)
         assert rc == 0 and rep["verdict"] == "OK" and rep["matched"] == len(rels), \
             f"一致锚应 EXIT=0: rc={rc} rep={rep}"
+
+        # R4.1（backlog B）：commit 与 HEAD 不一致属契约表「漂移」→ EXIT=5（非 3），
+        # 且继续 files 对账（expected>0），不再提前 return 丢失明细。
+        bad_commit = json.loads(json.dumps(base, ensure_ascii=False))
+        bad_commit["source"]["commit"] = "0" * 40
+        rc, rep = run(bad_commit)
+        assert rc == 5 and rep["verdict"] == "DRIFT" \
+            and any("commit" in e for e in rep.get("drift_errors", [])) \
+            and rep["expected"] == len(rels), \
+            f"commit 漂移应 EXIT=5 且继续对账: rc={rc} rep={rep}"
 
         tampered = json.loads(json.dumps(base, ensure_ascii=False))
         tampered["files"][rels[0]]["sha256"] = "0" * 64
@@ -1302,7 +1368,9 @@ def test_anchor_refresh_guard() -> None:
         obj["source"]["commit"] = "f" * 40
         anchor.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
         rc, rep = run()
-        assert rc == 3 and any("改锚刷绿" in e for e in rep["structural_errors"]), \
+        # R4.1（backlog B）：commit 不一致按契约表归「漂移」EXIT=5（原错判 3）
+        all_errs = rep["structural_errors"] + rep.get("drift_errors", [])
+        assert rc == 5 and any("改锚刷绿" in e for e in all_errs), \
             f"改锚刷绿必须被抓: rc={rc} rep={rep}"
 
         # 工作区 dirty → 拒绝刷新（防把未提交漂移写进基线）
