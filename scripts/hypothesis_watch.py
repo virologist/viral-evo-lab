@@ -120,13 +120,20 @@ def load_json_obj(path: Path) -> tuple[dict | None, str]:
     return obj, ""
 
 
-def extract_handled_ids(obj: dict) -> tuple[set, list[str]]:
+def extract_handled_ids(obj: dict | None) -> tuple[set, list[str]]:
     """L3（2026-11-09）：已处置 finding_id 清单安全提取。
+
+    R4（backlog⑥）：挡板内移——obj None/非 dict 时返回「顶层须为对象」漂移而非
+    AttributeError，消除「主路径 EXIT=6 / extract 分支 EXIT=1」两分支语义口径分裂
+    （盲检🟠）。调用方挡板保留（双保险）。
 
     原实现 set(list) 对含 dict/list 元素抛 TypeError(unhashable)；
     非字符串元素还会让台账比对静默失配。此处只收字符串，
     非字符串元素记为漂移并回报（不崩溃、不静默丢弃）。
     """
+    if not isinstance(obj, dict):
+        # R4（backlog⑥）：挡板内移——None/非 dict 返回漂移描述，不再 AttributeError
+        return set(), ["handled_finding_ids 顶层须为对象（实为 %s）" % type(obj).__name__]
     ids = obj.get("handled_finding_ids")
     if ids is None:
         return set(), []

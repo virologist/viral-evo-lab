@@ -26,7 +26,7 @@ check_gates.py —— 团队级脚本化门禁（D2/M3 修复 · 2026-10-15）
                   显式启用。未启用时 gates.json 的 skipped_gates 显式记名，不静默跳过；
                   启用后不合格 EXIT=5。只验形式要件，语义真伪归主理人 T1。
 
-退出码：0 = 全过；3 = artifact 缺失；5 = 任一门禁 FAIL
+退出码：0 = 全过；2 = 参数非法（task_id 白名单拦截）；3 = artifact 缺失；5 = 任一门禁 FAIL
 边界：只做结构性/确定性检查；"产出质量好不好"归 LLM 与人。
 """
 import argparse
@@ -478,9 +478,13 @@ def main() -> int:
     run_dir = Path(args.run_dir)
     # 成员 artifact = task_id__<member>.md；排除主理人生成的元文件
     LEAD_SUFFIXES = ("__checklist", "__output-check", "__gates", "spawn_prompt")
+    # R4（2026-11-18 backlog①）：子串包含 → 精确尾匹配。旧实现 any(s in stem)
+    # 使含 "__gates" 等子串的合法 task_id（如 x__gates）的成员文件
+    # x__gates__member.md 被误杀 → G3 恒「无一存在」（组合死锁，盲检②发现）。
+    # 元文件形态固定为 <task_id><suffix>.md（spawn_prompt 同理），尾匹配即可精确区分。
     artifacts = sorted(
         a for a in run_dir.glob(f"{args.task_id}__*.md")
-        if not any(s in a.stem for s in LEAD_SUFFIXES)
+        if not any(a.stem == f"{args.task_id}{s}" for s in LEAD_SUFFIXES)
     )
     results = []
     skipped_gates: list[str] = []   # ADR-002：SKIP 必须留痕，禁止静默恒 PASS

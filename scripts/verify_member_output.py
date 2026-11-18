@@ -20,7 +20,7 @@ verify_member_output.py —— 产出端数字核验关卡（A · 2026-10-14 V1 
        读取该字段，DEGRADE 未处置即判 FAIL——阻断信号可传导到下游门禁（C4 修复）
     6. 默认写 <run-dir>/<task-id>__output-check.json（与 checklist 同 schema 风格）
 
-退出码：0 = 全过；3 = artifact 缺失；5 = 存在未溯源数字（--gate 时阻断）
+退出码：0 = 全过；3 = artifact 缺失；5 = 存在未溯源数字（--gate 时阻断）；2 = 参数非法（task_id 白名单拦截）
 
 T-C2 决策记录（2026-10-15 · coder 拍板）：不实施 commit_hash 锚定。
 理由：
@@ -114,7 +114,9 @@ def main() -> int:
         a for a in run_dir.glob(f"{args.task_id}__*.md")
         # C3（2026-11-07）：排除元文件——与 check_gates.py LEAD_SUFFIXES 口径对齐，
         # 防止 checklist/output-check 等主理人侧文件被当作成员 artifact 参与数字核验
-        if not any(s in a.stem for s in ("__checklist", "__output-check", "__gates", "spawn_prompt"))
+        # R4（backlog①）：同 check_gates 改精确尾匹配，消除 task_id 含元后缀子串的组合死锁
+        if not any(a.stem == f"{args.task_id}{s}" for s in
+                   ("__checklist", "__output-check", "__gates", "spawn_prompt"))
     )
     if not artifacts:
         print(f"❌ 未找到 artifact: {run_dir}/{args.task_id}__*.md", file=sys.stderr)

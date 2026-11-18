@@ -12,6 +12,8 @@ log_spawn.py —— spawn manifest 留痕（R2-3 修复 · 2026-10-15）
 
 行为：追加一行到 <run-dir>/spawn_manifest.jsonl
     {"ts", "task_id", "member", "agent_task_id", "subagent_type", "spawn_file"}
+
+退出码：0 = 成功；2 = 参数非法（task_id/member 白名单拦截）；3 = 装配产物缺失
 """
 import argparse
 import json
@@ -43,6 +45,13 @@ def main() -> int:
     ap.add_argument("agent_task_id")
     ap.add_argument("--subagent-type", default="general-purpose")
     args = ap.parse_args()
+    # R4（backlog②）：member 拼进 spawn__{member}.md 文件名 + JSONL 记录，
+    # 与 task_id 同受白名单约束（消费端 poll_run_dir 已有白名单，此处闭合生产端）。
+    import re as _re
+    if not _re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.member):
+        print(f"❌ member 含非法字符（仅允许 [a-z0-9][a-z0-9-]*，与消费端白名单对齐）: "
+              f"{args.member!r}", file=sys.stderr)
+        return 2
     # R3（2026-11-17 · F2 修复）：task_id 拼路径前白名单校验——{task_id}__
     # 直接进 glob/写盘文件名，含 "/" / ".." 可越界读写（盲检已复现读 run_dir 外
     # 文件报 OK）。白名单 [A-Za-z0-9][A-Za-z0-9_-]* 与存量形态（T-20261015-M2、

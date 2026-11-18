@@ -122,7 +122,7 @@ RENDERERS = {"hyp": ("confirmed_hypotheses", render_hyp),
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="context_stack 双轨同步器：JSON 真源 → 重渲染 md 视图")
+    ap = argparse.ArgumentParser(description="context_stack 双轨同步器：JSON 真源 → 重渲染 md 视图（退出码：0=成功；3=真源缺失/解析/结构异常）")
     ap.add_argument("--research-ops", default=None)
     ap.add_argument("--which", choices=("all",) + tuple(RENDERERS), default="all")
     args = ap.parse_args()

@@ -78,7 +78,7 @@ def check_manifests(base: Path) -> list[dict]:
     for mf in (".codebuddy-plugin/plugin.json", ".claude-plugin/plugin.json"):
         p = base / mf
         try:
-            versions[mf] = json.loads(p.read_text(encoding="utf-8")).get("version", "?")
+            versions[mf] = json.loads(p.read_text(encoding="utf-8", errors="ignore")).get("version", "?")
         except (OSError, json.JSONDecodeError) as e:
             miss.append({"contract": f"{mf} 读取失败", "missing_pattern": str(e)})
     if len(set(versions.values())) > 1:
@@ -125,7 +125,7 @@ def main() -> int:
     # ③ 团队契约正本（R2-5：成员层抽走的全员同版内容在此验收）
     tc = base / "skills/viral-evo-core/references/team-contract.md"
     if tc.is_file():
-        tct = tc.read_text(encoding="utf-8")
+        tct = tc.read_text(encoding="utf-8", errors="ignore")
         miss = []
         for name, pat in TEAM_CONTRACT.items():
             if not re.search(pat, tct, re.M | re.I):

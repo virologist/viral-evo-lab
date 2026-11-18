@@ -737,6 +737,34 @@ def test_tc3_timezone_canonicalize() -> None:
         assert "Traceback" not in (p.stdout + p.stderr), "assemble team-contract 二进制崩溃"
         assert p.returncode == 0, f"契约非 UTF-8 应降级不阻断，实为 {p.returncode}"
 
+        # ⑫ R4（2026-11-18 backlog 回补）：组合死锁解除 + member 白名单。
+        # a) task_id 含元后缀子串（x__gates）不再误杀成员 artifact（LEAD_SUFFIXES 尾匹配）
+        rd2 = d / "rd2"
+        rd2.mkdir()
+        (rd2 / "x__gates__phylo-analyst.md").write_text("artifact\n", encoding="utf-8")
+        (rd2 / "x__gates__checklist.md").write_text("meta\n", encoding="utf-8")
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "check_gates.py"),
+                            str(rd2), "x__gates"], capture_output=True, text=True, timeout=60)
+        out = p.stdout + p.stderr
+        assert "Traceback" not in out, "check_gates 组合 task_id 崩溃"
+        assert "1 份 artifact" in out, f"成员 artifact 被元后缀子串误杀（组合死锁复发）: {out[:200]}"
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "verify_member_output.py"),
+                            str(rd2), "x__gates"], capture_output=True, text=True, timeout=60)
+        assert p.returncode != 3, "vmo 组合死锁复发（artifact 未找到）"
+
+        # b) log_spawn member 白名单（生产端闭合）
+        rd3 = d / "rd3"
+        rd3.mkdir()
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "log_spawn.py"),
+                            str(rd3), "T-F", "../evil", "at-1"],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 2 and "Traceback" not in (p.stdout + p.stderr),             f"log_spawn member ../evil 须 EXIT=2，实为 {p.returncode}"
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "log_spawn.py"),
+                            str(rd3), "T-F", "phylo-analyst", "at-1"],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), "log_spawn 合法 member 崩溃"
+        assert (rd3 / "spawn_manifest.jsonl").is_file(), "合法 member 未落 manifest"
+
 
 def test_gate_mode_blocks() -> None:
     """L3（2026-11-09）：gate_mode 行为回归——阻断信号必须传导。

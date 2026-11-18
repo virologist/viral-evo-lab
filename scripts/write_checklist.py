@@ -34,7 +34,7 @@ def _load_guard():
 
 def main() -> int:
     ap = __import__("argparse").ArgumentParser(
-        description="R9/R14 纪律审判落盘工具：生成 task_id__checklist.json + .md")
+        description="R9/R14 纪律审判落盘工具：生成 task_id__checklist.json + .md（退出码：0=PASS；2=参数非法；5=DEGRADE）")
     ap.add_argument("run_dir", help="运行目录")
     ap.add_argument("task_id", help="任务 ID")
     ap.add_argument("--items", type=int, default=8, help="checklist 总项数")

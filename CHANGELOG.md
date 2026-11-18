@@ -4,6 +4,21 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.18] - 2026-11-18（R4 backlog 清理轮 · 冻结后非阻塞项）
+
+> R3 收敛冻结（v1.5.17 / 连续两轮零🔴）后按用户「接续」授权开 R4 收尾轮，清 R3_SUMMARY §4 backlog 中不改变行为契约的六项。全程机器锚复用既有 `test_tc3_timezone_canonicalize`，45 CASES + 16 行为级 = 61/61 零联动；R4 改动须重新走两轮独立盲检才恢复冻结。
+
+### Fixed
+- **🟠 组合死锁（task_id × LEAD_SUFFIXES）**：`check_gates.py` / `verify_member_output.py` 旧 `any(s in a.stem)` 子串包含，在 task_id 合法含元后缀子串（如 `x__gates`）时把成员文件 `x__gates__phylo-analyst.md` 误判为元 artifact 排除 → G3 恒空。改精确尾匹配 `a.stem == f"{task_id}{s}"`（元文件形态固定 `<task_id><suffix>.md`）。
+- **🟡 `log_spawn.py` member 无白名单**：`parse_args()` 后补 `_re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.member)`，非法 → stderr + EXIT=2。与 6 脚本 task_id 白名单口径对齐。
+- **🟡 `hypothesis_watch.extract_handled_ids` 防御硬化**：签名 `obj: dict | None`，函数体内移挡板 `if not isinstance(obj, dict): return set(), [漂移描述]`。实证 🟠「hw state AttributeError」路径不可达（`load_json_obj` 不变式 err 非空 ⇒ obj 为 None + state_err 挡板保护），故仅硬化不改行为。
+
+### Changed
+- **退出码契约表补齐**：`check_gates.py` / `verify_member_output.py` / `log_spawn.py` / `write_checklist.py` / `render_context_stack.py` 的 description/docstring 补当前真实退出码（0/2/3/5 按脚本实际口径）。`poll_run_dir` docstring 已声明 0/5，跳过。
+- **解码口径统一**：`validate_contracts.py` 全部 `read_text(encoding="utf-8")` → `errors="ignore"`（对齐同文件既有宽松口径）；`check_decision_records.py` → `utf-8-sig + errors="ignore"`。
+- **README 环境要求**：新增 Python ≥ 3.10（PEP 604 `str | None`）+ git 在 PATH（`git ls-files` 为完整性清单唯一真源）说明。
+- 四处 version = **1.5.18**；manifest 重生成（79 文件）；全量验证 pytest **19** / fuzz **61/61** / 守卫 **11/11** / manifest EXIT=0。R4 收敛计数归零 0/2，待两轮独立盲检。
+
 ## [1.5.17] - 2026-11-17（R3 盲检回补 · R3.2）
 
 > R3 重启第一轮盲检（v1.5.16）FAIL 3🔴——UnicodeDecodeError 捕获面同类残留 4 处裸读点（假说池/state/成员 MD/plugin.json+team-contract），主代理逐一独立复现。计数再归零，回补后重启。

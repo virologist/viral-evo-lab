@@ -62,7 +62,8 @@ RULE_ANCHORS: dict[str, dict[str, tuple[str, ...]]] = {
 
 def _read_text(path: Path) -> str:
     """统一读文本：BOM 与 UTF-8 变体由 utf-8-sig 兜住。"""
-    return path.read_text(encoding="utf-8-sig")
+    # R4（backlog④）：utf-8-sig 顺带剥 BOM；errors="ignore" 对齐包内宽松读口径
+    return path.read_text(encoding="utf-8-sig", errors="ignore")
 
 
 def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
