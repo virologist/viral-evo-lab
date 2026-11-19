@@ -45,9 +45,14 @@ def check_file(p: Path) -> list:
         return hits
     try:
         text = p.read_text(encoding="utf-8-sig")
-    except (OSError, UnicodeError):
-        # R4.1：不可解码文件跳过检测（fail-closed 不报命中；不吞字节伪造干净）
-        return hits
+    except (OSError, UnicodeError) as e:
+        # R4.2（盲检🔴6）：R4.1 把不可解码当"无命中"实为 fail-open——UTF-16
+        # 污染文件被整体跳过 → 误判 clean EXIT=0。改为记一条"无法核验"命中，
+        # 由 main 判 EXIT=3（与 validate_contracts/check_gates 的 fail-closed 同口径）。
+        return [(-1, "UNREADABLE", f"{type(e).__name__}: 文件不可解码，无法核验是否含项目特定叙事")]
+    if "\x00" in text or "\ufffd" in text:
+        # 无 BOM UTF-16 的 NUL 交错是合法 UTF-8，解码不抛异常——显式检测
+        return [(-1, "UNREADABLE", "含 NUL/U+FFFD 控制字符（疑无 BOM UTF-16），无法核验")]
     for lineno, line in enumerate(text.splitlines(), 1):
         # 排除纯注释行（脚本自身含 PPMID 等黑名单词会自检）
         stripped = line.strip()

@@ -57,10 +57,24 @@ if [ "$TASK_ID" = "--all" ]; then
   TASKS="$(python3 - "$RUN_DIR" <<'PY'
 import json, re, sys
 from pathlib import Path
+# R4.2（盲检🟠）：原 errors="replace" 会把 UTF-16 manifest 吞成 U+FFFD → 全部
+# JSON 行解析失败 → TASKS 空 → "本轮无巡检对象"，监控静默失效。改用严格读；
+# 不可解码时明示错误并非零退出，禁止静默降级为"无任务"。
+# 说明：heredoc 内 __file__ 指向 <stdin>，故从 argv[1]（RUN_DIR）定位脚本目录不可靠，
+# 这里内联与 _text_guard 同款控制字符检测（NUL/U+FFFD），保持单一判定口径。
 p = Path(sys.argv[1]) / "spawn_manifest.jsonl"
 ids = []
 if p.is_file():
-    for line in p.read_text(encoding="utf-8-sig", errors="replace").splitlines():
+    try:
+        txt = p.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as e:
+        txt = None; err = f"{type(e).__name__}: {e}"
+    if txt is not None and ("\x00" in txt or "\ufffd" in txt):
+        txt = None; err = "含 NUL/U+FFFD 控制字符（疑 UTF-16 或非法字节）"
+    if txt is None:
+        print(f"[cron_watch] manifest 不可解码（{err}）——拒绝静默跳过巡检", file=sys.stderr)
+        sys.exit(3)
+    for line in txt.splitlines():
         try: ev = json.loads(line)
         except Exception: continue
         t = ev.get("task_id") if isinstance(ev, dict) else None

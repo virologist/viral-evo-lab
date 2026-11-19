@@ -45,6 +45,11 @@ import sys
 import time
 from pathlib import Path
 
+# R4.2（2026-11-19 · 盲检🔴3）：统一严格读守卫——撞限检测原用 errors="replace"
+# 会把 UTF-16 的「轮次耗尽」标注吞成 U+FFFD → 误判 READY 放行不完整产出。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _text_guard import read_text_checked  # noqa: E402
+
 # R-13a：撞限标注识别串（与主理人 MD 撞限协议条款逐字对应）
 HIT_LIMIT_MARK = "轮次耗尽"
 
@@ -134,15 +139,19 @@ def head_hit_limit(f: Path, lines: int = 8) -> bool:
       - 读失败从「偏放行」改「偏保守」：OSError → True（视为撞限嫌疑，
         交人工裁决）。漏放不完整产出比多问一句人工更危险（守卫方向）。
       - 空文件（0 字节）不算撞限（成员可能还在写，mtime 新鲜度另行判定）。
+      - R4.2（盲检🔴3）：原 errors="replace" 把 UTF-16 的中文撞限标注吞成 U+FFFD
+        → 误判 READY。改用统一严格读：解码失败/含 NUL/U+FFFD 一律保守判 True
+        （疑似撞限，交人工），不放行不完整产出。
     """
     try:
         if f.stat().st_size == 0:
             return False
-        with f.open("r", encoding="utf-8", errors="replace") as fh:
-            head = "".join(fh.readline() for _ in range(lines))
-        return HIT_LIMIT_MARK in head
     except OSError:
-        return True  # 读不到 ≠ 没标注——保守判定，人工复核
+        return True  # stat 都读不到——保守判定，人工复核
+    head, err = read_text_checked(f, max_chars=4000)
+    if head is None:
+        return True  # 不可解码/控制字符污染 ≠ 没标注——保守判定，人工复核
+    return HIT_LIMIT_MARK in "".join(head.splitlines()[:lines])
 
 
 def main() -> int:

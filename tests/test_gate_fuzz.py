@@ -836,6 +836,23 @@ def test_gate_mode_blocks() -> None:
             assert _read_gates(rd).get("G4", False) is True, \
                 "成员标注自己的数字应放行（G4 PASS），防止修成全 FAIL 误伤"
 
+            # R4.2（盲检🔴2）：endswith 后缀匹配会被 T__foo__alice.md 命中，
+            # 使多段前缀副产物的标注洗白 T__alice.md 的数字。精确匹配后须 G4 FAIL。
+            (rd / f"{TASK_ID}__alice.md").write_text(
+                env_s + "样本 n=777777\n", encoding="utf-8")  # alice 自己未标注
+            (rd / f"{TASK_ID}__foo__alice.md").write_text(
+                env_s + "777777 [待人工核验]\n", encoding="utf-8")  # 副产物标注
+            (rd / f"{TASK_ID}__output-check.json").write_text(json.dumps({
+                "task_id": TASK_ID, "artifact_mtimes": {},
+                "unverified": [{"member": "alice", "kind": "n_eq", "value": "777777"}],
+                "verdict": "DEGRADE", "gate_mode": "block"}, ensure_ascii=False),
+                encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(CHECK_GATES), str(rd), TASK_ID, "--sources", str(src2)],
+                capture_output=True, text=True, timeout=60)
+            assert _read_gates(rd).get("G4", False) is False, \
+                "多段前缀副产物（T__foo__alice.md）的标注不得洗白 alice 的数字"
+
 
 def test_require_tag_gate() -> None:
     """C3（2026-11-08）：产出端 require_tag 闸行为级守卫——未标记源必须被拒。
@@ -886,6 +903,50 @@ def test_require_tag_gate() -> None:
         assert p.returncode in (2, 5), \
             f"超长 task_id 应走参数非法码（2），实为 {p.returncode}"
 
+        # R4.2（盲检🔴1）：无 BOM 的 UTF-16（NUL 交错在 UTF-8 下合法）不得
+        # 被当空文本误判 PASS——必须显式检测 NUL → EXIT=3（fail-closed）。
+        nb = d / "utf16_nobom.md"
+        nb.write_bytes("p = 0.999\nn = 888\n".encode("utf-16-be"))  # 无 BOM
+        (d / "s2").mkdir(exist_ok=True)
+        (d / "s2" / "a.csv").write_text("p,0.111\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(nb), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"无 BOM UTF-16 产出须 NUL 检测 → EXIT=3，实为 {rc}"
+
+        # R4.2（盲检🔴6）：check_scope 不可解码/控制字符污染文件不得误判 clean(0)，
+        # 须报无法核验 → EXIT=3（fail-closed）。
+        cs = PKG / "scripts" / "check_scope.py"
+        dirty = d / "dirty.md"
+        dirty.write_bytes("# 事故\nPP 41034380\n".encode("utf-16"))
+        rc = subprocess.run([sys.executable, str(cs), str(dirty)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"不可解码污染文件须 EXIT=3（非 clean），实为 {rc}"
+
+        # R4.2（盲检🔴4）：confirmed_hypotheses.json 顶层非对象（合法 JSON []）
+        # 不得 AttributeError 崩溃（EXIT=1），须降级跳过（无 traceback）。
+        asm = PKG / "scripts" / "assemble_spawn_prompt.py"
+        ro = d / "ro"; (ro / "context_stack").mkdir(parents=True)
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text("[]", encoding="utf-8")
+        taskf = d / "task.txt"; taskf.write_text("test task", encoding="utf-8")
+        env = dict(os.environ, RESEARCH_OPS_DIR=str(ro))
+        p = subprocess.run([sys.executable, str(asm), "--expert-dir", str(PKG),
+                            "--member", "literature-scout", "--task-file", str(taskf),
+                            "--no-autodetect"], capture_output=True, text=True,
+                           timeout=60, env=env)
+        assert "Traceback" not in (p.stdout + p.stderr), "assemble 顶层非对象不得崩溃"
+        assert p.returncode != 1, f"assemble 畸形知识态不得 EXIT=1，实为 {p.returncode}"
+
+        # R4.2（盲检🔴5）：validate_contracts plugin.json 顶层非对象须 EXIT=5
+        # （契约仅 0/5），不得 AttributeError traceback EXIT=1。用副本改 manifest。
+        import shutil
+        pcopy = d / "pkgcopy"
+        shutil.copytree(PKG, pcopy, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"))
+        (pcopy / ".codebuddy-plugin" / "plugin.json").write_text("[]", encoding="utf-8")
+        p = subprocess.run([sys.executable, str(pcopy / "scripts" / "validate_contracts.py")],
+                           capture_output=True, text=True, timeout=60)
+        assert "Traceback" not in (p.stdout + p.stderr), "validate_contracts 畸形 manifest 不得崩溃"
+        assert p.returncode == 5, f"畸形 manifest 须 EXIT=5，实为 {p.returncode}"
+
 
 def test_poll_hitlimit_and_manifest() -> None:
     """R-13a/c（2026-11-09）：撞限标注消费 + --from-manifest 行为级守卫。
@@ -923,6 +984,14 @@ def test_poll_hitlimit_and_manifest() -> None:
         (d / "spawn_manifest.jsonl").unlink()
         rc, out = run("--from-manifest")
         assert rc == 5, f"manifest 缺失必须 EXIT=5，实际 rc={rc}"
+
+        # R4.2（盲检🔴3）：UTF-16 撞限标注（errors="replace" 会吞成 U+FFFD）不得
+        # 误判 READY——须严格读 + 控制字符检测 → 保守判撞限 NOT_READY/EXIT=5。
+        (d / "T-P__literature-scout.md").write_bytes(
+            "<!-- 轮次耗尽：产出不完整 -->\n# p\n".encode("utf-16"))
+        rc, out = run("--expected", "literature-scout")
+        assert rc == 5 and "撞限" in out, \
+            f"UTF-16 撞限标注须 NOT_READY/EXIT=5，实为 rc={rc}"
 
 
 def test_legacy_package_check_fallback() -> None:

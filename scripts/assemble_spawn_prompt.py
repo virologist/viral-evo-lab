@@ -542,10 +542,17 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
         if hyp.is_file():
             try:
                 d = json.loads(hyp.read_text(encoding="utf-8"))
-                active = [h.get("id") for h in d.get("active_hypotheses", [])
-                          if h.get("status") != "deprecated"]
-                deprec = [h.get("id") for h in d.get("active_hypotheses", [])
-                          if h.get("status") == "deprecated"]
+                # R4.2（2026-11-19 · 盲检🔴4）：合法 JSON 但顶层非对象（如 []）时
+                # d.get 抛 AttributeError → EXIT=1（契约无 1）。与 hypothesis_watch
+                # load_json_obj 同源防护：结构不符即跳过注入（降级），不炸装配。
+                if not isinstance(d, dict):
+                    raise ValueError(f"confirmed_hypotheses.json 顶层须为对象，实为 {type(d).__name__}")
+                ah = d.get("active_hypotheses", [])
+                if not isinstance(ah, list):
+                    raise ValueError(f"active_hypotheses 须为数组，实为 {type(ah).__name__}")
+                ah = [h for h in ah if isinstance(h, dict)]  # 非对象元素skip（防 h.get 崩溃）
+                active = [h.get("id") for h in ah if h.get("status") != "deprecated"]
+                deprec = [h.get("id") for h in ah if h.get("status") == "deprecated"]
                 inj.append("【项目知识态·硬约束】（引用结论前必查；违反=虚报）")
                 inj.append(f"- 活跃假说（可引用）：{', '.join(x or '?' for x in active) or '（无）'}")
                 inj.append(f"- 已废弃假说（🔴禁止引用为当前结论，只能作历史陈述）："
@@ -553,8 +560,9 @@ def assemble(expert_dir: Path, member_id: str, fm: dict, body: str,
                 inj.append(f"- 权威源：{hyp}")
                 inj.append("- 任务产出中的关键数字（n=/百分比/p=/D′值）必须能在权威源 CSV 中 grep 到；"
                            "找不到 = 标注[待人工核验]，禁止直接当作事实陈述")
-            except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
-                # R3.1（2026-11-17 盲检回补）：非 UTF-8 假说池同前，跳过注入不炸装配。
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError,
+                    AttributeError, TypeError, ValueError) as e:
+                # R3.1/R4.2：非 UTF-8 / 结构畸形假说池同前，跳过注入不炸装配。
                 log(f"confirmed_hypotheses.json 解析失败，跳过注入：{e}")
         if kidx.is_file():
             inj.append(f"- 知识地图（结论→证据链→文件路径）：{kidx}")

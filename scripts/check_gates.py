@@ -40,6 +40,23 @@ REQUIRED_ENV = ["agent_id", "task_id", "phase", "status", "confidence", "deliver
 VALID_STATUS = {"success", "partial", "failed", "blocked"}
 
 
+# R4.2（2026-11-19 · 盲检🔴1/🔴2）：统一严格读守卫（单一事实源 scripts/_text_guard.py）。
+# 无 BOM UTF-16 的 NUL 交错在 UTF-8 下合法，单纯捕获 UnicodeError 防不住 fail-open；
+# 必须由 _text_guard 解码后显式检测 NUL/U+FFFD。动态加载与同目录其它模块一致。
+_TEXT_GUARD = None
+
+
+def _text_checked(path):
+    """返回 (text, err)，text=None 表示不可解码/控制字符污染（调用方 fail-closed）。"""
+    global _TEXT_GUARD
+    if _TEXT_GUARD is None:
+        here = Path(__file__).resolve().parent
+        spec = importlib.util.spec_from_file_location("_text_guard", here / "_text_guard.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        _TEXT_GUARD = mod
+    return _TEXT_GUARD.read_text_checked(path)
+
 
 def _load_guard():
     """R-10a：加载同目录 guard_readonly（只读区写盘守卫）；加载失败不阻断（降级为无守卫）。"""
@@ -198,11 +215,14 @@ def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str]
     """
     if not isinstance(unverified, list) or not unverified:
         return 0, ""
-    try:
-        texts = {a.name: a.read_text(encoding="utf-8-sig") for a in artifacts}
-    except (OSError, UnicodeError):
-        # R4.1：任一 artifact 不可解码 → 无法证明标注属于成员，fail-closed 不放行
-        return 0, ""
+    texts: dict[str, str] = {}
+    for a in artifacts:
+        txt, _ = _text_checked(a)
+        if txt is None:
+            # R4.1/R4.2：任一 artifact 不可解码或含 NUL/U+FFFD → 无法证明标注
+            # 属于成员，fail-closed 不放行（整批放弃，避免部分文本误放行）
+            return 0, ""
+        texts[a.name] = txt
     # 标注形态：数字与标记可被空白/标点分隔（"n=777 [待人工核验]" / "n=777（待人工核验）"）
     marker_pat = re.compile(
         r"(?P<num>\d{1,6}(?:\.\d+)?)\s*[^\n]{0,40}?\[?\s*待人工核验\s*\]?", re.I)
@@ -214,12 +234,19 @@ def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str]
         val = str(u.get("value", "")).strip()
         if not val:
             continue
-        # R4.1：只认「该数字所属成员」的产出标注，缺 member 无法确定来源则不放行
+        # R4.1/R4.2：只认「该数字所属成员」的产出标注，缺 member 不放行。
+        # R4.2 盲检🔴2：原 endswith(f"__{member}.md") 会被 T__foo__alice.md 命中，
+        # 使副产物的标注洗白 T__alice.md 的数字。改为「文件名最后一段 __ 之后必须
+        # 恰好是 {member}.md」——末段精确相等，杜绝前缀拼接绕过。
         member = str(u.get("member", "")).strip()
-        if not member:
+        if not member or "__" in member:  # 成员 ID 不含 __；含 __ 视为可疑伪造，拒绝
             continue
+        # 精确：文件名主体须恰好 {task_id}__{member}（仅一个 __ 分隔符），
+        # 杜绝 T__foo__alice.md 这类多段前缀副产物混入（其标注不可洗白 alice）。
         own = [txt for name, txt in texts.items()
-               if name.endswith(f"__{member}.md")]
+               if name.endswith(".md")
+               and name.removesuffix(".md").count("__") == 1
+               and name.removesuffix(".md").rsplit("__", 1)[-1] == member]
         if not own:
             continue
         hit = False
@@ -257,11 +284,11 @@ def check_envelope(art: Path, sidecar_wf: str = "", sidecar_note: str = "") -> t
         - sidecar=other   + 信封 workflow=analysis → FAIL（擅自升级，伪造分析约束）
         - 无 sidecar（存量链路）→ 退回「只信信封」旧行为，不误阻断存量产出
     """
-    try:
-        head = art.read_text(encoding="utf-8-sig")[:ENVELOPE_SKIP_CHARS]
-    except (OSError, UnicodeError) as e:
-        # R4.1：解码失败≠无信封，fail-closed 判 G1 FAIL（不吞字节伪造通过）
-        return False, f"读取失败: {type(e).__name__}: {e}"
+    full, dec_err = _text_checked(art)
+    if full is None:
+        # R4.1/R4.2：解码失败或 NUL/U+FFFD 污染≠无信封，fail-closed 判 G1 FAIL
+        return False, f"读取失败: {dec_err}"
+    head = full[:ENVELOPE_SKIP_CHARS]
     # 信封可能是独立 JSON 行/块——逐行尝试解析含 agent_id 的 JSON 对象
     for line in head.splitlines():
         line = line.strip().rstrip(",")
@@ -636,10 +663,10 @@ def main() -> int:
         decode_failed: list[str] = []
         for art in artifacts:
             bucket: set[str] = set()
-            try:
-                text = art.read_text(encoding="utf-8-sig")
-            except (OSError, UnicodeError) as e:
-                decode_failed.append(f"{art.name}({type(e).__name__})")
+            text, dec_err = _text_checked(art)
+            if text is None:
+                # R4.2：NUL/U+FFFD 污染（无 BOM UTF-16）同样计入 decode_failed
+                decode_failed.append(f"{art.name}({dec_err})")
                 marked_by_art[art.name] = bucket
                 continue
             for m in re.finditer(
@@ -649,9 +676,8 @@ def main() -> int:
                     bucket.add(m.group("num"))
             marked_by_art[art.name] = bucket
         for art in artifacts:
-            try:
-                text = art.read_text(encoding="utf-8-sig")
-            except (OSError, UnicodeError):
+            text, _ = _text_checked(art)
+            if text is None:
                 continue   # 已记入 decode_failed，下面并入 G2 FAIL
             own_marked = marked_by_art.get(art.name, set())
             for kind, val, _ in vmo._vn.extract_numbers(text, min_digits=2):

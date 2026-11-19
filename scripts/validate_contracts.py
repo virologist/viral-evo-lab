@@ -79,8 +79,15 @@ def check_manifests(base: Path) -> list[dict]:
     for mf in (".codebuddy-plugin/plugin.json", ".claude-plugin/plugin.json"):
         p = base / mf
         try:
-            versions[mf] = json.loads(p.read_text(encoding="utf-8-sig")).get("version", "?")
-        except (OSError, UnicodeError, json.JSONDecodeError) as e:
+            obj = json.loads(p.read_text(encoding="utf-8-sig"))
+            # R4.2（2026-11-19 · 盲检🔴5）：合法 JSON 但顶层非对象（如 []）时
+            # .get 抛 AttributeError → EXIT=1（契约仅 0/5）。结构不符记契约缺失
+            # → 最终 EXIT=5，与同函数其它读取失败同口径。
+            if not isinstance(obj, dict):
+                raise ValueError(f"顶层须为对象，实为 {type(obj).__name__}")
+            versions[mf] = obj.get("version", "?")
+        except (OSError, UnicodeError, json.JSONDecodeError,
+                AttributeError, TypeError, ValueError) as e:
             miss.append({"contract": f"{mf} 读取失败", "missing_pattern": str(e)})
     if len(set(versions.values())) > 1:
         miss.append({"contract": "双 manifest version 不一致",

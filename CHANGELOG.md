@@ -4,6 +4,27 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.20] - 2026-11-19（R4.2 全面复测回补轮 · 用户授权持续迭代至全绿）
+
+两路独立盲检（R4.1 后）各报真实缺陷，主代理逐条独立复现后全修。核心根因：R4.1 的「严格 utf-8-sig + 捕获 UnicodeError」防不住**无 BOM UTF-16**——其 NUL 交错字节在 UTF-8 下合法，解码不抛异常却使数字正则全部失配 → `checked=0 → PASS`（比 traceback 更危险的 fail-open）。
+
+### Fixed（6🔴 + 1🟠，全部实证复现后修复）
+- **🔴 UTF-16 fail-open（3 入口）**：新增共享守卫 `scripts/_text_guard.py`（解码后检测 NUL/U+FFFD，单一事实源），接入 `verify_numbers`（产出+权威源）、`verify_member_output`、`check_gates`（G2 分桶扫描 + G4 标注 + G1 信封）。无 BOM UTF-16 产出从误判 PASS 改为契约码 3 / G2 FAIL / unverified 哨兵。
+- **🔴 G4 标注后缀绕过**：`_pending_manual_marked` 原 `endswith(f"__{member}.md")` 被 `T__foo__alice.md` 命中，副产物标注洗白 `T__alice.md` 数字 → 误判 PASS/EXIT=0。改为精确匹配（文件名主体须恰好 `{task_id}__{member}`，仅一个 `__` 分隔符）+ member 白名单校验；修复中发现并修正 off-by-one（`.md` 3 字符误切 4）。
+- **🔴 撞限标注 UTF-16 漏检**：`poll_run_dir.head_hit_limit` 原 `errors="replace"` 把 UTF-16 的「轮次耗尽」吞成 U+FFFD → 判 READY 放行不完整产出。改严格读 + 控制字符检测，失败/污染保守判撞限 True（NOT_READY/EXIT=5）。
+- **🔴 assemble_spawn_prompt 结构崩溃**：`confirmed_hypotheses.json` 顶层非对象（`[]`）或元素非 dict → `AttributeError` EXIT=1（契约无 1）。加 isinstance 防护 + 捕获面扩展，降级跳过注入不炸装配。
+- **🔴 validate_contracts 结构崩溃**：plugin.json 顶层非对象 → `AttributeError` EXIT=1（契约仅 0/5）。结构不符记契约缺失 → EXIT=5。
+- **🔴 check_scope fail-open**：不可解码/控制字符污染文件原被当「无命中」→ 误判 clean/EXIT=0。改为记「无法核验」命中 → EXIT=3（与 validate_contracts/check_gates fail-closed 同口径）。
+- **🟠 cron_watch.sh manifest 静默失效**：原 `errors="replace"` 使 UTF-16 manifest 全部 JSON 行解析失败 → TASKS 空 → 监控静默失效。改严格读 + 控制字符检测，不可解码时 stderr 明示 + 非零退出。
+
+### Changed
+- 新增 `scripts/_text_guard.py` 进入完整性清单（manifest 79 → **80 文件**）。
+- 回归断言全部复用既有测试函数（不新增函数，`CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**）：🔴1/4/5/6 入 `test_require_tag_gate`，🔴2 入 `test_gate_mode_blocks`，🔴3 入 `test_poll_hitlimit_and_manifest`。
+
+### Verified
+- pytest 19 passed / fuzz 61/61 / 守卫 11/11 / manifest 80 文件 --check EXIT=0 / py_compile 全过。
+- 6🔴 全部主代理独立复现（复现→修复→反向对照三态）后才采信与闭合。
+
 ## [1.5.19] - 2026-11-18（R4.1 盲检回补轮 · 用户裁决全修）
 
 > R4 两轮独立盲检均报🔴（通用盲检 2🔴 / 对抗性盲检 6🔴），主代理逐条独立复现后坐实 4 类真缺陷、厘清误报与 fail-close 安全方向。用户裁决「全修 + 重开盲检」「UTF-16 全包统一改严格读」。R4 收敛计数归零，本轮回补后重启两轮零🔴盲检。

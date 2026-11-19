@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-18T22:31:11",
- "file_count": 79,
+ "generated": "2026-11-19T21:03:00",
+ "file_count": 80,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "21368ced5348ceef",
+   "sha16": "dd2f905b4af687ad",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "b634c37eb20a96ca",
+   "sha16": "32300856c10487d1",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "cc496ceccdaa19d8",
+   "sha16": "a4e52131fb68be67",
    "bytes": 6722
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "33fa957850ce5175",
-   "bytes": 76363
+   "sha16": "5f3bd5d4e0eb05b3",
+   "bytes": 79365
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
@@ -162,9 +162,13 @@
    "sha16": "3b6ff9cd7ccd2aa5",
    "bytes": 6211
   },
+  "scripts/_text_guard.py": {
+   "sha16": "5f2674f81b6dd963",
+   "bytes": 2567
+  },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "2eb750d470c5f499",
-   "bytes": 38628
+   "sha16": "b1588c2e755ec3c6",
+   "bytes": 39331
   },
   "scripts/audit_decision_log.py": {
    "sha16": "8a52b91e7add991b",
@@ -179,16 +183,16 @@
    "bytes": 8703
   },
   "scripts/check_gates.py": {
-   "sha16": "d0d6334bc035d630",
-   "bytes": 44337
+   "sha16": "21221d4bca3a5fdd",
+   "bytes": 45897
   },
   "scripts/check_scope.py": {
-   "sha16": "e2ca062b01272b9e",
-   "bytes": 5033
+   "sha16": "cd08d81e989daab5",
+   "bytes": 5575
   },
   "scripts/cron_watch.sh": {
-   "sha16": "5175be300a33521e",
-   "bytes": 4050
+   "sha16": "e2e4f1edb627e35f",
+   "bytes": 4947
   },
   "scripts/find_knowledge.py": {
    "sha16": "180c06ee5265e0c7",
@@ -215,8 +219,8 @@
    "bytes": 3978
   },
   "scripts/poll_run_dir.py": {
-   "sha16": "0edfc444bde812a8",
-   "bytes": 12116
+   "sha16": "27116df1bcba887b",
+   "bytes": 12764
   },
   "scripts/reconcile_decisions.py": {
    "sha16": "4ca61cf5f337c46e",
@@ -227,20 +231,20 @@
    "bytes": 8253
   },
   "scripts/validate_contracts.py": {
-   "sha16": "7bab687655df530a",
-   "bytes": 7609
+   "sha16": "879228f09335759f",
+   "bytes": 8087
   },
   "scripts/verify_evidence_check.py": {
    "sha16": "83a611bcfa7eb481",
    "bytes": 6620
   },
   "scripts/verify_member_output.py": {
-   "sha16": "b7f354acd592e818",
-   "bytes": 9807
+   "sha16": "bb75f7d8a1f7fc40",
+   "bytes": 9871
   },
   "scripts/verify_numbers.py": {
-   "sha16": "8dc2291347088889",
-   "bytes": 9456
+   "sha16": "23bf0abb6f276bd9",
+   "bytes": 9765
   },
   "scripts/write_checklist.py": {
    "sha16": "c78c56df37da400c",
@@ -303,8 +307,8 @@
    "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "4dabad9d578a1b08",
-   "bytes": 88380
+   "sha16": "a7d1f6bfe1a4e4cb",
+   "bytes": 93129
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

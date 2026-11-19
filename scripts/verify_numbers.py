@@ -41,6 +41,11 @@ import re
 import sys
 from pathlib import Path
 
+# R4.2（2026-11-19 · 盲检🔴1）：统一严格读守卫——无 BOM UTF-16 的 NUL 交错在
+# UTF-8 下是合法字节，单独捕获 UnicodeError 防不住，必须显式检测控制字符。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _text_guard import read_text_checked  # noqa: E402
+
 # 权威数字模式（保守：只抓最易造假/最关键的四类 + CI）
 PATTERNS = [
     ("pct",   re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")),
@@ -110,11 +115,9 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
     chunks = []
 
     def tagged(f: Path) -> bool:
-        try:
-            return "source_tag: authoritative" in "".join(f.read_text(encoding="utf-8-sig").splitlines()[:3])
-        except (OSError, UnicodeError):
-            # R4.1：解码失败视为无标记（fail-closed，该源不进权威池）
-            return False
+        txt, _ = read_text_checked(f, max_chars=400)
+        # R4.1/R4.2：解码失败或控制字符污染视为无标记（fail-closed，该源不进权威池）
+        return txt is not None and "source_tag: authoritative" in "".join(txt.splitlines()[:3])
 
     for sp in paths:
         p = Path(sp)
@@ -126,11 +129,10 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
                 if f.suffix.lower() in ok_suffix and f.is_file():
                     if require_tag and not tagged(f):
                         continue
-                    try:
-                        chunks.append(f.read_text(encoding="utf-8-sig"))
-                    except (OSError, UnicodeError):
-                        # R4.1：畸形源跳过，不静默吞字节进池
-                        pass
+                    src_txt, _ = read_text_checked(f)
+                    if src_txt is not None:
+                        chunks.append(src_txt)
+                    # R4.1/R4.2：畸形/控制字符污染源跳过，不静默吞字节进池
         else:
             ok_suffix2 = (".csv", ".json", ".md", ".txt") if allow_md else (".csv", ".json")
             if not (p.is_file() and p.suffix.lower() in ok_suffix2):
@@ -139,11 +141,10 @@ def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: b
                 continue
             if require_tag and not tagged(p):
                 continue
-            try:
-                chunks.append(p.read_text(encoding="utf-8-sig"))
-            except (OSError, UnicodeError):
-                # R4.1：畸形源跳过（单文件路径分支）
-                pass
+            src_txt, _ = read_text_checked(p)
+            if src_txt is not None:
+                chunks.append(src_txt)
+            # R4.1/R4.2：畸形源跳过（单文件路径分支）
     return "\n".join(chunks)
 
 def main() -> int:
@@ -166,11 +167,11 @@ def main() -> int:
     if not art.is_file():
         print(f"[verify_numbers] 产出文件不存在: {art}", file=sys.stderr)
         return 3
-    try:
-        text = art.read_text(encoding="utf-8-sig")
-    except (OSError, UnicodeError) as e:
-        # R4.1：产出不可解码 = 证据源不可用（契约码 3），禁止吞字节后误判 PASS
-        print(f"[verify_numbers] 产出文件不可解码: {type(e).__name__}: {e}", file=sys.stderr)
+    text, dec_err = read_text_checked(art)
+    if text is None:
+        # R4.1/R4.2：产出不可解码或含 NUL/U+FFFD = 证据源不可用（契约码 3），
+        # 禁止吞字节后误判 PASS（无 BOM UTF-16 的 NUL 交错是合法 UTF-8，须显式检测）
+        print(f"[verify_numbers] 产出文件不可解码: {dec_err}", file=sys.stderr)
         return 3
     nums = extract_numbers(text, args.min_digits)
     pool = load_sources(args.sources, args.exclude, args.allow_md, require_tag=args.require_tag)

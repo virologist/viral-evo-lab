@@ -135,15 +135,15 @@ def main() -> int:
     all_unverified = []
     for art in artifacts:
         member = art.stem.split("__", 1)[1] if "__" in art.stem else art.stem
-        try:
-            text = art.read_text(encoding="utf-8-sig")
-        except (OSError, UnicodeError) as e:
-            # R4.1：不可解码产出 fail-closed 记未溯源哨兵 → verdict=DEGRADE，
-            # 禁止吞字节当"无数字"而误判 PASS（G4 block 态据此拦截）。
-            print(f"🔴 {member}: 产出不可解码（{type(e).__name__}）——按未溯源计",
+        text, dec_err = _vn.read_text_checked(art)
+        if text is None:
+            # R4.1/R4.2：不可解码或含 NUL/U+FFFD 的产出 fail-closed 记未溯源哨兵
+            # → verdict=DEGRADE，禁止吞字节当"无数字"而误判 PASS（G4 block 据此拦截）。
+            # 无 BOM UTF-16 的 NUL 交错是合法 UTF-8，须显式检测（盲检🔴1）。
+            print(f"🔴 {member}: 产出不可解码（{dec_err}）——按未溯源计",
                   file=sys.stderr)
             all_unverified.append({"member": member, "kind": "decode_error",
-                                   "value": f"<不可解码:{type(e).__name__}>"})
+                                   "value": f"<不可解码:{dec_err}>"})
             continue
         nums = _vn.extract_numbers(text, min_digits=2)
         unverified = []
