@@ -968,6 +968,14 @@ def test_require_tag_gate() -> None:
         rc = subprocess.run([sys.executable, str(vn), str(zwjnum), "--sources", str(d / "s2")],
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 3, f"ZWJ 夹数字须检测为污染 EXIT=3（防 fail-open），实为 {rc}"
+        # R4.3 复核（主代理对抗实证）：emoji(So) 夹进数字串（n=8👨‍👩88）同样
+        # 让数字正则静默失配 → checked=0 → PASS fail-open。合法 emoji 放行
+        # 不能以打开此通道为代价；emoji/ZWJ 段紧贴 ASCII 数字须 EXIT=3。
+        emonum = d / "emoji_num.md"
+        emonum.write_text("n=8👨\u200d👩88\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(emonum), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"emoji 夹数字须检测为污染 EXIT=3（防 fail-open），实为 {rc}"
 
         # R4.2（盲检🔴6）：check_scope 不可解码/控制字符污染文件不得误判 clean(0)，
         # 须报无法核验 → EXIT=3（fail-closed）。

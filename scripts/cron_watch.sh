@@ -66,18 +66,29 @@ import unicodedata
 _ALLOWED_WS = set("\t\n\r\v\f")
 def _emoji(cp):
     return 0x1F000 <= cp <= 0x1FAFF or 0x2600 <= cp <= 0x27BF
-def _bad_at(s, i):
-    # R4.3：与 _text_guard.has_forbidden 同款——U+200D(ZWJ) 两侧均 emoji 时放行
-    ch = s[i]
-    if ch in _ALLOWED_WS:
-        return False
-    if ch == "\ufffd" or unicodedata.category(ch) == "Cc":
-        return True
-    if unicodedata.category(ch) == "Cf":
-        return not (ch == "\u200d" and 0 < i < len(s)-1 and _emoji(ord(s[i-1])) and _emoji(ord(s[i+1])))
-    return False
 def _bad_text(s):
-    return any(_bad_at(s, i) for i in range(len(s)))
+    # R4.3：与 _text_guard.has_forbidden 同款 span 判定——把连续 emoji/Cf 视为
+    # 一段；非 ZWJ 的 Cf 一律拒绝；emoji/ZWJ 段紧贴 ASCII 数字（夹断数字串）拒绝。
+    n = len(s); i = 0
+    while i < n:
+        ch = s[i]
+        if ch in _ALLOWED_WS:
+            i += 1; continue
+        if ch == "\ufffd" or unicodedata.category(ch) == "Cc":
+            return True
+        if _emoji(ord(ch)) or unicodedata.category(ch) == "Cf":
+            j = i; non_zwj = False
+            while j < n and (_emoji(ord(s[j])) or s[j] == "\u200d" or unicodedata.category(s[j]) == "Cf"):
+                if unicodedata.category(s[j]) == "Cf" and s[j] != "\u200d":
+                    non_zwj = True
+                j += 1
+            left = s[i-1] if i > 0 else ""
+            right = s[j] if j < n else ""
+            if non_zwj or left.isdigit() or right.isdigit():
+                return True
+            i = j; continue
+        i += 1
+    return False
 p = Path(sys.argv[1]) / "spawn_manifest.jsonl"
 ids = []
 if p.is_file():

@@ -57,19 +57,42 @@ def has_forbidden(text: str) -> bool:
     fail-open；emoji 序列也不会被数字正则当作数字的一部分。
     """
     n = len(text)
-    for i, ch in enumerate(text):
+    i = 0
+    while i < n:
+        ch = text[i]
         if ch in _ALLOWED_WS:
+            i += 1
             continue
         if ch == "\ufffd":
             return True
         cat = unicodedata.category(ch)
         if cat == "Cc":
             return True
-        if cat == "Cf":
-            if (ch == "\u200d" and 0 < i < n - 1
-                    and _is_emoji_cp(text[i - 1]) and _is_emoji_cp(text[i + 1])):
-                continue  # 合法 emoji ZWJ 序列
-            return True
+        # R4.3 复核（主代理对抗实证）：emoji(So)/Cf 本身不是 fail-open，但把
+        # 连续 emoji/Cf 当成一个 span 塞进数字串中间（n=8👨‍👩88）会让数字正则
+        # 静默失配 → checked=0 → PASS。合法 emoji 序列不会紧贴 ASCII 数字，
+        # 故：span 左右任一紧邻 ASCII 数字即判污染；否则（如「家族 👨‍👩‍👧
+        # 样本量 n=888」）放行。同时保留 ZWSP/BOM/软连字符等非 ZWJ Cf 一律拒绝。
+        if _is_emoji_cp(ch) or cat == "Cf":
+            j = i
+            has_non_zwj_cf = False
+            while j < n and (_is_emoji_cp(text[j]) or text[j] == "\u200d"
+                             or unicodedata.category(text[j]) == "Cf"):
+                if (unicodedata.category(text[j]) == "Cf"
+                        and text[j] != "\u200d"):
+                    has_non_zwj_cf = True
+                j += 1
+            left = text[i - 1] if i > 0 else ""
+            right = text[j] if j < n else ""
+            # 非 ZWJ 的 Cf（ZWSP/BOM/软连字符/U+2060）夹在任意位置都拒绝
+            if has_non_zwj_cf:
+                return True
+            # emoji/ZWJ span 紧贴数字 = 数字串被隔断 = fail-open，拒绝
+            if (left.isdigit() or right.isdigit()):
+                return True
+            i = j
+            continue
+        i += 1
     return False
 
 
