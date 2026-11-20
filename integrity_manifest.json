@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-19T21:03:00",
+ "generated": "2026-11-20T18:43:40",
  "file_count": 80,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "dd2f905b4af687ad",
+   "sha16": "33a0527ace505c74",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "32300856c10487d1",
+   "sha16": "4ea74a634d4105cd",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "a4e52131fb68be67",
+   "sha16": "0985710d48cea91d",
    "bytes": 6722
   },
   ".gitignore": {
@@ -163,12 +163,12 @@
    "bytes": 6211
   },
   "scripts/_text_guard.py": {
-   "sha16": "5f2674f81b6dd963",
-   "bytes": 2567
+   "sha16": "c3917bd26f155095",
+   "bytes": 4626
   },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "b1588c2e755ec3c6",
-   "bytes": 39331
+   "sha16": "71d37b9a3c34aa81",
+   "bytes": 40349
   },
   "scripts/audit_decision_log.py": {
    "sha16": "8a52b91e7add991b",
@@ -179,20 +179,20 @@
    "bytes": 15852
   },
   "scripts/check_decision_records.py": {
-   "sha16": "8637e37f7a2e807b",
-   "bytes": 8703
+   "sha16": "35460773cf3ae737",
+   "bytes": 9463
   },
   "scripts/check_gates.py": {
-   "sha16": "21221d4bca3a5fdd",
-   "bytes": 45897
+   "sha16": "868f8ba4d35ca1c8",
+   "bytes": 47069
   },
   "scripts/check_scope.py": {
-   "sha16": "cd08d81e989daab5",
-   "bytes": 5575
+   "sha16": "081a40dea0979e2c",
+   "bytes": 5808
   },
   "scripts/cron_watch.sh": {
-   "sha16": "e2e4f1edb627e35f",
-   "bytes": 4947
+   "sha16": "d91b0a2b93b39e35",
+   "bytes": 6076
   },
   "scripts/find_knowledge.py": {
    "sha16": "180c06ee5265e0c7",
@@ -207,8 +207,8 @@
    "bytes": 6361
   },
   "scripts/hypothesis_watch.py": {
-   "sha16": "1e48fcd3624c47c8",
-   "bytes": 18546
+   "sha16": "fb449bf9fb8cd7cb",
+   "bytes": 19388
   },
   "scripts/install_cron_watch.sh": {
    "sha16": "2ad7aad9a46c4895",
@@ -231,8 +231,8 @@
    "bytes": 8253
   },
   "scripts/validate_contracts.py": {
-   "sha16": "879228f09335759f",
-   "bytes": 8087
+   "sha16": "ad29c782376e2054",
+   "bytes": 8524
   },
   "scripts/verify_evidence_check.py": {
    "sha16": "83a611bcfa7eb481",
@@ -307,8 +307,8 @@
    "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "a7d1f6bfe1a4e4cb",
-   "bytes": 93129
+   "sha16": "e85355cbb8566994",
+   "bytes": 100804
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

@@ -12,7 +12,7 @@ _text_guard.py —— 统一严格文本读取守卫（R4.2 · 2026-11-19）
 
 本模块提供单一事实源：read_text_checked()
     1) utf-8-sig 严格解码（剥 BOM，畸形多字节序列抛 UnicodeError）
-    2) 解码后扫描控制字符：NUL(U+0000) / U+FFFD 替换符 → 判不可解码
+    2) 解码后按 Unicode 类别扫描：Cc(除 \t\n\r\v\f) / Cf(零宽/格式字符) / U+FFFD → 判不可解码
     3) 统一返回 (text | None, reason)；调用方按各自契约码 fail-closed
 
 使用（同目录 import，脚本运行时 scripts/ 在 sys.path[0]）：
@@ -25,15 +25,52 @@ _text_guard.py —— 统一严格文本读取守卫（R4.2 · 2026-11-19）
     - fail-closed：宁可拒绝/降级，也不把不可解码内容当空/当干净放行
     - 不放宽：errors 参数固定 strict，禁止 ignore/replace 静默吞字节
 """
+import unicodedata
 from pathlib import Path
 
-# 不可解码控制字符：NUL（UTF-16 交错的铁证）、U+FFFD（非法字节被替换的痕迹）
-_FORBIDDEN = ("\x00", "\ufffd")
+# R4.3（2026-11-19 · 盲检①🔴6 + 主代理对抗实证）：从「枚举 C0 字符」升级为
+# **Unicode 类别检测**——零宽/格式字符（Cf，如 U+200B/ZWSP、U+FEFF、U+2060、
+# U+00AD 软连字符）交错在数字旁同样让正则静默失配 → checked=0 → PASS fail-open，
+# 而它们不在 C0 范围，枚举法挡不住。改用类别：
+#   - Cc（控制字符）：NUL/SOH/DEL 等；白名单 \t\n\r\v\f（Python re 的 \s，合法文本空白）
+#   - Cf（格式字符）：零宽空格/连接符/BOM/软连字符等，一律拒绝
+#   - U+FFFD（So 替换符）：非法字节被替换的痕迹，单独拒绝
+# 放行：NBSP(U+00A0, Zs)——Python re 的 \s 可解析、合法文档会用；及一切可见字符。
+_ALLOWED_WS = frozenset("\t\n\r\v\f")  # re \s 成员，放行不造成数字正则失配
+
+
+def _is_emoji_cp(ch: str) -> bool:
+    """ZWJ 序列两侧的 emoji 码点判定（常见 emoji 区 + dingbats）。"""
+    cp = ord(ch)
+    return (0x1F000 <= cp <= 0x1FAFF) or (0x2600 <= cp <= 0x27BF)
 
 
 def has_forbidden(text: str) -> bool:
-    """文本是否含 NUL / U+FFFD——命中即视为 UTF-16 或非法字节污染。"""
-    return any(ch in text for ch in _FORBIDDEN)
+    """文本是否含 Cc(除空白)/Cf/U+FFFD——命中即视为二进制或不可见字符污染。
+
+    R4.3（2026-11-20 · 盲检🟠）：合法 emoji ZWJ 序列（👨‍👩‍👧，U+200D 连接两侧
+    emoji）不得被一刀切误拒（fail-close 误伤合法产出）。精确白名单：仅当
+    U+200D 两侧均为 emoji 码点时放行；其余 Cf（U+200B/ZWSP、U+FEFF、U+00AD
+    软连字符、U+2060）仍拒绝。
+    安全论证：放行条件要求两侧都是 emoji——数字/字母侧一律拒绝，故攻击者
+    无法用 ZWJ 分隔数字串（如 0\\u200d7）造成正则失配 → checked=0 → PASS 的
+    fail-open；emoji 序列也不会被数字正则当作数字的一部分。
+    """
+    n = len(text)
+    for i, ch in enumerate(text):
+        if ch in _ALLOWED_WS:
+            continue
+        if ch == "\ufffd":
+            return True
+        cat = unicodedata.category(ch)
+        if cat == "Cc":
+            return True
+        if cat == "Cf":
+            if (ch == "\u200d" and 0 < i < n - 1
+                    and _is_emoji_cp(text[i - 1]) and _is_emoji_cp(text[i + 1])):
+                continue  # 合法 emoji ZWJ 序列
+            return True
+    return False
 
 
 def read_text_checked(path, *, encoding: str = "utf-8-sig", max_chars: int | None = None):
@@ -48,7 +85,7 @@ def read_text_checked(path, *, encoding: str = "utf-8-sig", max_chars: int | Non
     except (OSError, UnicodeError) as e:
         return None, f"{type(e).__name__}: {e}"
     if has_forbidden(text):
-        return None, "含 NUL/U+FFFD 控制字符（疑无 BOM UTF-16 或非法字节序列）"
+        return None, "含 Cc(控制)/Cf(零宽格式)字符或 U+FFFD（疑不可见字符/二进制污染）"
     if max_chars is not None:
         text = text[:max_chars]
     return text, ""

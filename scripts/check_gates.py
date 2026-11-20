@@ -191,7 +191,7 @@ def load_workflow_sidecar(run_dir: Path, task_id: str) -> tuple[dict | None, str
     return obj, ""
 
 
-def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str]:
+def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str, int]:
     """L3（2026-11-09 · A-5 修复）：解析成员的 [待人工核验] 标注。
 
     背景：文档（team-lead T1 / quality-gates / verify_member_output 输出）
@@ -212,16 +212,21 @@ def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str]
     误判 PASS）。unverified 条目带 `member` 字段（verify_member_output 落盘），
     现按 member 精确定位来源 artifact（`{task_id}__{member}.md`），只在该产出
     自身标注里匹配；缺 member / 找不到对应 artifact 时 fail-closed 不放行。
+
+    返回 (已标注数量, 摘要, unverified 总数)。第三项供 G4 判定「是否全部处置」——
+    R4.3（2026-11-20 · 盲检🔴6）：原返回 2 元组，main 只要 marked>0 就解除整段
+    阻断，部分标注（2 项未溯源仅标 1 项）即可洗白其余未标注项，与 waiver 路径
+    「部分放行不解除阻断」的纪律不对称。
     """
     if not isinstance(unverified, list) or not unverified:
-        return 0, ""
+        return 0, "", 0
     texts: dict[str, str] = {}
     for a in artifacts:
         txt, _ = _text_checked(a)
         if txt is None:
             # R4.1/R4.2：任一 artifact 不可解码或含 NUL/U+FFFD → 无法证明标注
             # 属于成员，fail-closed 不放行（整批放弃，避免部分文本误放行）
-            return 0, ""
+            return 0, "", len(unverified)
         texts[a.name] = txt
     # 标注形态：数字与标记可被空白/标点分隔（"n=777 [待人工核验]" / "n=777（待人工核验）"）
     marker_pat = re.compile(
@@ -264,7 +269,7 @@ def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str]
         if hit:
             marked += 1
             detail.append(val)
-    return marked, (", ".join(detail[:5]) if detail else "")
+    return marked, (", ".join(detail[:5]) if detail else ""), len(unverified)
 
 
 def check_envelope(art: Path, sidecar_wf: str = "", sidecar_note: str = "") -> tuple[bool, str]:
@@ -776,18 +781,26 @@ def main() -> int:
                 # A-5 修复：处置路径①「成员补 [待人工核验] 重传」须真实可解析——
                 # 原实现只有 print 文案，代码里无解析逻辑，该路径实际不解除任何门禁，
                 # 主理人因此只剩文档明令禁止的「人工裁量跳过」。
-                marked, marked_detail = _pending_manual_marked(unverified, artifacts)
+                marked, marked_detail, marked_total = _pending_manual_marked(unverified, artifacts)
+                # R4.3（2026-11-20 · 盲检🔴6）：标注放行须覆盖**全部**未溯源项，
+                # 与 waivers 路径 `_g4_waiver_hit` 的「部分放行不解除阻断」同纪律。
+                # 原 `elif marked:` 只要 1 项标注就解除整段阻断（2 项未溯源仅标 1
+                # 项即洗白另一项）。单条 unverified 全标注（marked==total）仍放行。
+                marked_all = marked > 0 and marked >= marked_total
                 if waived_all and unverified:
                     # 已放行 → 阻断**解除**，仅留可见性说明
                     resolved.append(
                         f"阻断态 DEGRADE 已由 waivers.json 人工放行（{len(covered)} 个未溯源数字经署名放行）")
-                elif marked:
+                elif marked_all:
                     resolved.append(
-                        f"阻断态 DEGRADE 已由成员标注 [待人工核验] 处置（{marked} 项）：{marked_detail}")
+                        f"阻断态 DEGRADE 已由成员标注 [待人工核验] 处置（{marked}/{marked_total} 项）：{marked_detail}")
                 else:
                     extra = ""
+                    if marked > 0 and not marked_all:
+                        extra += (f"（部分标注 {marked}/{marked_total}——须全部标注方可解除阻断；"
+                                  f"已标: {marked_detail}）")
                     if covered:
-                        extra = f"（已放行 {len(covered)} 个: {', '.join(covered[:3])}）"
+                        extra += f"（已放行 {len(covered)} 个: {', '.join(covered[:3])}）"
                     problems.append(
                         "阻断态 DEGRADE 未处置（gate_mode=block）"
                         + ("（verdict 字段缺失——无 verdict 不等于核验通过）" if verdict_missing else "")

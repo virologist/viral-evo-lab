@@ -16,6 +16,10 @@ import re
 import sys
 from pathlib import Path
 
+# R4.2/R4.3：复用单一事实源的不可见字符检测（Cc/Cf/U+FFFD），避免内联判定与守卫漂移
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _text_guard import has_forbidden  # noqa: E402
+
 # 项目特定叙事黑名单（关键词式；命中即疑似污染）
 # 原则：禁"具体事件"（错案位点+具体数字+具体PMID+具体事故日）
 # 不禁"领域通用"（糖基化、亚型名、位点符号本身）
@@ -50,9 +54,9 @@ def check_file(p: Path) -> list:
         # 污染文件被整体跳过 → 误判 clean EXIT=0。改为记一条"无法核验"命中，
         # 由 main 判 EXIT=3（与 validate_contracts/check_gates 的 fail-closed 同口径）。
         return [(-1, "UNREADABLE", f"{type(e).__name__}: 文件不可解码，无法核验是否含项目特定叙事")]
-    if "\x00" in text or "\ufffd" in text:
-        # 无 BOM UTF-16 的 NUL 交错是合法 UTF-8，解码不抛异常——显式检测
-        return [(-1, "UNREADABLE", "含 NUL/U+FFFD 控制字符（疑无 BOM UTF-16），无法核验")]
+    if has_forbidden(text):
+        # 无 BOM UTF-16 的 NUL/Cf 零宽字符交错是合法 UTF-8，解码不抛异常——显式检测
+        return [(-1, "UNREADABLE", "含 Cc/Cf 不可见字符或 U+FFFD（疑二进制污染），无法核验")]
     for lineno, line in enumerate(text.splitlines(), 1):
         # 排除纯注释行（脚本自身含 PPMID 等黑名单词会自检）
         stripped = line.strip()

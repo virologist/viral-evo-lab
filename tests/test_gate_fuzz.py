@@ -438,6 +438,21 @@ def test_disposition_gate() -> None:
         assert rc == 5, f"畸形 state 下 fatal 不得漏报（应 EXIT=5 REVIEW_REQUIRED），实为 {rc}"
         assert "H-99" in out, "畸形 state 下 fatal finding 必须被报出"
 
+        # R4.3（盲检🔴2）：closed_date 带小数秒（ISO 变体）不得让 severe 闭环漏报。
+        # 假说池更新设早一日，闭环设今日+小数秒 → 应判 late_fatal → EXIT=5。
+        st_p.unlink(missing_ok=True)
+        hyp_p.write_text(json.dumps({
+            "last_updated": "2026-11-18T00:00:00+08:00",
+            "active_hypotheses": [{"id": "H-1", "status": "active", "claim": "c"}]}) + "\n",
+            encoding="utf-8")
+        led_p.write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n"
+            "F-R43,severe,closed,2026-11-19T10:30:00.123456+08:00,小数秒闭环\n",
+            encoding="utf-8")
+        rc, out = run()
+        assert rc == 5 and "F-R43" in out, \
+            f"小数秒 severe 闭环须判 REVIEW_REQUIRED/EXIT=5，实为 rc={rc}: {out[-300:]}"
+
 
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
@@ -853,6 +868,23 @@ def test_gate_mode_blocks() -> None:
             assert _read_gates(rd).get("G4", False) is False, \
                 "多段前缀副产物（T__foo__alice.md）的标注不得洗白 alice 的数字"
 
+            # R4.3（盲检🔴6）：部分标注不得解除整段阻断——与 waivers 路径
+            # 「部分放行不解除阻断」同纪律。2 项未溯源只标 1 项 → G4 须 FAIL。
+            (rd / f"{TASK_ID}__alice.md").write_text(
+                env_s + "样本 n=777777 [待人工核验]；另 n=888888 未标注\n", encoding="utf-8")
+            (rd / f"{TASK_ID}__foo__alice.md").unlink(missing_ok=True)
+            (rd / f"{TASK_ID}__output-check.json").write_text(json.dumps({
+                "task_id": TASK_ID, "artifact_mtimes": {},
+                "unverified": [{"member": "alice", "kind": "n_eq", "value": "777777"},
+                               {"member": "alice", "kind": "n_eq", "value": "888888"}],
+                "verdict": "DEGRADE", "gate_mode": "block"}, ensure_ascii=False),
+                encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(CHECK_GATES), str(rd), TASK_ID, "--sources", str(src2)],
+                capture_output=True, text=True, timeout=60)
+            assert _read_gates(rd).get("G4", False) is False, \
+                "2 项未溯源仅标 1 项属部分标注，不得解除 G4 阻断"
+
 
 def test_require_tag_gate() -> None:
     """C3（2026-11-08）：产出端 require_tag 闸行为级守卫——未标记源必须被拒。
@@ -913,6 +945,30 @@ def test_require_tag_gate() -> None:
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 3, f"无 BOM UTF-16 产出须 NUL 检测 → EXIT=3，实为 {rc}"
 
+        # R4.2（主代理对抗实证）：非 NUL 的 C0 控制字符（U+0001）交错在数字旁
+        # 会让正则静默失配 → checked=0 → PASS fail-open。须一并检测 → EXIT=3。
+        c0 = d / "c0_inject.md"
+        c0.write_bytes(b"n\x01=\x01888\n")
+        rc = subprocess.run([sys.executable, str(vn), str(c0), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"C0 控制字符交错产出须 EXIT=3（非 PASS），实为 {rc}"
+
+        # R4.3（盲检🟠）：合法 emoji ZWJ 序列（U+200D 两侧皆 emoji）不得被 Cf
+        # 一刀切误拒（fail-close 误伤），但 ZWJ/ZWSP 夹数字仍须 EXIT=3（fail-open）。
+        emo = d / "emoji_ok.md"
+        emo.write_text("家族 👨\u200d👩\u200d👧 样本量 n=888。\n", encoding="utf-8")
+        pemo = subprocess.run([sys.executable, str(vn), str(emo), "--sources", str(d / "s2")],
+                              capture_output=True, text=True, timeout=60)
+        rc = pemo.returncode
+        # 关键是不得被当成不可解码污染（EXIT=3）；数字核验结果 0/5 取决于
+        # 888 是否在源中，本 fixture 源不含 888 → 正常为 5（未溯源），非误拒。
+        assert rc != 3, f"合法 emoji ZWJ 产出不得误拒为不可解码 EXIT=3，实为 {rc}"
+        zwjnum = d / "zwj_num.md"
+        zwjnum.write_text("n=8\u200d88\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(zwjnum), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"ZWJ 夹数字须检测为污染 EXIT=3（防 fail-open），实为 {rc}"
+
         # R4.2（盲检🔴6）：check_scope 不可解码/控制字符污染文件不得误判 clean(0)，
         # 须报无法核验 → EXIT=3（fail-closed）。
         cs = PKG / "scripts" / "check_scope.py"
@@ -946,6 +1002,36 @@ def test_require_tag_gate() -> None:
                            capture_output=True, text=True, timeout=60)
         assert "Traceback" not in (p.stdout + p.stderr), "validate_contracts 畸形 manifest 不得崩溃"
         assert p.returncode == 5, f"畸形 manifest 须 EXIT=5，实为 {p.returncode}"
+
+        # R4.3（盲检🔴1）：version 字段为 list/dict 时 set(values) 抛 TypeError
+        # → EXIT=1（契约仅 0/5）。须记契约缺失 → EXIT=5。
+        mvf = pcopy / ".codebuddy-plugin" / "plugin.json"
+        # 上一步把顶层写成 []，先恢复为合法对象基底（真实 plugin.json）
+        mvf.write_bytes((PKG / ".codebuddy-plugin" / "plugin.json").read_bytes())
+        mobj = json.loads(mvf.read_text(encoding="utf-8"))
+        mobj["version"] = ["1.5.20", "bad"]
+        mvf.write_text(json.dumps(mobj), encoding="utf-8")
+        p = subprocess.run([sys.executable, str(pcopy / "scripts" / "validate_contracts.py")],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 5 and "Traceback" not in (p.stdout + p.stderr), \
+            f"version=list 须 EXIT=5 不得崩溃，实为 {p.returncode}: {p.stderr[-200:]}"
+
+        # R4.3（盲检🔴3）：assemble plugin.json 的 teamInfo 非对象 / members 元素
+        # 非对象不得 AttributeError 崩溃 EXIT=1（契约无 1）。
+        for bad_field, bad_val in (("teamInfo", ["malformed"]), ("members", ["bad-str"])):
+            pj = pcopy / ".codebuddy-plugin" / "plugin.json"
+            # 每次从合法基底重建，避免上一迭代畸形字段累积
+            pj.write_bytes((PKG / ".codebuddy-plugin" / "plugin.json").read_bytes())
+            obj = json.loads(pj.read_text(encoding="utf-8"))
+            obj.pop("teamInfo", None); obj.pop("members", None)
+            obj[bad_field] = bad_val
+            pj.write_text(json.dumps(obj), encoding="utf-8")
+            p = subprocess.run([sys.executable, str(asm), "--expert-dir", str(pcopy),
+                                "--member", "literature-scout", "--task-file", str(taskf),
+                                "--no-autodetect"], capture_output=True, text=True,
+                               timeout=60, env=env)
+            assert "Traceback" not in (p.stdout + p.stderr) and p.returncode != 1, \
+                f"{bad_field}={bad_val} 不得崩溃 EXIT=1，实为 {p.returncode}: {p.stderr[-200:]}"
 
 
 def test_poll_hitlimit_and_manifest() -> None:
@@ -1252,6 +1338,22 @@ def test_decision_records_guard() -> None:
         assert rc == 3 and rep["verdict"] == "RECORDS_UNREADABLE", \
             f"裁决文件消失应 EXIT=3: rc={rc} rep={rep}"
 
+        # R4.3（盲检🔴4）：cli_sites / tests 元素非字符串须记结构错误 EXIT=3，
+        # 不得 TypeError 崩溃 EXIT=1（契约仅 0/3/5）。
+        dr = root / "docs" / "decision_records.json"
+        base_rec = {"id": "ADR-R43", "title": "t", "status": "accepted",
+                    "decided_at": "2026-01-01", "decision": "d"}
+        for field, badval in (("cli_sites", [{"bad": 1}]), ("tests", [123])):
+            ver = {"rule": "require_tag_default_off", "cli_sites": [], "tests": ["test_require_tag_gate"]}
+            ver[field] = badval
+            dr.write_text(json.dumps({"schema_version": 1,
+                                      "records": [dict(base_rec, verification=ver)]}),
+                          encoding="utf-8")
+            p = subprocess.run([sys.executable, str(script), "--pkg-root", str(root), "--json"],
+                               capture_output=True, text=True, timeout=60)
+            assert p.returncode == 3 and "Traceback" not in p.stderr, \
+                f"{field} 非字符串元素应结构错误 EXIT=3，实为 {p.returncode}: {p.stderr[-200:]}"
+
 
 def test_g6_evidence_gate() -> None:
     """ADR-002 / SOP T-D1：G6 从软门变成可触发硬门，且 SKIP 必须留痕。"""
@@ -1488,6 +1590,15 @@ def test_cron_b5_assets() -> None:
         log = sd / "cron_watch.jsonl"
         assert log.is_file() and "T-CRON" in log.read_text(encoding="utf-8"), \
             f"巡检结果须落盘: rc={p.returncode} {p.stdout} {p.stderr}"
+
+        # R4.3（盲检🔴5）：UTF-16 manifest 时内联 py sys.exit(3) 不得被
+        # `TASKS="$(...)"` 命令替换吞掉 → 静默降级「无巡检对象」EXIT=0。
+        (rd / "spawn_manifest.jsonl").write_bytes(
+            json.dumps({"task_id": "T-CRON"}).encode("utf-16"))
+        p = subprocess.run(["bash", str(watch), "--run-dir", str(rd), "--state-dir", str(sd)],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 3 and "manifest 汇总失败" in p.stderr, \
+            f"UTF-16 manifest 须透传 EXIT=3 拒绝静默跳过，实为 {p.returncode}: {p.stderr[-200:]}"
 
 
 def _wording_counts(src: str) -> tuple:

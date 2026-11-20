@@ -298,22 +298,38 @@ def load_plugin(expert_dir: Path) -> dict:
     for c in candidates:
         if c.is_file():
             try:
-                return json.loads(c.read_text(encoding="utf-8"))
+                obj = json.loads(c.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, UnicodeDecodeError) as e:
                 # R3.2：非 UTF-8 plugin.json 与解析失败同通道（既有码 3）。
                 log(f"❌ plugin.json 解析失败：{c} -> {e}")
                 sys.exit(3)
+            # R4.3（2026-11-20 · 盲检🔴3）：顶层非对象（如 []）时
+            # load_member_ids 内 plugin.get 抛 AttributeError → EXIT=1（契约无 1）。
+            # 结构不符按解析失败同口径 EXIT=3。
+            if not isinstance(obj, dict):
+                log(f"❌ plugin.json 顶层非对象（{type(obj).__name__}）：{c}")
+                sys.exit(3)
+            return obj
     log(f"❌ 未找到 plugin.json， searched: {[str(c) for c in candidates]}")
     sys.exit(3)
 
 
 def load_member_ids(plugin: dict) -> list[str]:
     """从 plugin.json 提取成员白名单（teamInfo.memberAgents 优先，回退 members）。"""
+    # R4.3（2026-11-20 · 盲检🔴3）：嵌套结构类型不可信——
+    # teamInfo 为 list → .get 抛 AttributeError；members 元素为 str → m.get 抛
+    # AttributeError；memberAgents 为 dict → 遍历出 str key 混入白名单。
+    # 全部加 isinstance 挡板，畸形形态按"该项不可用"跳过（fail-closed），不崩。
     team_info = plugin.get("teamInfo") or {}
-    ids = list(team_info.get("memberAgents") or [])
+    if not isinstance(team_info, dict):
+        team_info = {}
+    ma = team_info.get("memberAgents") or []
+    ids = list(ma) if isinstance(ma, (list, tuple)) else []
     if not ids:
-        ids = [m.get("id") for m in plugin.get("members", []) if m.get("id")]
-    return [i for i in ids if i]
+        members = plugin.get("members", [])
+        ids = [m.get("id") for m in members
+               if isinstance(m, dict) and m.get("id")] if isinstance(members, list) else []
+    return [i for i in ids if isinstance(i, str) and i]
 
 
 # ---------------------------------------------------------------- 成员 MD 解析

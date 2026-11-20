@@ -79,10 +79,15 @@ def parse_dt(s):
     # "2026-11-10T12:00:00" 全不匹配 → None → 台账循环静默 continue，
     # 一条 fatal/severe 证伪发现被吞掉（实测仅差一个 Z 后缀即 1 条→0 条）。
     # naive 串按本包既有 +08 语境解释，与 canonicalize 后基准一致。
+    # R4.3（2026-11-20 · 盲检🔴2）：strptime 固定格式不认小数秒
+    # （如 2026-11-19T10:30:00.123456+08:00）→ parse_dt 返回 None → 行被跳过 →
+    # 一条 severe 闭环发现漏报（实测 EXIT=0，去掉 .123456 则 EXIT=5）。
+    # 固定格式循环后追加 fromisoformat 回退（Python ≥3.10 支持小数秒与 Z/+HH:MM）。
+    raw = s.strip()
     for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S+08:00",
                 "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
         try:
-            dt = datetime.strptime(s.strip(), fmt)
+            dt = datetime.strptime(raw, fmt)
             # T-C3（R2 · 2026-11-15）：显式 canonicalize 到 +08:00 再转 naive。
             # 旧实现直接 dt.replace(tzinfo=None) 对 Z/+0000/-05:00 等带偏移输入
             # 静默丢弃偏移量 → 与 now_canonical()（+08 naive）混比时 late_fatal
@@ -94,7 +99,16 @@ def parse_dt(s):
             return dt
         except (ValueError, TypeError):
             continue
-    return None
+    # R4.3 回退：fromisoformat 解析小数秒 / Z / ±HH:MM[:SS] 等 ISO 变体。
+    # 统一 canonicalize 到 +08 naive（与 strptime 分支完全同口径）。
+    try:
+        iso = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+        dt = datetime.fromisoformat(iso)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone(timedelta(hours=8))).replace(tzinfo=None)
+        return dt
+    except (ValueError, TypeError):
+        return None
 
 
 def load_json_obj(path: Path) -> tuple[dict | None, str]:

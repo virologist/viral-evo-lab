@@ -122,6 +122,12 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
             rep["structural_errors"].append(f"{rid}: cli_sites 缺失 / 为空")
             continue
         for rel in sites:
+            # R4.3（2026-11-20 · 盲检🔴4）：元素非字符串时 pkg_root / rel 抛
+            # TypeError → EXIT=1（契约仅 0/3/5）。记结构错误并跳过该元素。
+            if not isinstance(rel, str):
+                rep["structural_errors"].append(
+                    f"{rid}: cli_sites 元素非字符串（{type(rel).__name__}）")
+                continue
             f = pkg_root / rel
             try:
                 src = _read_text(f)
@@ -151,6 +157,12 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
         except (OSError, UnicodeError) as e:
             rep["structural_errors"].append(f"{rid}: tests/ 不可读: {type(e).__name__}: {e}")
         for anchor in tests:
+            # R4.3（2026-11-20 · 盲检🔴4）：元素非字符串时 `anchor not in test_src`
+            # 抛 TypeError → EXIT=1。记结构错误并跳过。
+            if not isinstance(anchor, str):
+                rep["structural_errors"].append(
+                    f"{rid}: tests 元素非字符串（{type(anchor).__name__}）")
+                continue
             if anchor not in test_src:
                 rep["violations"].append(f"{rid}: 测试锚 {anchor!r} 在 tests/ 中消失")
 

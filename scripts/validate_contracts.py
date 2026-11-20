@@ -85,7 +85,13 @@ def check_manifests(base: Path) -> list[dict]:
             # → 最终 EXIT=5，与同函数其它读取失败同口径。
             if not isinstance(obj, dict):
                 raise ValueError(f"顶层须为对象，实为 {type(obj).__name__}")
-            versions[mf] = obj.get("version", "?")
+            # R4.3（2026-11-20 · 盲检🔴1）：version 为 list/dict 时
+            # set(versions.values()) 抛 TypeError（unhashable）→ EXIT=1（契约仅 0/5）。
+            # 非字符串 version 记契约缺失 → 最终 EXIT=5，与同函数其它结构异常同口径。
+            v = obj.get("version", "?")
+            if not isinstance(v, str):
+                raise ValueError(f"version 须为字符串，实为 {type(v).__name__}")
+            versions[mf] = v
         except (OSError, UnicodeError, json.JSONDecodeError,
                 AttributeError, TypeError, ValueError) as e:
             miss.append({"contract": f"{mf} 读取失败", "missing_pattern": str(e)})

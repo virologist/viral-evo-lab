@@ -61,7 +61,23 @@ from pathlib import Path
 # JSON 行解析失败 → TASKS 空 → "本轮无巡检对象"，监控静默失效。改用严格读；
 # 不可解码时明示错误并非零退出，禁止静默降级为"无任务"。
 # 说明：heredoc 内 __file__ 指向 <stdin>，故从 argv[1]（RUN_DIR）定位脚本目录不可靠，
-# 这里内联与 _text_guard 同款控制字符检测（NUL/U+FFFD），保持单一判定口径。
+# 这里内联与 _text_guard.has_forbidden 同款 Unicode 类别检测，保持单一判定口径。
+import unicodedata
+_ALLOWED_WS = set("\t\n\r\v\f")
+def _emoji(cp):
+    return 0x1F000 <= cp <= 0x1FAFF or 0x2600 <= cp <= 0x27BF
+def _bad_at(s, i):
+    # R4.3：与 _text_guard.has_forbidden 同款——U+200D(ZWJ) 两侧均 emoji 时放行
+    ch = s[i]
+    if ch in _ALLOWED_WS:
+        return False
+    if ch == "\ufffd" or unicodedata.category(ch) == "Cc":
+        return True
+    if unicodedata.category(ch) == "Cf":
+        return not (ch == "\u200d" and 0 < i < len(s)-1 and _emoji(ord(s[i-1])) and _emoji(ord(s[i+1])))
+    return False
+def _bad_text(s):
+    return any(_bad_at(s, i) for i in range(len(s)))
 p = Path(sys.argv[1]) / "spawn_manifest.jsonl"
 ids = []
 if p.is_file():
@@ -69,8 +85,8 @@ if p.is_file():
         txt = p.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeError) as e:
         txt = None; err = f"{type(e).__name__}: {e}"
-    if txt is not None and ("\x00" in txt or "\ufffd" in txt):
-        txt = None; err = "含 NUL/U+FFFD 控制字符（疑 UTF-16 或非法字节）"
+    if txt is not None and _bad_text(txt):
+        txt = None; err = "含 Cc/Cf/U+FFFD 不可见字符（疑二进制污染）"
     if txt is None:
         print(f"[cron_watch] manifest 不可解码（{err}）——拒绝静默跳过巡检", file=sys.stderr)
         sys.exit(3)
@@ -83,6 +99,15 @@ if p.is_file():
 print(" ".join(ids))
 PY
 )"
+# R4.3（2026-11-20 · 盲检🔴5）：命令替换 `VAR="$(python3 ...)"` 会吞掉内联
+# python 的 sys.exit(3)——赋值语句成功 → $?=0 → 空 TASKS → 下方 exit 0
+# "本轮无巡检对象"，监控静默失效（实测 UTF-16 manifest 下 EXIT=0）。
+# 立即捕获内联 python 真实退出码，非零则原样透传，禁止静默降级。
+TASKS_RC=$?
+if [ "${TASKS_RC}" -ne 0 ]; then
+  echo "❌ manifest 汇总失败（内联校验 EXIT=${TASKS_RC}）——拒绝静默跳过巡检" >&2
+  exit "${TASKS_RC}"
+fi
 else
   if ! printf '%s' "$TASK_ID" | grep -Eq '^[A-Za-z0-9_-]{1,64}$'; then
     echo "❌ task_id 非法（仅允许字母数字下划线连字符）: $TASK_ID" >&2; exit 3
