@@ -15,6 +15,13 @@ _text_guard.py —— 统一严格文本读取守卫（R4.2 · 2026-11-19）
     2) 解码后按 Unicode 类别扫描：Cc(除 \t\n\r\v\f) / Cf(零宽/格式字符) / U+FFFD → 判不可解码
     3) 统一返回 (text | None, reason)；调用方按各自契约码 fail-closed
 
+R4.3 复核（2026-11-20 · 两路独立盲检交叉验证的 fail-open）：
+    「数字被任意非数字字符隔断」会让数字正则静默失配 → checked=0 → PASS。
+    变体：emoji(So，如 U+2B50 ⭐)、ZWJ emoji 序列、组合音标(Mn，如 U+0301)、
+    符号(Sm/Po)。字符类别补区间永远补不完，故本模块再加一层**数字劈开检测**：
+    has_split_number() 识别「数字 + 符号/修饰/格式类字符 + 数字」的结构，
+    由调用方 fail-closed。
+
 使用（同目录 import，脚本运行时 scripts/ 在 sys.path[0]）：
     from _text_guard import read_text_checked
     text, err = read_text_checked(path)
@@ -25,6 +32,7 @@ _text_guard.py —— 统一严格文本读取守卫（R4.2 · 2026-11-19）
     - fail-closed：宁可拒绝/降级，也不把不可解码内容当空/当干净放行
     - 不放宽：errors 参数固定 strict，禁止 ignore/replace 静默吞字节
 """
+import re
 import unicodedata
 from pathlib import Path
 
@@ -43,6 +51,30 @@ def _is_emoji_cp(ch: str) -> bool:
     """ZWJ 序列两侧的 emoji 码点判定（常见 emoji 区 + dingbats）。"""
     cp = ord(ch)
     return (0x1F000 <= cp <= 0x1FAFF) or (0x2600 <= cp <= 0x27BF)
+
+
+# R4.3 复核（2026-11-20 · 两路盲检交叉验证）：数字劈开检测。
+# 「数字 + 符号/修饰/格式类字符 + 数字」→ 数字被劈开，数字正则必然失配 →
+# checked=0 → PASS fail-open。已实测变体：emoji(So ⭐/U+2B50)、ZWJ emoji 序列、
+# 组合音标(Mn U+0301)、符号。字符类别补区间补不完（U+203C‼ 是 Po），
+# 故按「类别属于符号/修饰/格式/货币，且不含常规数字分隔符(. ,)」判劈开。
+# 说明：常规排版（1,234.5 / 10:30 / 20°C / 10~20）不含此类字符，不误判。
+_SPLIT_NUM = re.compile(r"\d(?P<x>[^\d\s]{1,8})\d")
+_SPLIT_BAD_CATS = ("So", "Sk", "Mn", "Cf", "Sc")
+
+
+def has_split_number(text: str) -> bool:
+    """文本中是否存在被符号/修饰/格式类字符劈开的数字串。
+
+    命中即意味着数字正则可能静默失配（checked=0 → PASS），调用方须 fail-closed。
+    """
+    for m in _SPLIT_NUM.finditer(text):
+        core = m.group("x").rstrip(".,")
+        if not core:
+            continue
+        if all(unicodedata.category(c) in _SPLIT_BAD_CATS for c in core):
+            return True
+    return False
 
 
 def has_forbidden(text: str) -> bool:

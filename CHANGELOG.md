@@ -4,6 +4,37 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.23] - 2026-11-20（R4.4 复核回补轮 · 数字劈开/标注洗白/正本缺失/静默过滤）
+
+R4.3 冻结后重启两路独立盲检（通用 + 对抗性）。通用盲检报 0🔴/2🟠 后在 v1.5.22 复核追加 1🔴；对抗性盲检报 3🔴 + 4🟠。主代理**逐条独立复现**后采信 6 项（3🔴 + 3🟠），证伪 1 项，另有 1🟠 由另一盲检交叉印证。本轮回补为 R4.4。
+
+### Fixed（3🔴 + 3🟠，全部实证复现后修复）
+
+- **🔴 数字劈开 fail-open（3 变体）**：`数字 + 符号类字符 + 数字` 使数字正则静默失配 → `checked=0 → PASS`（比 traceback 更危险）。实测变体：emoji 隔开标记（`p = 👨‍👩 0.9`）、`⭐`(U+2B50) 夹数字、组合音标(U+0301) 劈开。根因：字符码点区间枚举永远补不完（U+2B50 在既有区间外、U+203C‼ 是 Po、U+3030 是 Pd）。**根因级治理**：不再补码点区间，改为「Unicode 类别化劈开检测」——新增 `_text_guard.has_split_number()`，判定「数字 + So/Sk/Mn/Cf/Sc 类字符 + 数字」结构，命中即 fail-closed（EXIT=3 / 记 unverified 哨兵 → DEGRADE）。常规排版（`1,234.5` / `10:30` / `20°C` / `10~20`）不误判。
+- **🔴 邻近标注洗白**：`[待人工核验]` 标注原按 `[^\n]{0,40}?` 采集，可跨过数字吸附到邻近数字 → `n=111 及 n=222 [待人工核验]` 洗白 111。改为 `[^\d\n]{0,40}?`——标注只归属紧邻其前、且间隔内无其他数字的数字；G4 放行须覆盖**全部** unverified（`marked >= marked_total`），部分标注进 problems 并阻断。
+- **🔴 hypothesis_watch 非 dict 元素**：`active_hypotheses: [5]` → `AttributeError` EXIT=1（契约无 1）。改为漂移检测（缺 `KEY_FIELDS` 任一即判漂移），无 Traceback，退出码 ∈ {0,3,5,6}。
+- **🟠 数字子串匹配假阳性**：原 `cand in pool` 子串匹配 → `0.94` 命中 `0.9441`、`0.98` 命中 `10.980`。改为边界匹配 `(?<![\d.])cand(?![\d.])`（`pool_has_number`），单一实现供 `verify_numbers` / `verify_member_output` / `check_gates` G2 复用。
+- **🟠 validate_contracts 虚假「全员契约完整」**：正本 `SKILL.md` / `team-contract.md` 缺失时原判「契约完整」EXIT=0（删文件反而 PASS）。改为按缺失条目数记契约缺失 → EXIT=5。
+- **🟠 cron_watch task_id 全被白名单过滤**：manifest 中 task_id 全部超长/非法 → 原静默丢弃 → 「本轮无巡检对象」EXIT=0，监控失效。改为 stderr 明示 + EXIT=3。
+
+### Changed
+
+- `poll_run_dir.head_hit_limit` 由「只扫前 8 行」改为**全文扫描**（`max_chars=200000`）：撞限标注是成员显式写入的产出内容，位置不应受限——原实现标注挪到第 9 行即漏检 → 不完整产出被判 READY/EXIT=0。docstring 与提示同步由「头部带」改为「正文带」。
+- `validate_contracts` / `check_decision_records` / `assemble_spawn_prompt` 三处结构异常改记契约缺失/结构错误（EXIT=5 / 3 / 2-3），不再 AttributeError/TypeError 崩溃。
+
+### Verified
+
+- pytest 19 passed / fuzz **61/61** / 守卫 11/11 / manifest 80 文件 `--check` EXIT=0 / py_compile 全过 / 四处 version 一致。
+- 6 项坐实缺陷全部**主代理独立复现**（复现 → 修复 → 反向对照三态）后才采信与闭合；1 项（`verify_member_output` 无权威源）经复现为 EXIT=5，**证伪不修**。
+
+## [1.5.22] - 2026-11-20（R4.3 复核回补 · emoji/ZWJ 夹数字 fail-open 封堵）
+
+R4.3 冻结后通用盲检复核追加 1🔴：连续 emoji/Cf span 紧贴 ASCII 数字时，`has_forbidden` 的类别判定放行 → 数字仍被隔断。改为 span 判定（连续 emoji/Cf 为一段；非 ZWJ 的 Cf 一律拒绝；emoji/ZWJ 段紧贴 ASCII 数字即拒绝；合法 ZWJ emoji 序列放行），修 `ord()` 双重取值的 TypeError。
+
+## [1.5.21] - 2026-11-20（R4.3 全面复测回补 · 6🔴 + 1🟠）
+
+R4.2 冻结后两路独立盲检各报真实缺陷，主代理逐条独立复现后全修：version 容器 TypeError（EXIT=1→5）、小数秒闭环漏报（EXIT=0→5）、assemble 嵌套畸形 AttributeError（1→2/3）、decision 元素 TypeError（1→3）、cron_watch 吞退出码（0→3）、G4 部分标注放行（放行→FAIL）、Cf 一刀切误拒合法 emoji（放行）。回归断言全部复用既有测试函数，`CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = 61/61。
+
 ## [1.5.20] - 2026-11-19（R4.2 全面复测回补轮 · 用户授权持续迭代至全绿）
 
 两路独立盲检（R4.1 后）各报真实缺陷，主代理逐条独立复现后全修。核心根因：R4.1 的「严格 utf-8-sig + 捕获 UnicodeError」防不住**无 BOM UTF-16**——其 NUL 交错字节在 UTF-8 下合法，解码不抛异常却使数字正则全部失配 → `checked=0 → PASS`（比 traceback 更危险的 fail-open）。

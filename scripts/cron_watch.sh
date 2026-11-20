@@ -107,6 +107,13 @@ if p.is_file():
         t = ev.get("task_id") if isinstance(ev, dict) else None
         if isinstance(t, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,64}", t) and t not in ids:
             ids.append(t)
+        elif isinstance(t, str) and t.strip():
+            # R4.3（盲检🟠B）：manifest 里有 task_id 但被白名单过滤（超长/非法字符）
+            # → 原实现静默丢弃 → ids 空 → 下方「本轮无巡检对象」EXIT=0，监控失效。
+            # 与「manifest 根本没有 task_id」区分开：前者是异常，拒绝静默跳过。
+            print(f"[cron_watch] manifest 中 task_id 非法（长度/字符集不合规）: {t[:80]!r}",
+                  file=sys.stderr)
+            sys.exit(3)
 print(" ".join(ids))
 PY
 )"

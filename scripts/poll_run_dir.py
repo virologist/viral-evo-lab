@@ -12,9 +12,10 @@ poll_run_dir.py —— run_dir 落盘巡检（P4 监控设计 §3 方案 B 落�
     黄超时  存在但 mtime 距今 >= yellow-min 分钟（落盘后久未更新，留意）
     缺失    文件不存在（成员未产出或派工未达）
     红超时  存在但 >= red-min 分钟未更新
-    撞限    文件头 8 行含「轮次耗尽」标注（R-13a · 2026-11-09：产出不完整，
+    撞限    正文含「轮次耗尽」标注（R-13a · 2026-11-09：产出不完整，
             主理人声明"文件存在且无撞限标注 = Phase 完成"——本脚本负责把
-            该判据的标注侧落成机械检查，带标注 = 视为未完成）
+            该判据的标注侧落成机械检查，带标注 = 视为未完成；
+            R4.3：原只看文件头 8 行，标注挪到第 9 行即漏检 → 改全文扫描）
 
 期望清单来源（二选一）：
     --expected 人工逗号分隔（显式，优先）
@@ -132,7 +133,7 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
 
 
 def head_hit_limit(f: Path, lines: int = 8) -> bool:
-    """R-13a：读文件头 N 行判断是否带撞限标注。
+    """R-13a：读产出判断是否带撞限标注。
 
     L3 盲检 Y3 修正（2026-11-09）：
       - 窗口 3→8 行（模板头部可能占多行，标注被挤出 3 行窗口会漏检）
@@ -140,18 +141,21 @@ def head_hit_limit(f: Path, lines: int = 8) -> bool:
         交人工裁决）。漏放不完整产出比多问一句人工更危险（守卫方向）。
       - 空文件（0 字节）不算撞限（成员可能还在写，mtime 新鲜度另行判定）。
       - R4.2（盲检🔴3）：原 errors="replace" 把 UTF-16 的中文撞限标注吞成 U+FFFD
-        → 误判 READY。改用统一严格读：解码失败/含 NUL/U+FFFD 一律保守判 True
+        → 误判 READY。改用统一严格读：解码失败/含 NOL/U+FFFD 一律保守判 True
         （疑似撞限，交人工），不放行不完整产出。
+      - R4.3（盲检🟠C）：原只看前 8 行——标注被挪到第 9 行即漏检 → 不完整产出
+        被判 READY。撞限标注是成员显式写入的产出内容，位置不应受限；改为
+        **全文扫描**（仍限 max_chars 防超大文件）。保留 lines 参数仅为兼容旧签名。
     """
     try:
         if f.stat().st_size == 0:
             return False
     except OSError:
         return True  # stat 都读不到——保守判定，人工复核
-    head, err = read_text_checked(f, max_chars=4000)
+    head, err = read_text_checked(f, max_chars=200000)
     if head is None:
         return True  # 不可解码/控制字符污染 ≠ 没标注——保守判定，人工复核
-    return HIT_LIMIT_MARK in "".join(head.splitlines()[:lines])
+    return HIT_LIMIT_MARK in head
 
 
 def main() -> int:
@@ -243,7 +247,7 @@ def main() -> int:
             reasons.append(f"撞限 {len(hitlimit)}")
         print(f"\n裁决: NOT_READY（{' / '.join(reasons)}）→ 勿进 G 闸，先派工补位或人工介入")
         if hitlimit:
-            print("  ⛔ 撞限成员产出不完整（头部带「轮次耗尽」标注）——按撞限协议续跑或人工裁决，不得收 envelope")
+            print("  ⛔ 撞限成员产出不完整（正文带「轮次耗尽」标注）——按撞限协议续跑或人工裁决，不得收 envelope")
         return 5
     print("\n裁决: READY → 可跑 check_gates.py 收 envelope")
     if yellow:

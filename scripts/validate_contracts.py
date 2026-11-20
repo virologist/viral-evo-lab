@@ -125,6 +125,9 @@ def main() -> int:
             print(f"✅ agents/{ag.name}")
 
     # ② skills 层（viral-evo-core/SKILL.md 唯一入口）
+    # R4.3（盲检🟠A）：原实现文件缺失时静默跳过，但结尾仍输出「全员契约完整」
+    # ——删除文件反而 PASS、留空文件反而 FAIL，属 fail-open + 虚假保证，违反
+    # 包内「禁止把 SKIP/缺失伪装成 PASS」诚实性红线。缺失即记契约缺失。
     skill_md = base / "skills/viral-evo-core/SKILL.md"
     if skill_md.is_file():
         miss = check_skill(skill_md)
@@ -135,6 +138,9 @@ def main() -> int:
                 print(f"   - {m['contract']}（需匹配: /{m['missing_pattern'][:40]}/）")
         else:
             print(f"✅ skills/SKILL.md（工具索引+铁律完整）")
+    else:
+        total_missing += 1
+        print(f"❌ skills/viral-evo-core/SKILL.md: 文件缺失（唯一入口不可缺）")
 
     # ③ 团队契约正本（R2-5：成员层抽走的全员同版内容在此验收）
     tc = base / "skills/viral-evo-core/references/team-contract.md"
@@ -157,6 +163,10 @@ def main() -> int:
                 print(f"   - {m['contract']}（需匹配: /{m['missing_pattern'][:40]}/）")
         else:
             print(f"✅ skills/team-contract.md（正本 {len(TEAM_CONTRACT)} 条款完整）")
+    else:
+        # R4.3（盲检🟠A）：正本文件缺失 = 无法验收正本条款，按全部条款缺失计。
+        total_missing += len(TEAM_CONTRACT)
+        print(f"❌ skills/team-contract.md: 文件缺失（正本 {len(TEAM_CONTRACT)} 条款无法验收）")
 
     if total_missing:
         print(f"\n总计 {total_missing} 处契约缺失——影响层间一致性，建议补齐")

@@ -229,8 +229,12 @@ def _pending_manual_marked(unverified: list, artifacts: list) -> tuple[int, str,
             return 0, "", len(unverified)
         texts[a.name] = txt
     # 标注形态：数字与标记可被空白/标点分隔（"n=777 [待人工核验]" / "n=777（待人工核验）"）
+    # R4.3（盲检🔴2）：原 `[^\n]{0,40}?` 允许间隔内含**其他数字**——"n=111 及 n=222
+    # [待人工核验]" 会让 111 匹配到 222 的标注（finditer 非重叠消费，222 落在
+    # 已消费区间内不再单独成桶），未标注的 111 被洗白 → G2/G4 误判 PASS。
+    # 改为间隔不得含数字（[^\d\n]）：标注只归属紧邻其前、且间隔内无其他数字者。
     marker_pat = re.compile(
-        r"(?P<num>\d{1,6}(?:\.\d+)?)\s*[^\n]{0,40}?\[?\s*待人工核验\s*\]?", re.I)
+        r"(?P<num>\d{1,6}(?:\.\d+)?)\s*[^\d\n]{0,40}?\[?\s*待人工核验\s*\]?", re.I)
     marked = 0
     detail: list[str] = []
     for u in unverified:
@@ -674,8 +678,18 @@ def main() -> int:
                 decode_failed.append(f"{art.name}({dec_err})")
                 marked_by_art[art.name] = bucket
                 continue
+            # R4.3（两路盲检交叉验证）：数字被符号劈开 / 关键标记与数字被隔开
+            # → 数字正则失配 → extract_numbers 为空 → 「无未溯源数字」fail-open。
+            # 与 verify_numbers / verify_member_output 同口径 → 计入 decode_failed
+            # （G2 FAIL），不放行。
+            if vmo._vn.has_split_number(text) or vmo._vn.has_broken_key_pattern(text):
+                decode_failed.append(f"{art.name}(数字被隔断:数字正则会失配)")
+                marked_by_art[art.name] = bucket
+                continue
+            # R4.3（盲检🔴2）：间隔不得含其他数字——标注只归属紧邻其前者，
+            # 防 "n=111 及 n=222 [待人工核验]" 用 222 的标注洗白 111。
             for m in re.finditer(
-                    r"(?P<num>\d{1,6}(?:\.\d+)?)\s*[^\n]{0,40}?\[?\s*待人工核验\s*\]?", text, re.I):
+                    r"(?P<num>\d{1,6}(?:\.\d+)?)\s*[^\d\n]{0,40}?\[?\s*待人工核验\s*\]?", text, re.I):
                 seg = text[max(0, m.start() - 60):m.end() + 40]
                 if "待人工核验" in seg:
                     bucket.add(m.group("num"))
@@ -687,7 +701,7 @@ def main() -> int:
             own_marked = marked_by_art.get(art.name, set())
             for kind, val, _ in vmo._vn.extract_numbers(text, min_digits=2):
                 cands = vmo._vn.float_candidates(val)
-                if not any(c in pool for c in cands):
+                if not any(vmo._vn.pool_has_number(pool, c) for c in cands):
                     # C7（2026-11-07）：waiver 匹配走 float_candidates 容差（原精确串匹配，
                     # 0.79 与 0.790 等值浮点无法放行）。
                     # P3-R1 修复（2026-11-07）：原嵌套 genexpr 误用外层未定义的 w → NameError

@@ -44,7 +44,7 @@ from pathlib import Path
 # R4.2（2026-11-19 · 盲检🔴1）：统一严格读守卫——无 BOM UTF-16 的 NUL 交错在
 # UTF-8 下是合法字节，单独捕获 UnicodeError 防不住，必须显式检测控制字符。
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _text_guard import read_text_checked  # noqa: E402
+from _text_guard import read_text_checked, has_split_number  # noqa: E402
 
 # 权威数字模式（保守：只抓最易造假/最关键的四类 + CI）
 PATTERNS = [
@@ -58,6 +58,28 @@ PATTERNS = [
 # C6（2026-11-07）：年份 ^20[0-2]\d$ → ^20\d{2}$（原实现 2030+ 失效）
 YEAR = re.compile(r"^20\d{2}$")
 VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
+
+# R4.3（两路盲检交叉验证的 fail-open）：关键标记与数字之间被插入字符时，
+# PATTERNS 全部失配 → checked=0 → 「无数字即 PASS」。实测变体：
+#   p = 👨‍👩 0.9      （emoji 插在 = 与数字之间）
+#   n = ⭐888         （符号插在 = 与数字之间）
+# 判据：关键标记（n=/p=/D'/CI）之后的首个非空白字符不是数字 → 标记未接上数字。
+# CI 括号形态（"CI [0.1, 0.2]"）不适用此判据（标记后是括号），单独排除。
+KEY_MARKERS = re.compile(r"(?:\bn\s*=|\bp\s*=|D[′']\s*=|CI\s*[\[（(])", re.I)
+
+
+def has_broken_key_pattern(text: str) -> bool:
+    """文本中是否存在「关键标记与数字被隔开」的结构（正则必然失配）。"""
+    for m in KEY_MARKERS.finditer(text):
+        tail = text[m.end():m.end() + 12].lstrip()
+        if not tail:
+            continue
+        if tail[0].isdigit():
+            continue  # 标记后紧跟数字 → 正常
+        if m.group(0).rstrip().endswith(("(", "[", "（", "[")):
+            continue  # CI 括号形态：标记后是括号，不是数字
+        return True
+    return False
 
 def extract_numbers(text: str, min_digits: int):
     """返回 [(kind, value_str, norm_str)]，norm 用于 grep。"""
@@ -98,6 +120,22 @@ def float_candidates(val: str) -> set:
     except ValueError:
         pass
     return cands
+
+
+def pool_has_number(pool: str, cand: str) -> bool:
+    """候选数值是否作为**完整数字 token** 出现在权威池中（R4.3 单一事实源）。
+
+    R4.3（盲检🟠4）：原实现用 `cand in pool` 子串匹配，导致编造数字可被
+    权威源里的更长数字洗白——
+      p = 0.94  命中池中 "0.9441"   → 假阳性 PASS
+      p=0.98   命中池中 "10.980"   → 假阳性 PASS
+    改为 token 边界匹配：候选值前后不得紧邻数字或小数点（. 与 , 视为数字延续），
+    即池中必须是与候选值等值的独立数字 token。
+    """
+    if not cand:
+        return False
+    pat = re.compile(r"(?<![\d.])" + re.escape(cand) + r"(?![\d.])")
+    return pat.search(pool) is not None
 
 
 def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False,
@@ -173,14 +211,28 @@ def main() -> int:
         # 禁止吞字节后误判 PASS（无 BOM UTF-16 的 NUL 交错是合法 UTF-8，须显式检测）
         print(f"[verify_numbers] 产出文件不可解码: {dec_err}", file=sys.stderr)
         return 3
+    # R4.3 复核（两路盲检交叉验证）：数字被符号/修饰/格式类字符劈开时，数字
+    # 正则必然失配 → checked=0 → 「无数字即 PASS」fail-open。fail-closed。
+    if has_split_number(text):
+        print("[verify_numbers] 产出含被符号劈开的数字串（疑数字正则失配）——拒绝判 PASS",
+              file=sys.stderr)
+        return 3
+    # R4.3：关键标记与数字之间被插入字符（p = 👨‍👩 0.9）同样导致正则失配。
+    if has_broken_key_pattern(text):
+        print("[verify_numbers] 产出含被隔开的关键数字模式（疑正则失配）——拒绝判 PASS",
+              file=sys.stderr)
+        return 3
     nums = extract_numbers(text, args.min_digits)
     pool = load_sources(args.sources, args.exclude, args.allow_md, require_tag=args.require_tag)
 
     found, not_found = [], []
     for kind, val, _ in nums:
         # 归一化 grep：原值 与 保留形式都试
+        # R4.3（盲检🟠4）：原 `c in pool` 为子串匹配——p=0.94 会被权威源里的
+        # 0.9441 洗白（假阳性），p=0.98 会被 10.980 洗白。改用数字 token
+        # 边界匹配：候选值须作为完整数字 token 出现（前后不得紧邻数字/小数点）。
         cands = float_candidates(val)
-        hit = any(c in pool for c in cands)
+        hit = any(pool_has_number(pool, c) for c in cands)
         (found if hit else not_found).append({"kind": kind, "value": val})
 
     result = {

@@ -145,11 +145,22 @@ def main() -> int:
             all_unverified.append({"member": member, "kind": "decode_error",
                                    "value": f"<不可解码:{dec_err}>"})
             continue
+        # R4.3（两路盲检交叉验证）：数字被符号劈开 / 关键标记与数字被隔开时，
+        # 数字正则必然失配 → nums 为空 → 「无数字即全溯源」fail-open。
+        # 与 verify_numbers 同口径（单一事实源 _vn），记未溯源哨兵 → DEGRADE。
+        if _vn.has_split_number(text) or _vn.has_broken_key_pattern(text):
+            print(f"🔴 {member}: 产出含被隔断的关键数字（数字正则会失配）——按未溯源计",
+                  file=sys.stderr)
+            all_unverified.append({"member": member, "kind": "split_number",
+                                   "value": "<数字被隔断:正则会失配>"})
+            continue
         nums = _vn.extract_numbers(text, min_digits=2)
         unverified = []
         for kind, val, _ in nums:
             cands = _vn.float_candidates(val)
-            if not any(c in pool for c in cands):
+            # R4.3（盲检🟠4）：子串匹配改 token 边界匹配（单一事实源
+            # _vn.pool_has_number）——p=0.94 不得被池中 0.9441 洗白。
+            if not any(_vn.pool_has_number(pool, c) for c in cands):
                 unverified.append({"kind": kind, "value": val})
         if unverified:
             print(f"🔴 {member}: {len(unverified)} 个未溯源数字")

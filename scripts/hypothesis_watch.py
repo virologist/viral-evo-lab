@@ -247,11 +247,15 @@ def main() -> int:
         return 3
     # T-B3（2026-10-15）：字段漂移告警——条目缺 id/status/claim 任一关键字段时
     # 发 warning 但不退出（结构可漂移≠不可用，处置权归 archivist）。
+    # R4.3（盲检🔴3）：原 `(h or {})` 在 h 为真值非 dict（如 int 5）时返回该 int，
+    # `k not in 5` 抛 TypeError → 未捕获 traceback EXIT=1（契约仅 0/3/5/6）。
+    # 改为：非 dict 条目一律视为「缺全部关键字段」，只告警不崩。
     KEY_FIELDS = ("id", "status", "claim")
     drift = [
-        (i, [k for k in KEY_FIELDS if k not in (h or {})])
+        (i, ([k for k in KEY_FIELDS if k not in h] if isinstance(h, dict)
+             else list(KEY_FIELDS)))
         for i, h in enumerate(hyp.get("active_hypotheses", []))
-        if not isinstance(h, dict) or any(k not in (h or {}) for k in KEY_FIELDS)
+        if not isinstance(h, dict) or any(k not in h for k in KEY_FIELDS)
     ]
     for i, miss in drift:
         print(f"⚠️  字段漂移: active_hypotheses[{i}] 缺 {miss}（建议 archivist 补齐或下架该条目）",

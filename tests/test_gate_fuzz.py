@@ -453,6 +453,16 @@ def test_disposition_gate() -> None:
         assert rc == 5 and "F-R43" in out, \
             f"小数秒 severe 闭环须判 REVIEW_REQUIRED/EXIT=5，实为 rc={rc}: {out[-300:]}"
 
+        # R4.3（盲检🔴3）：active_hypotheses 元素为非 dict（如 int 5）时，原
+        # `(h or {})` 返回该 int → `k not in 5` 抛 TypeError → 未捕获 traceback
+        # EXIT=1（契约仅 0/3/5/6）。须只告警不崩。
+        hyp_p.write_text(json.dumps({
+            "last_updated": "2026-11-18T00:00:00+08:00",
+            "active_hypotheses": [5]}) + "\n", encoding="utf-8")
+        rc, out = run()
+        assert "Traceback" not in out, f"非 dict 假说条目不得抛未捕获异常: {out[-300:]}"
+        assert rc in (0, 3, 5, 6), f"非 dict 假说条目退出码越界: {rc}"
+
 
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
@@ -885,6 +895,25 @@ def test_gate_mode_blocks() -> None:
             assert _read_gates(rd).get("G4", False) is False, \
                 "2 项未溯源仅标 1 项属部分标注，不得解除 G4 阻断"
 
+            # R4.3（盲检🔴2）：邻近标注洗白——"n=111 及 n=222 [待人工核验]" 中，
+            # 原 marker_pat 允许间隔内含其他数字（finditer 非重叠消费），222 的
+            # 标注被归给未标注的 111 → G2/G4 误判 PASS。标注只归属紧邻其前者。
+            (rd / f"{TASK_ID}__alice.md").write_text(
+                env_s + "n=111 及 n=222 [待人工核验]\n", encoding="utf-8")
+            (rd / f"{TASK_ID}__bob.md").unlink(missing_ok=True)
+            (rd / f"{TASK_ID}__output-check.json").write_text(json.dumps({
+                "task_id": TASK_ID, "artifact_mtimes": {},
+                "unverified": [{"member": "alice", "kind": "n_eq", "value": "111"}],
+                "verdict": "DEGRADE", "gate_mode": "block"}, ensure_ascii=False),
+                encoding="utf-8")
+            subprocess.run(
+                [sys.executable, str(CHECK_GATES), str(rd), TASK_ID, "--sources", str(src2)],
+                capture_output=True, text=True, timeout=60)
+            assert _read_gates(rd).get("G2", False) is False, \
+                "邻近标注（另一个数字的）不得洗白未标注数字（G2 须 FAIL）"
+            assert _read_gates(rd).get("G4", False) is False, \
+                "邻近标注（另一个数字的）不得解除 G4 阻断"
+
 
 def test_require_tag_gate() -> None:
     """C3（2026-11-08）：产出端 require_tag 闸行为级守卫——未标记源必须被拒。
@@ -976,6 +1005,36 @@ def test_require_tag_gate() -> None:
         rc = subprocess.run([sys.executable, str(vn), str(emonum), "--sources", str(d / "s2")],
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 3, f"emoji 夹数字须检测为污染 EXIT=3（防 fail-open），实为 {rc}"
+
+        # R4.3（两路独立盲检交叉验证 🔴1）：「数字被非数字字符劈开」与
+        # 「关键标记与数字被隔开」两种形态都会让数字正则静默失配 → checked=0
+        # → PASS fail-open。三个必测变体：
+        #   ① emoji 插在 = 与数字之间（p = 👨‍👩 0.9）
+        #   ② 范围外符号 ⭐(U+2B50) 夹在数字内部（n=8⭐88）
+        #   ③ 组合音标 U+0301 夹在数字内部（p = 0́.9）
+        for label, payload in (
+                ("emoji隔开标记", "p = \U0001F468\u200d\U0001F469 0.9\n"),
+                ("符号劈开数字", "n=8\u2b5088\n"),
+                ("音标劈开数字", "p = 0\u0301.9\n")):
+            f_split = d / f"split_{label}.md"
+            f_split.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_split), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 3, f"{label} 须 EXIT=3（数字正则失配防 fail-open），实为 {rc}"
+
+        # R4.3（盲检🟠4）：数字 grep 原为子串匹配——p=0.94 被权威源里的 0.9441
+        # 洗白（假阳性 PASS）、p=0.98 被 10.980 洗白。改 token 边界匹配后，
+        # 两者都必须判未溯源 EXIT=5。
+        for label, payload, pool_val in (("0.94", "p = 0.94\n", "0.9441"),
+                                         ("0.98", "p=0.98\n", "10.980")):
+            sub = d / f"sub_{label}"
+            sub.mkdir(exist_ok=True)
+            (sub / "pool.csv").write_text(f"value\n{pool_val}\n", encoding="utf-8")
+            f_sub = d / f"sub_{label}.md"
+            f_sub.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_sub), "--sources", str(sub)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 5, f"{label} 不得被池中 {pool_val} 子串洗白（须 EXIT=5），实为 {rc}"
 
         # R4.2（盲检🔴6）：check_scope 不可解码/控制字符污染文件不得误判 clean(0)，
         # 须报无法核验 → EXIT=3（fail-closed）。
@@ -1086,6 +1145,17 @@ def test_poll_hitlimit_and_manifest() -> None:
         rc, out = run("--expected", "literature-scout")
         assert rc == 5 and "撞限" in out, \
             f"UTF-16 撞限标注须 NOT_READY/EXIT=5，实为 rc={rc}"
+
+        # R4.3（盲检🟠C）：撞限标注被挪到第 9 行（原实现只看前 8 行）→ 漏检 →
+        # 不完整产出被判 READY/EXIT=0。撞限标注是成员显式写入的产出内容，位置
+        # 不应受限——须全文扫描。该行须精确落在第 9 行（>8 行窗口）。
+        (d / "T-P__literature-scout.md").write_text(
+            "\n".join([f"# 正文第 {i} 行" for i in range(1, 9)]
+                      + ["<!-- 轮次耗尽，产出不完整：已完成 1/3，剩余 2 -->"]
+                      + ["# 尾注"]) + "\n", encoding="utf-8")
+        rc, out = run("--expected", "literature-scout")
+        assert rc == 5 and "撞限" in out, \
+            f"第 9 行撞限标注须 NOT_READY/EXIT=5（不得因位置漏检），实为 rc={rc}"
 
 
 def test_legacy_package_check_fallback() -> None:
@@ -1362,6 +1432,31 @@ def test_decision_records_guard() -> None:
             assert p.returncode == 3 and "Traceback" not in p.stderr, \
                 f"{field} 非字符串元素应结构错误 EXIT=3，实为 {p.returncode}: {p.stderr[-200:]}"
 
+        # R4.3（盲检🟠A）：契约正本/SKILL 文件缺失不得被静默跳过却输出
+        # 「全员契约完整」虚假 PASS（删文件反而 PASS、留空文件反而 FAIL）。
+        import shutil
+        vcroot = Path(td) / "vcpkg"
+        (vcroot / "scripts").mkdir(parents=True)
+        (vcroot / "agents").mkdir()
+        (vcroot / "skills" / "viral-evo-core").mkdir(parents=True)
+        (vcroot / ".codebuddy-plugin").mkdir()
+        (vcroot / ".claude-plugin").mkdir()
+        shutil.copy(PKG / "scripts" / "validate_contracts.py", vcroot / "scripts" / "validate_contracts.py")
+        (vcroot / ".codebuddy-plugin" / "plugin.json").write_text('{"version":"1.0"}', encoding="utf-8")
+        (vcroot / ".claude-plugin" / "plugin.json").write_text('{"version":"1.0"}', encoding="utf-8")
+        (vcroot / "agents" / "foo.md").write_text(
+            "result_envelope 能力边界 路由判定表", encoding="utf-8")
+        (vcroot / "skills" / "viral-evo-core" / "SKILL.md").write_text(
+            "assemble_spawn_prompt 数字必溯源 禁项目叙事 GOVERNANCE_BOUNDARIES 主理人 team-lead",
+            encoding="utf-8")
+        # 故意不创建 skills/viral-evo-core/references/team-contract.md
+        p = subprocess.run([sys.executable, str(vcroot / "scripts" / "validate_contracts.py")],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 5, \
+            f"契约正本缺失须 EXIT=5（不得虚假 PASS），实为 {p.returncode}"
+        assert "全员契约完整" not in p.stdout, \
+            "契约正本缺失时不得输出「全员契约完整」虚假结论"
+
 
 def test_g6_evidence_gate() -> None:
     """ADR-002 / SOP T-D1：G6 从软门变成可触发硬门，且 SKIP 必须留痕。"""
@@ -1607,6 +1702,21 @@ def test_cron_b5_assets() -> None:
                            capture_output=True, text=True, timeout=60)
         assert p.returncode == 3 and "manifest 汇总失败" in p.stderr, \
             f"UTF-16 manifest 须透传 EXIT=3 拒绝静默跳过，实为 {p.returncode}: {p.stderr[-200:]}"
+
+        # R4.3（盲检🟠B）：manifest 有 task_id 但被白名单过滤（超长/非法字符）
+        # → 原实现静默丢弃 → 「本轮无巡检对象」EXIT=0，监控失效。须 EXIT=3。
+        (rd / "spawn_manifest.jsonl").write_text(
+            json.dumps({"task_id": "T" + "x" * 70}) + "\n", encoding="utf-8")
+        p = subprocess.run(["bash", str(watch), "--run-dir", str(rd), "--state-dir", str(sd)],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 3 and "task_id 非法" in p.stderr, \
+            f"非法 task_id 须 EXIT=3 拒绝静默跳过，实为 {p.returncode}: {p.stderr[-200:]}"
+        # 对照：manifest 无 task_id 字段 → 正常「无巡检对象」EXIT=0
+        (rd / "spawn_manifest.jsonl").write_text(
+            json.dumps({"event": "spawn"}) + "\n", encoding="utf-8")
+        p = subprocess.run(["bash", str(watch), "--run-dir", str(rd), "--state-dir", str(sd)],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 0, f"无 task_id 字段应正常跳过 EXIT=0，实为 {p.returncode}"
 
 
 def _wording_counts(src: str) -> tuple:
