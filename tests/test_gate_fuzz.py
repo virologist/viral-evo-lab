@@ -1012,10 +1012,12 @@ def test_require_tag_gate() -> None:
         #   ① emoji 插在 = 与数字之间（p = 👨‍👩 0.9）
         #   ② 范围外符号 ⭐(U+2B50) 夹在数字内部（n=8⭐88）
         #   ③ 组合音标 U+0301 夹在数字内部（p = 0́.9）
+        #   ④ 空白拆段（n = 1 2 3）——has_split_number 只管非空白隔断，此前漏网
         for label, payload in (
                 ("emoji隔开标记", "p = \U0001F468\u200d\U0001F469 0.9\n"),
                 ("符号劈开数字", "n=8\u2b5088\n"),
-                ("音标劈开数字", "p = 0\u0301.9\n")):
+                ("音标劈开数字", "p = 0\u0301.9\n"),
+                ("空白拆段数字", "n = 1 2 3\n")):
             f_split = d / f"split_{label}.md"
             f_split.write_text(payload, encoding="utf-8")
             rc = subprocess.run([sys.executable, str(vn), str(f_split), "--sources", str(d / "s2")],

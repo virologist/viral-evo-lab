@@ -4,6 +4,19 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.24] - 2026-11-24（R4.5 主代理对抗自验 · 空白拆段 fail-open 封堵）
+
+v1.5.23 后主代理对抗压测发现同类漏网 fail-open：`n = 1 2 3`（数字被**空白**拆成多段）→ `n_eq` 正则 `\d{2,6}` 失配 → `checked=0 → PASS`。此前 `has_split_number` 只管非空白隔断（`[^\d\s]`），放行空白；`has_broken_key_pattern` 只看「标记后首字符是否数字」，首字符是 `1` 即判正常——两道防线各留半扇门。
+
+### Fixed
+- **空白拆段 fail-open**：在单一事实源 `has_broken_key_pattern` 增加第二判据——标记后首个数字 token 紧跟「空白 + 数字」即判隔断（`^\d{1,6}(?:\.\d+)?\s+\d`），EXIT=3。三消费方（`verify_numbers` / `verify_member_output` / `check_gates` G2）经单一事实源自动生效。
+- 精确对照不误伤：`n = 5`（min_digits=2 有意跳过）、`n = 30 例`、`p = 0.05 vs 0.01`、`CI [0.1, 0.2]`（逗号非空白）均保持原行为。
+- docstring 改 raw string，消除 `SyntaxWarning: invalid escape sequence '\d'`（`-W error` 下可致失败）。
+
+### Verified
+- 回归断言复用既有 `test_require_tag_gate`（新增第 4 变体），零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- pytest 19 passed / fuzz 61/61 / 守卫 11/11 / manifest 80 文件 / py_compile 全过 / `-W error` 下攻击 EXIT=3、合法对照不误拒。
+
 ## [1.5.23] - 2026-11-20（R4.4 复核回补轮 · 数字劈开/标注洗白/正本缺失/静默过滤）
 
 R4.3 冻结后重启两路独立盲检（通用 + 对抗性）。通用盲检报 0🔴/2🟠 后在 v1.5.22 复核追加 1🔴；对抗性盲检报 3🔴 + 4🟠。主代理**逐条独立复现**后采信 6 项（3🔴 + 3🟠），证伪 1 项，另有 1🟠 由另一盲检交叉印证。本轮回补为 R4.4。

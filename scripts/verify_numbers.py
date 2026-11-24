@@ -69,13 +69,25 @@ KEY_MARKERS = re.compile(r"(?:\bn\s*=|\bp\s*=|D[′']\s*=|CI\s*[\[（(])", re.I)
 
 
 def has_broken_key_pattern(text: str) -> bool:
-    """文本中是否存在「关键标记与数字被隔开」的结构（正则必然失配）。"""
+    r"""文本中是否存在「关键标记与数字被隔开/数字被空白拆段」的结构（正则必然失配）。
+
+    两类：① 标记后首个非空白字符不是数字（emoji/符号隔断）；
+          ② 标记后数字被空白拆成多段（n = 1 2 3 → \d{2,6} 失配）。
+    """
     for m in KEY_MARKERS.finditer(text):
         tail = text[m.end():m.end() + 12].lstrip()
         if not tail:
             continue
         if tail[0].isdigit():
-            continue  # 标记后紧跟数字 → 正常
+            # R4.4（主代理对抗实证）：数字被**空白**拆成多段（n = 1 2 3）时，
+            # \d{2,6} / 0\.\d+ 要求连续数字 → 全部失配 → checked=0 → PASS fail-open。
+            # has_split_number 只管非空白隔断（[^\d\s]），放行空白，故此通道此前漏网。
+            # 判据：标记后首个数字 token 紧跟「空白 + 数字」即判隔断。
+            # 不误伤：n = 5（min_digits=2 有意跳过）、n = 30 例、p = 0.05 vs 0.01、
+            # CI [0.1, 0.2]（逗号非空白，不匹配）。
+            if re.match(r"^\d{1,6}(?:\.\d+)?\s+\d", tail):
+                return True
+            continue  # 标记后紧跟完整数字 → 正常
         if m.group(0).rstrip().endswith(("(", "[", "（", "[")):
             continue  # CI 括号形态：标记后是括号，不是数字
         return True
