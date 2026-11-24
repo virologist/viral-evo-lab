@@ -8,6 +8,8 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 v1.5.23 后主代理对抗压测发现同类漏网 fail-open：`n = 1 2 3`（数字被**空白**拆成多段）→ `n_eq` 正则 `\d{2,6}` 失配 → `checked=0 → PASS`。此前 `has_split_number` 只管非空白隔断（`[^\d\s]`），放行空白；`has_broken_key_pattern` 只看「标记后首字符是否数字」，首字符是 `1` 即判正常——两道防线各留半扇门。
 
+> **并行会话并入说明（v1.5.24 同 commit）**：本版本提交时工作树同时带有 C19 跨包根治（Agent Harness 战线 `2026-11-22` 的 A-2/N1 `resolve_skill_paths` 未知技能 fail-loud，5 包 vendor 逐字节同步），涉及 `scripts/assemble_spawn_prompt.py`、`vendor/shared-core/{assemble_spawn_prompt.py,VENDOR.json}`。该改动非本轮 fail-open 修复内容，经确认属用户并行会话有意工作：vendor 哈希守卫 `test_vendor_core.py` 全链通过（声明 hash 与实际逐字节一致），合法技能解析结果与顺序不变。此处如实标注，避免版本叙事漂移。
+
 ### Fixed
 - **空白拆段 fail-open**：在单一事实源 `has_broken_key_pattern` 增加第二判据——标记后首个数字 token 紧跟「空白 + 数字」即判隔断（`^\d{1,6}(?:\.\d+)?\s+\d`），EXIT=3。三消费方（`verify_numbers` / `verify_member_output` / `check_gates` G2）经单一事实源自动生效。
 - 精确对照不误伤：`n = 5`（min_digits=2 有意跳过）、`n = 30 例`、`p = 0.05 vs 0.01`、`CI [0.1, 0.2]`（逗号非空白）均保持原行为。

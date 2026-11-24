@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-24T21:24:32",
+ "generated": "2026-11-24T21:25:48",
  "file_count": 80,
  "files": {
   ".claude-plugin/marketplace.json": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "696b467bc1611608",
-   "bytes": 85254
+   "sha16": "310f790c77f724ac",
+   "bytes": 85882
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
