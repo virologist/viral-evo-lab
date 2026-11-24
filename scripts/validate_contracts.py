@@ -111,7 +111,17 @@ def main() -> int:
         print(f"❌ manifest: {m['contract']}（{m['missing_pattern']}）")
 
     # ① agents 层（9 员；主理人 MD 是契约源头，套成员层模式无意义）
-    for ag in sorted((base / "agents").glob("*.md")):
+    # R4.6（盲检🔴 B5）：原实现只遍历存在的 agents/*.md——删光全部成员后循环零次、
+    # total_missing 不增，结尾仍宣称「agents 9」全员契约完整 EXIT=0（fail-open +
+    # 虚假保证）。补最小数量硬门：成员 MD 少于 9 即记契约缺失，缺几个记几个。
+    agent_files = sorted((base / "agents").glob("*.md"))
+    MIN_AGENTS = 9
+    if len(agent_files) < MIN_AGENTS:
+        shortfall = MIN_AGENTS - len(agent_files)
+        total_missing += shortfall
+        print(f"❌ agents 层: 仅 {len(agent_files)} 份成员 MD（契约要求 ≥{MIN_AGENTS}）——"
+              f"缺 {shortfall} 份，成员层不齐不可验收")
+    for ag in agent_files:
         if ag.name == "viral-evo-lab-team-lead.md":
             print("✅ agents/viral-evo-lab-team-lead.md（契约源头，豁免成员层检查）")
             continue

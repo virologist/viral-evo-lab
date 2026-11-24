@@ -77,6 +77,20 @@ def has_split_number(text: str) -> bool:
     return False
 
 
+def normalize_for_extraction(text: str) -> str:
+    """NFKC 归一化——仅用于数字/声明提取，不改动原始文本的其他用途。
+
+    R4.5（2026-11-24 · 两路盲检 + 主代理对抗实证）：Unicode 等价形态的声明
+     glyph 会让 ASCII-only 正则静默失配 → checked=0 → PASS fail-open。NFKC
+     在根因层消解这一整类变体（实测）：
+       ①(U+2460)→1  ⑧→8  ²(U+00B2)→2  ％(U+FF05)→%  ＝(U+FF1D)→=
+       ［］(U+FF3B/FF3D)→[]  ０．９４(U+FF10/FF0E)→0.94
+     归一化后由消费侧既有 PATTERNS 正常提取（EXIT=5 未溯源 或 命中 EXIT=0），
+     不再靠枚举每个等价码点。对照组（ASCII 正字、纯文本、n=5）NFKC 后逐字不变。
+    """
+    return unicodedata.normalize("NFKC", text)
+
+
 def has_forbidden(text: str) -> bool:
     """文本是否含 Cc(除空白)/Cf/U+FFFD——命中即视为二进制或不可见字符污染。
 

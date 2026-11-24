@@ -145,16 +145,17 @@ def main() -> int:
             all_unverified.append({"member": member, "kind": "decode_error",
                                    "value": f"<不可解码:{dec_err}>"})
             continue
-        # R4.3（两路盲检交叉验证）：数字被符号劈开 / 关键标记与数字被隔开时，
-        # 数字正则必然失配 → nums 为空 → 「无数字即全溯源」fail-open。
-        # 与 verify_numbers 同口径（单一事实源 _vn），记未溯源哨兵 → DEGRADE。
-        if _vn.has_split_number(text) or _vn.has_broken_key_pattern(text):
-            print(f"🔴 {member}: 产出含被隔断的关键数字（数字正则会失配）——按未溯源计",
+        # R4.3/R4.5（两路盲检 + 主代理对抗）：数字被符号/空白劈开、关键标记被隔开、
+        # Unicode 等价形态（全角/圈号/上标）、声明存在却零提取——都使数字正则静默
+        # 失配 → nums 为空 → 「无数字即全溯源」fail-open。统一走 _vn.prepare_numbers
+        # 单一入口（NFKC 归一化 + 隔断 + 声明总闸），记未溯源哨兵 → DEGRADE。
+        ok, nums, reason = _vn.prepare_numbers(text, min_digits=2)
+        if not ok:
+            print(f"🔴 {member}: 产出含{reason}（数字正则会失配）——按未溯源计",
                   file=sys.stderr)
             all_unverified.append({"member": member, "kind": "split_number",
-                                   "value": "<数字被隔断:正则会失配>"})
+                                   "value": f"<{reason}:正则会失配>"})
             continue
-        nums = _vn.extract_numbers(text, min_digits=2)
         unverified = []
         for kind, val, _ in nums:
             cands = _vn.float_candidates(val)

@@ -48,7 +48,7 @@ mkdir -p "$STATE_DIR" || { echo "❌ state_dir 不可创建" >&2; exit 3; }
 # 会留下死锁导致后续巡检永久跳过（v1.5.9 首轮测试实测抓到）。
 LOCK="$STATE_DIR/.cron_watch.lock"
 if ! (set -o noclobber; : > "$LOCK") 2>/dev/null; then
-  echo "⏭ 上一轮巡检仍在进行，跳过本次（锁: $LOCK）" >&2; exit 0
+  echo "⏭ 上一轮巡检仍在进行，跳过本次（锁: ${LOCK}）" >&2; exit 0
 fi
 trap 'rm -f "$LOCK" 2>/dev/null || true' EXIT
 

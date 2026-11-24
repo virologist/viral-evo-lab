@@ -44,13 +44,18 @@ from pathlib import Path
 # R4.2（2026-11-19 · 盲检🔴1）：统一严格读守卫——无 BOM UTF-16 的 NUL 交错在
 # UTF-8 下是合法字节，单独捕获 UnicodeError 防不住，必须显式检测控制字符。
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _text_guard import read_text_checked, has_split_number  # noqa: E402
+from _text_guard import (read_text_checked, has_split_number,  # noqa: E402
+                         normalize_for_extraction)
 
 # 权威数字模式（保守：只抓最易造假/最关键的四类 + CI）
+# R4.5：\b → (?<![A-Za-z])——CJK 紧邻（"实验p=0.8" / "样本n=888"）时 \b 不成立
+# （CJK 属 \w），导致声明被静默漏掉 → checked=0 → PASS。改用「左侧非 ASCII 字母」
+# 判据：CJK/数字紧邻放行提取，ASCII 单词（如 exp=0.8）仍不误抓成 p 值。
+# 配合 NFKC 归一化（消费侧 main 中），全角/圈号/上标等价形态一并收敛。
 PATTERNS = [
     ("pct",   re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")),
-    ("n_eq",  re.compile(r"\bn\s*=\s*(\d{2,6})\b", re.I)),
-    ("p_val", re.compile(r"\bp\s*=\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)", re.I)),
+    ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*=\s*(\d{2,6})(?![A-Za-z])", re.I)),
+    ("p_val", re.compile(r"(?<![A-Za-z])p\s*=\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z])", re.I)),
     ("dprime",re.compile(r"D[′']\s*=\s*([+-]?\d\.\d+)")),
     ("ci",    re.compile(r"CI\s*[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]")),
 ]
@@ -92,6 +97,67 @@ def has_broken_key_pattern(text: str) -> bool:
             continue  # CI 括号形态：标记后是括号，不是数字
         return True
     return False
+
+# R4.5（2026-11-24 · 两路盲检 + 主代理对抗实证）：声明意图总闸。
+# 根因：13 个 fail-open 变体（逗号/中点/阿拉伯小数点 0,94 / 0·94 / ٠٫٩٤、
+# 连字符拆段 1-2-3、9 符号劈开、CJK 紧邻等）共性是「文本含关键数字声明，但
+# ASCII-only 正则一个都没提取 → checked=0 → PASS」。逐变体补区间补不完，
+# 改为根因判定：**声明标记存在，却零数字被提取 → fail-closed**。
+# 判据复用 PATTERNS 的 key marker 语义，仅追加「文本确含数字声明」检测；
+# 合法对照不误伤：纯文字（无声明）、n = 5（min_digits 有意跳过的小 n，
+# 但声明存在——需在调用侧按 checked==0 且无其它声明时才放行，见 main）。
+DECL_HINT = re.compile(
+    r"(?:[np]\s*[=＝]|[dD][′']\s*=|CI\s*[\[（(［]|(?:\d{1,3}(?:\.\d+)?)\s*[%％])",
+    re.I)
+# 合法的小 n 声明（n = 5）——min_digits=2 有意跳过的 1 位样本量。此类声明后
+# 紧跟**单个 ASCII 数字**，数字是可解析的，只是低于阈值，不是正则失配。
+# 豁免须整段声明干净：单数字后只允许行尾/空白/句读终止符，禁止紧接另一数字
+# 或隔断符（- © · 等）——否则 n = 1-2-3 / n = 1©…©2 会被误当作小 n 放行。
+_SMALL_N_DECL = re.compile(
+    r"n\s*=\s*\d(?=\s|$|[。，、；;)）\]])", re.I)
+
+
+def has_declaration_without_number(text: str, nums: list, min_digits: int = 2) -> bool:
+    """文本含数字声明意图，但一个数字都没提取出来 → 疑正则失配，须 fail-closed。
+
+    仅在 nums 为空时触发（有任一数字被提取说明正则在工作，不构成静默全放行）。
+    豁免：仅含小 n 声明（n = 5，1 位低于 min_digits）且无其它声明——该数字可
+    正常解析，属设计内跳过，非正则失配。多个声明其中之一可解析时仍按 fail-open。
+    """
+    if nums:
+        return False
+    if not DECL_HINT.search(text):
+        return False
+    # 小 n 豁免：文中所有声明都是干净的单数字 n= 时放行
+    hints = list(DECL_HINT.finditer(text))
+    small_matches = list(_SMALL_N_DECL.finditer(text))
+    if len(small_matches) >= len(hints) and min_digits >= 2:
+        return False
+    return True
+
+
+def prepare_numbers(text: str, min_digits: int = 2):
+    """消费方共用的「归一化 → 提取 → 隔断/声明守卫」单一入口。
+
+    返回 (ok: bool, nums: list, reason: str)。ok=False 表示检出一个或多个
+    fail-open 结构（符号劈开 / 标记隔断 / 声明无数字），消费方须按自身契约
+    fail-closed（verify_numbers → EXIT=3；vmo → unverified 哨兵 → DEGRADE；
+    check_gates → G2 FAIL）。R4.5 新增 NFKC 归一化与声明总闸。
+    """
+    # 污染检测必须在归一化前（原始 text）——归一化不该掩盖 NUL/Cf 污染
+    if has_split_number(text):
+        return False, [], "数字被符号劈开"
+    if has_broken_key_pattern(text):
+        return False, [], "关键数字模式被隔开"
+    norm = normalize_for_extraction(text)
+    # 归一化后再查一次劈开（全角→ASCII 后可能出现新的相邻数字-符号结构）
+    if has_split_number(norm) or has_broken_key_pattern(norm):
+        return False, [], "归一化后数字被隔断"
+    nums = extract_numbers(norm, min_digits)
+    if has_declaration_without_number(norm, nums, min_digits):
+        return False, [], "含数字声明但零提取（正则失配）"
+    return True, nums, ""
+
 
 def extract_numbers(text: str, min_digits: int):
     """返回 [(kind, value_str, norm_str)]，norm 用于 grep。"""
@@ -223,18 +289,15 @@ def main() -> int:
         # 禁止吞字节后误判 PASS（无 BOM UTF-16 的 NUL 交错是合法 UTF-8，须显式检测）
         print(f"[verify_numbers] 产出文件不可解码: {dec_err}", file=sys.stderr)
         return 3
-    # R4.3 复核（两路盲检交叉验证）：数字被符号/修饰/格式类字符劈开时，数字
-    # 正则必然失配 → checked=0 → 「无数字即 PASS」fail-open。fail-closed。
-    if has_split_number(text):
-        print("[verify_numbers] 产出含被符号劈开的数字串（疑数字正则失配）——拒绝判 PASS",
+    # R4.3/R4.5（两路盲检 + 主代理对抗）：符号/空白劈开、标记隔断、Unicode 等价
+    # 形态、声明存在却零提取 → 数字正则静默失配 → checked=0 → PASS fail-open。
+    # 统一走 prepare_numbers 单一入口（NFKC + 隔断 + 声明总闸），与另两个消费方
+    # （verify_member_output / check_gates）同口径，杜绝三处判定漂移。
+    ok_nums, nums, why_nums = prepare_numbers(text, args.min_digits)
+    if not ok_nums:
+        print(f"[verify_numbers] 产出含{why_nums}（疑数字正则失配）——拒绝判 PASS",
               file=sys.stderr)
         return 3
-    # R4.3：关键标记与数字之间被插入字符（p = 👨‍👩 0.9）同样导致正则失配。
-    if has_broken_key_pattern(text):
-        print("[verify_numbers] 产出含被隔开的关键数字模式（疑正则失配）——拒绝判 PASS",
-              file=sys.stderr)
-        return 3
-    nums = extract_numbers(text, args.min_digits)
     pool = load_sources(args.sources, args.exclude, args.allow_md, require_tag=args.require_tag)
 
     found, not_found = [], []

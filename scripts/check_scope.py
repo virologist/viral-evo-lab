@@ -58,14 +58,24 @@ def check_file(p: Path) -> list:
         # 无 BOM UTF-16 的 NUL/Cf 零宽字符交错是合法 UTF-8，解码不抛异常——显式检测
         return [(-1, "UNREADABLE", "含 Cc/Cf 不可见字符或 U+FFFD（疑二进制污染），无法核验")]
     for lineno, line in enumerate(text.splitlines(), 1):
-        # 排除纯注释行（脚本自身含 PPMID 等黑名单词会自检）
+        # R4.6（盲检🔴 B3）：原实现把整行 `#`/`//` 开头的行全部跳过——md 标题
+        # （`# 事故复盘：PP 41034380`）同样以 `#` 开头 → 事故叙事藏在标题里即可
+        # 绕过 scope 检查 → 误判 clean EXIT=0（fail-open）。
+        # 收窄豁免：仅当黑名单命中位于「注释标记之后紧邻的注释正文」且该行本身
+        # 是代码注释（`# ` / `// `）时跳过——但 md 的 `# ` 标题无法仅凭前缀区分。
+        # 正确处理：不再按前缀整行跳过，而是**照常扫描所有行**；脚本自检误报问题
+        # 由 GOVERNANCE_BOUNDARIES.md 白名单处理（维持原特例），其余文件一视同仁。
         stripped = line.strip()
-        if stripped.startswith(("#", "//")) and "GOVERNANCE_BOUNDARIES.md" not in str(p):
-            continue
+        is_governance_doc = "GOVERNANCE_BOUNDARIES.md" in str(p)
         for pat in PATTERNS:
-            if pat.search(line):
-                hits.append((lineno, pat.pattern, line.strip()[:80]))
-                break
+            m = pat.search(line)
+            if not m:
+                continue
+            # 仅豁免：治理正文本身，且命中在行首注释标记之后（自描述黑名单词场景）
+            if is_governance_doc and stripped.startswith(("#", "//")):
+                continue
+            hits.append((lineno, pat.pattern, line.strip()[:80]))
+            break
     return hits
 
 

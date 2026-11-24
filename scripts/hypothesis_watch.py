@@ -167,8 +167,13 @@ def _row_str(v) -> str:
 
     csv.DictReader 在短行/多列场景会给 None 或 list 值，
     直接 .lower()/.strip() 会抛 AttributeError。
+
+    R4.6（盲检🔴 B4）：原实现不 strip，CSV 单元格 `fatal `（尾空格）/
+    ` closed` 在 severity/status 比较时失配 → fatal/severe 闭环发现被静默
+    丢弃 → late_fatal 漏报 EXIT=0（fail-open）。CSV 单元格首尾空格是格式
+    噪声、非语义，统一 strip 不改变任何合法值。
     """
-    return v if isinstance(v, str) else ""
+    return v.strip() if isinstance(v, str) else ""
 
 
 def check_disposition(state_p: Path, late_fatal: list, hyp_updated: datetime,
@@ -308,9 +313,14 @@ def main() -> int:
         if cd is None:
             # R2 回补：非空但无法解析的 closed_date 不再静默吞掉——
             # 该行本可能是 fatal/severe 证伪发现，漏读即门禁漏报。
-            if closed_raw:
-                print(f"⚠️  closed_date 无法解析，跳过该行: "
-                      f"finding_id={fid} closed_date={closed_raw!r}", file=sys.stderr)
+            # R4.6（盲检🔴 A8）：原实现「空 closed_date」连警告都不打直接
+            # continue——一条 status=closed + severity=fatal 的证伪发现只要
+            # 没填日期就完全消失 → late_fatal 漏报 EXIT=0（fail-open）。
+            # 保守判定：closed 的 fatal/severe 缺日期/日期不可解析 = 无法证明
+            # 「不晚于假说池更新」→ 计入 late_fatal 交人工复查（fail-closed）。
+            print(f"⚠️  closed_date 缺失/无法解析，按「待复查」计入（不再静默跳过）: "
+                  f"finding_id={fid} closed_date={closed_raw!r}", file=sys.stderr)
+            late_fatal.append(row)
             continue
         # H2 修复（审计 2026-10-15）：closed_date 为纯日期时按"同日即算晚于"（避免同日晚闭环漏报）
         if len(_row_str(closed_raw).strip()) <= 10:

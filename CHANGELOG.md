@@ -4,6 +4,28 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.25] - 2026-11-24（R4.6 全面复测回补 · Unicode 等价形态 fail-open 根因级封堵 + 五项结构缺陷）
+
+R4.5 冻结后重启两路独立盲检：A=9🔴+1🟠、B=6🔴+2🟠。主代理**逐条独立复现**后确认 13 个 Unicode/声明 fail-open 变体全部 `rc=0 / checked=0 / PASS`，另复现 5 项结构性缺陷；证伪 1 项（`verify_member_output` 无权威源，实测 EXIT=5）。根因与 v1.5.24 同源但面更广：**枚举字符码点永远补不完**——全角数字/等号/百分号、圈号数字（`①` 满足 `isdigit()` 但 `\d` 不匹配）、上标数字、不同语言小数点、数字声明零提取都会让正则静默失配 → `checked=0 → PASS`。本轮不再补码点，改走归一化 + 总闸的单一事实源。
+
+### Fixed（根因级）
+- **NFKC 归一化单一入口**：`_text_guard.normalize_for_extraction()` 仅用于数字/声明提取前归一化，根因收敛 `０．９４` / `p＝0.8` / `95％` / `①.⑧` / `8²8` / `CI ［0.1，0.2］`；原始文本其他用途不变。
+- **数字声明意图总闸**：新增 `DECL_HINT` / `_SMALL_N_DECL` / `has_declaration_without_number()`——文本含 `p=` / `n=` / `D′=` / `CI [` / `%` 声明但一个数字都提取不出时，判正则静默失配 fail-closed（EXIT=3），杜绝「声明存在、checked=0、PASS」。干净小 n（`n = 5` 后接空白/句读/行尾）保留豁免，`n = 1-2-3` / `n = 1©…©2` 仍拦。
+- **`prepare_numbers()` 单一事实源**：隔断检测 → 归一化 → 声明总闸 → 提取全链路收拢，`verify_numbers` / `verify_member_output` / `check_gates` G2 三消费方同口径，任一方不再自行拼接检测步骤。
+
+### Fixed（结构性，全部实证复现后修复）
+- **`assemble_spawn_prompt` 子串洗白**：V1 自动核验原 `cand in pool` 使 `0.94` 命中 `0.9441`。改为复用 `verify_numbers.pool_has_number()` / `float_candidates()` 做 token 边界匹配；模块加载失败时降级到等价边界正则（不再回退子串）。
+- **`check_scope` md 标题绕过**：原 `stripped.startswith("#")` 整行跳过，标题内事故叙事不设防。改为仅治理正本 `GOVERNANCE_BOUNDARIES.md` 的注释行豁免，其余标题照常扫描。
+- **`validate_contracts` 成员层缺失虚假 PASS**：删除全部 agents 后仍判契约完整。新增 `MIN_AGENTS = 9` 硬门，缺员计入契约缺失 → EXIT=5。
+- **`hypothesis_watch` 尾空格/空日期漏报**：`_row_str()` 对字符串单元格 strip，`fatal ` / ` closed` 不再漏判；closed + fatal/severe + 空或不可解析 `closed_date` 不再静默跳过，计入 `late_fatal`。
+- **`poll_run_dir` 200k 后撞限漏检**：移除 `max_chars=200000` 截断，全文严格读；撞限标注挪到第 200001 字符后仍判 NOT_READY/EXIT=5。
+- **`cron_watch.sh` bash 3.2 陈旧锁崩溃**：全角右括号紧贴 `$LOCK` 被解析为 `$LOCK\xef`，`set -u` 下 unbound variable EXIT=1（契约仅 0/3/5）。改 `${LOCK}`。
+
+### Verified
+- 13 个 Unicode/声明 fail-open 变体 + 5 项结构缺陷全部主代理独立复现（复现 → 修复 → 反向对照三态）。
+- 回归断言全部复用既有 `test_require_tag_gate()` / `test_poll_hitlimit_and_manifest()` / `test_decision_records_guard()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件 `--check` EXIT=0 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / py_compile 全过 / 四处 version 一致。
+
 ## [1.5.24] - 2026-11-24（R4.5 主代理对抗自验 · 空白拆段 fail-open 封堵）
 
 v1.5.23 后主代理对抗压测发现同类漏网 fail-open：`n = 1 2 3`（数字被**空白**拆成多段）→ `n_eq` 正则 `\d{2,6}` 失配 → `checked=0 → PASS`。此前 `has_split_number` 只管非空白隔断（`[^\d\s]`），放行空白；`has_broken_key_pattern` 只看「标记后首字符是否数字」，首字符是 `1` 即判正常——两道防线各留半扇门。

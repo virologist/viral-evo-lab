@@ -101,6 +101,24 @@ def _load_guard():
         print(f"⚠ guard_readonly 加载失败（守卫降级）: {type(e).__name__}: {e}", file=sys.stderr)
         return None
 
+def _load_verify_numbers():
+    """R4.6（盲检🔴 A6/B1）：加载同目录 verify_numbers，复用数字 token 边界
+    匹配单一事实源。V1 自动核验原用 `c in pool` 子串匹配——task_payload 的
+    p=0.94 被权威池的 0.9441 洗白（假阴性），float_candidates 也是 own copy
+    易漂移。加载失败返回 None（降级为本地严格实现，不静默放行）。
+    """
+    here = Path(__file__).resolve().parent
+    try:
+        spec = importlib.util.spec_from_file_location("_vn_for_assemble", here / "verify_numbers.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        if callable(getattr(mod, "pool_has_number", None)) and callable(getattr(mod, "float_candidates", None)):
+            return mod
+    except Exception as e:  # noqa: BLE001 — 模块损坏不应炸装配主流程
+        print(f"⚠ verify_numbers 加载失败（数字匹配降级）: {type(e).__name__}: {e}", file=sys.stderr)
+    return None
+
+
 def _load_v5_checker(expert_dir: Path):
     """从 vendor 版装配器加载 check_task_package_v5；失败返回 None。"""
     core = expert_dir / _VENDOR_CORE_REL
@@ -246,14 +264,23 @@ def _auto_verify_payload(expert_dir: Path, payload: str, research_ops: str) -> d
                         pass
     pool = "\n".join(pool_chunks)
     unverified = []
+    _vn = _load_verify_numbers()
     for kind, val in nums:
-        cands = {val}
-        try:
-            f = float(val)
-            cands |= {f"{f:.2f}", f"{f:.3f}", f"{f:.4f}"} if f >= 1 else {f"{f:.3f}", f"{f:.4f}", f"{f:.5f}"}
-        except ValueError:
-            pass
-        if not any(c in pool for c in cands):
+        # R4.6：优先复用 verify_numbers 的 token 边界匹配 + 浮点候选单一事实源，
+        # 杜绝 0.94⊂0.9441 子串洗白。降级路径也用等价的边界正则（不用子串）。
+        if _vn is not None:
+            cands = _vn.float_candidates(val)
+            hit = any(_vn.pool_has_number(pool, c) for c in cands)
+        else:
+            cands = {val}
+            try:
+                f = float(val)
+                cands |= {f"{f:.2f}", f"{f:.3f}", f"{f:.4f}"} if f >= 1 else {f"{f:.3f}", f"{f:.4f}", f"{f:.5f}"}
+            except ValueError:
+                pass
+            hit = any(re.search(r"(?<![\d.])" + re.escape(c) + r"(?![\d.])", pool)
+                      for c in cands)
+        if not hit:
             unverified.append({"kind": kind, "value": val})
     return {"unverified": unverified, "warning_text": None, "skipped": False}
 

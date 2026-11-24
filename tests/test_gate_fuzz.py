@@ -1024,6 +1024,41 @@ def test_require_tag_gate() -> None:
                                 capture_output=True, text=True, timeout=60).returncode
             assert rc == 3, f"{label} 须 EXIT=3（数字正则失配防 fail-open），实为 {rc}"
 
+        # R4.5（两路盲检 9🔴+6🟠 + 主代理对抗实证）：13 个「声明存在却零提取」
+        # fail-open 变体全部须拒绝 PASS。两类期望：
+        #   - NFKC 可归一化（①⑧²／全角＝％［］数字）→ 正则恢复提取 → 未溯源 EXIT=5；
+        #   - 归一化后仍隔断（CJK紧邻走边界判据除外的 9符号/小数点空白拆/逗号·中点·
+        #     阿拉伯小数点/连字符拆段）→ prepare_numbers 声明总闸 → EXIT=3。
+        # 合法对照（纯文字 / n=5 小 n）须保持 EXIT=0，不得 fail-close 误拒。
+        for label, payload, want_rc in (
+                ("CJK紧邻声明", "实验p=0.8，差异显著。\n", 5),
+                ("圈号数字", "结论：p = ①.⑧，差异极显著。\n", 5),
+                ("上标数字", "n = 8²8\n", 5),
+                ("全角百分号", "保护率 95％（权威源无）。\n", 5),
+                ("全角等号", "p＝0.8\n", 5),
+                ("全角方括号CI", "CI ［0.1，0.2］\n", 5),
+                ("9符号劈开", "n = 1©©©©©©©©©2，样本量见此。\n", 3),
+                ("小数点空白拆", "p = 0 . 8，差异显著。\n", 3),
+                ("全角数字小数点", "p = ０．９４\n", 5),
+                ("逗号小数点", "p = 0,94\n", 3),
+                ("中点小数点", "p = 0·94\n", 3),
+                ("阿拉伯小数点", "p = ٠٫٩٤\n", 3),
+                ("连字符拆段", "n = 1-2-3\n", 3)):
+            f_u = d / f"uni_{label}.md"
+            f_u.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_u), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == want_rc and rc != 0, \
+                f"{label} 须 EXIT={want_rc}（不得 PASS），实为 {rc}"
+        # 合法对照：纯文字（无声明）与小 n（min_digits 有意跳过）不得误拒
+        for label, payload in (("纯文字", "本研究分析了进化关系\n"),
+                               ("小n跳过", "n = 5\n")):
+            f_ok = d / f"ok_{label}.md"
+            f_ok.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_ok), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 0, f"{label} 不得 fail-close 误拒，实为 {rc}"
+
         # R4.3（盲检🟠4）：数字 grep 原为子串匹配——p=0.94 被权威源里的 0.9441
         # 洗白（假阳性 PASS）、p=0.98 被 10.980 洗白。改 token 边界匹配后，
         # 两者都必须判未溯源 EXIT=5。
@@ -1458,6 +1493,89 @@ def test_decision_records_guard() -> None:
             f"契约正本缺失须 EXIT=5（不得虚假 PASS），实为 {p.returncode}"
         assert "全员契约完整" not in p.stdout, \
             "契约正本缺失时不得输出「全员契约完整」虚假结论"
+
+        # R4.6（两路盲检结构🔴）：六项结构缺陷回归，全部复用本函数（零新增函数）。
+        # ① validate_contracts 删光 agents 后不得虚假 PASS：副本清空 agents/*.md
+        vcempty = root / "vc_empty"
+        if vcempty.exists():
+            shutil.rmtree(vcempty, ignore_errors=True)
+        shutil.copytree(vcroot, vcempty)
+        for ag in (vcempty / "agents").glob("*.md"):
+            ag.unlink()
+        p = subprocess.run([sys.executable, str(vcempty / "scripts" / "validate_contracts.py")],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 5 and "成员层不齐" in p.stdout, \
+            f"agents 全删须 EXIT=5 且明示不齐，实为 rc={p.returncode}"
+
+        # ② check_scope：md 标题行隐藏事故数字不得判 clean（须 EXIT=3）
+        cs = PKG / "scripts" / "check_scope.py"
+        hidden = root / "scope_hidden.md"
+        hidden.write_text("# 事故复盘：PP 41034380 位置映射错误\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(cs), str(hidden)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"md 标题隐藏事故数字须 EXIT=3，实为 {rc}"
+        # 对照：治理正本自描述黑名单词仍豁免
+        gov = root / "GOVERNANCE_BOUNDARIES.md"
+        gov.write_text("# 黑名单词说明：PP 41034380 是事故编号\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(cs), str(gov)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 0, f"治理正本自描述须豁免，实为 {rc}"
+
+        # ③ hypothesis_watch：closed fatal 空日期 / 尾空格 severity 均须进 REVIEW_REQUIRED
+        hw = PKG / "scripts" / "hypothesis_watch.py"
+        hro = root / "hwro"
+        (hro / "context_stack").mkdir(parents=True, exist_ok=True)
+        (hro / "00_governance").mkdir(parents=True, exist_ok=True)
+        (hro / "context_stack" / "confirmed_hypotheses.json").write_text(
+            '{"last_updated":"2026-11-01T00:00:00+08:00",'
+            '"active_hypotheses":[{"id":"H1","status":"active","claim":"x"}]}',
+            encoding="utf-8")
+        for label, csv_line in (
+                ("空日期", "F1,severe,closed,,\"证伪发现\""),
+                ("尾空格", "F2,\"fatal \",closed,2026-11-20,\"证伪发现\"")):
+            (hro / "00_governance" / "redteam_ledger.csv").write_text(
+                "finding_id,severity,status,closed_date,closed_summary\n" + csv_line + "\n",
+                encoding="utf-8")
+            p = subprocess.run([sys.executable, str(hw), "--research-ops", str(hro)],
+                               capture_output=True, text=True, timeout=60)
+            assert p.returncode in (5, 6) and "REVIEW_REQUIRED" in p.stdout, \
+                f"{label} fatal/severe 须进 REVIEW_REQUIRED，实为 rc={p.returncode}"
+
+        # ④ poll_run_dir：200k 之后的撞限标注不得 READY（全文扫描无截断）
+        poll = PKG / "scripts" / "poll_run_dir.py"
+        prun = root / "poll_big"
+        prun.mkdir(exist_ok=True)
+        (prun / "T-BIG__alice.md").write_text(
+            "A" * 200100 + "\n<!-- 轮次耗尽，产出不完整 -->\n", encoding="utf-8")
+        p = subprocess.run([sys.executable, str(poll), str(prun), "T-BIG", "--expected", "alice"],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 5 and "NOT_READY" in p.stdout, \
+            f"200k 后撞限标注须 NOT_READY，实为 rc={p.returncode}"
+
+        # ⑤ cron_watch：陈旧锁分支不得 unbound variable EXIT=1（契约 0/3/5）
+        watch = PKG / "scripts" / "cron_watch.sh"
+        crun, cstate = root / "cron_r", root / "cron_s"
+        crun.mkdir(exist_ok=True); cstate.mkdir(exist_ok=True)
+        (cstate / ".cron_watch.lock").write_text("stale\n", encoding="utf-8")
+        p = subprocess.run(["bash", str(watch), "--run-dir", str(crun), "--state-dir", str(cstate)],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode in (0, 3, 5) and "unbound variable" not in p.stderr, \
+            f"陈旧锁须契约内退出，实为 rc={p.returncode}: {p.stderr[-120:]}"
+
+        # ⑥ assemble V1：0.94 不得被权威池 0.9441 子串洗白（须告警未溯源）
+        asmo = root / "asm_ro"
+        (asmo / "context_stack" / "outputs").mkdir(parents=True, exist_ok=True)
+        (asmo / "context_stack" / "outputs" / "auth.csv").write_text("p,0.9441\n", encoding="utf-8")
+        asmt = root / "asm_task.md"
+        asmt.write_text("objective: 核验\np = 0.94\noutput_format: md\n"
+                        "constraints: 无\ntask_boundary: 无\n", encoding="utf-8")
+        env = dict(os.environ, RESEARCH_OPS_DIR=str(asmo))
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "assemble_spawn_prompt.py"),
+                            "--member", "phylo-analyst", "--task-file", str(asmt),
+                            "--out", str(root / "asm_out.md")],
+                           capture_output=True, text=True, timeout=60, env=env)
+        assert "未溯源数字" in p.stdout + p.stderr, \
+            "0.94 不得被 0.9441 子串洗白，须 V1 告警未溯源"
 
 
 def test_g6_evidence_gate() -> None:

@@ -145,14 +145,18 @@ def head_hit_limit(f: Path, lines: int = 8) -> bool:
         （疑似撞限，交人工），不放行不完整产出。
       - R4.3（盲检🟠C）：原只看前 8 行——标注被挪到第 9 行即漏检 → 不完整产出
         被判 READY。撞限标注是成员显式写入的产出内容，位置不应受限；改为
-        **全文扫描**（仍限 max_chars 防超大文件）。保留 lines 参数仅为兼容旧签名。
+        **全文扫描**。保留 lines 参数仅为兼容旧签名。
+      - R4.6（盲检🔴）：R4.3 的全文扫描仍限 max_chars=200000——标注被挪到
+        200k 之后（实测 200100 字节处）即漏检 → READY fail-open。成员产出是
+        小规模 md，容量上限的 DoS 防护价值远低于「漏放不完整产出」风险；移除
+        截断限制，全文严格读。保留严格解码守卫（不可解码仍保守判撞限）。
     """
     try:
         if f.stat().st_size == 0:
             return False
     except OSError:
         return True  # stat 都读不到——保守判定，人工复核
-    head, err = read_text_checked(f, max_chars=200000)
+    head, err = read_text_checked(f)
     if head is None:
         return True  # 不可解码/控制字符污染 ≠ 没标注——保守判定，人工复核
     return HIT_LIMIT_MARK in head

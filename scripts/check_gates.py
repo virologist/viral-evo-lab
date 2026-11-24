@@ -678,12 +678,14 @@ def main() -> int:
                 decode_failed.append(f"{art.name}({dec_err})")
                 marked_by_art[art.name] = bucket
                 continue
-            # R4.3（两路盲检交叉验证）：数字被符号劈开 / 关键标记与数字被隔开
-            # → 数字正则失配 → extract_numbers 为空 → 「无未溯源数字」fail-open。
+            # R4.3/R4.5（两路盲检 + 主代理对抗）：符号/空白劈开、标记隔断、Unicode
+            # 等价形态、声明无数字——数字正则失配 → 「无未溯源数字」fail-open。
+            # 统一走 vmo._vn.prepare_numbers 单一入口（NFKC + 隔断 + 声明总闸），
             # 与 verify_numbers / verify_member_output 同口径 → 计入 decode_failed
             # （G2 FAIL），不放行。
-            if vmo._vn.has_split_number(text) or vmo._vn.has_broken_key_pattern(text):
-                decode_failed.append(f"{art.name}(数字被隔断:数字正则会失配)")
+            ok_nums, _, why_nums = vmo._vn.prepare_numbers(text, min_digits=2)
+            if not ok_nums:
+                decode_failed.append(f"{art.name}({why_nums}:数字正则会失配)")
                 marked_by_art[art.name] = bucket
                 continue
             # R4.3（盲检🔴2）：间隔不得含其他数字——标注只归属紧邻其前者，
