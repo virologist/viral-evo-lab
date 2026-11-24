@@ -670,6 +670,11 @@ def main() -> int:
         # R4.1（backlog D）：不可解码 artifact 不静默跳过（跳过=当无数字=fail-open），
         # 单独记账，最后并入 G2 FAIL（fail-closed）。
         decode_failed: list[str] = []
+        # R4.7（盲检 B🔴2）：原第二循环用 `extract_numbers(text)` 对**原始文本**
+        # 提取，而守卫循环把 prepare_numbers 的归一化结果丢弃 → 全角/nfkc 等价
+        # 声明在守卫处通过、在实际提取处零命中 → G2 误判 PASS。存下同一入口的
+        # 提取结果供第二循环复用，杜绝「守卫与消费两个口径」漂移。
+        nums_by_art: dict[str, list] = {}
         for art in artifacts:
             bucket: set[str] = set()
             text, dec_err = _text_checked(art)
@@ -683,10 +688,11 @@ def main() -> int:
             # 统一走 vmo._vn.prepare_numbers 单一入口（NFKC + 隔断 + 声明总闸），
             # 与 verify_numbers / verify_member_output 同口径 → 计入 decode_failed
             # （G2 FAIL），不放行。
-            ok_nums, _, why_nums = vmo._vn.prepare_numbers(text, min_digits=2)
+            ok_nums, art_nums, why_nums = vmo._vn.prepare_numbers(text, min_digits=2)
             if not ok_nums:
                 decode_failed.append(f"{art.name}({why_nums}:数字正则会失配)")
                 marked_by_art[art.name] = bucket
+                nums_by_art[art.name] = []
                 continue
             # R4.3（盲检🔴2）：间隔不得含其他数字——标注只归属紧邻其前者，
             # 防 "n=111 及 n=222 [待人工核验]" 用 222 的标注洗白 111。
@@ -696,12 +702,13 @@ def main() -> int:
                 if "待人工核验" in seg:
                     bucket.add(m.group("num"))
             marked_by_art[art.name] = bucket
+            nums_by_art[art.name] = art_nums
         for art in artifacts:
             text, _ = _text_checked(art)
             if text is None:
                 continue   # 已记入 decode_failed，下面并入 G2 FAIL
             own_marked = marked_by_art.get(art.name, set())
-            for kind, val, _ in vmo._vn.extract_numbers(text, min_digits=2):
+            for kind, val, _ in nums_by_art.get(art.name, []):
                 cands = vmo._vn.float_candidates(val)
                 if not any(vmo._vn.pool_has_number(pool, c) for c in cands):
                     # C7（2026-11-07）：waiver 匹配走 float_candidates 容差（原精确串匹配，

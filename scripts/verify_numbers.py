@@ -70,7 +70,11 @@ VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
 #   n = ⭐888         （符号插在 = 与数字之间）
 # 判据：关键标记（n=/p=/D'/CI）之后的首个非空白字符不是数字 → 标记未接上数字。
 # CI 括号形态（"CI [0.1, 0.2]"）不适用此判据（标记后是括号），单独排除。
-KEY_MARKERS = re.compile(r"(?:\bn\s*=|\bp\s*=|D[′']\s*=|CI\s*[\[（(])", re.I)
+# R4.7（盲检 A🔴）：\b 在「样本n=」这类 CJK 紧邻处不成立（CJK 属 \w），
+# 与 PATTERNS 的 (?<![A-Za-z]) 口径漂移 → CJK 紧邻的空白拆段绕过隔断检测。
+# 统一为「仅禁 ASCII 字母紧邻」，与 PATTERNS / DECL_HINT 同口径。
+KEY_MARKERS = re.compile(
+    r"(?:(?<![A-Za-z])n\s*=|(?<![A-Za-z])p\s*=|D[′']\s*=|CI\s*[\[（(])", re.I)
 
 
 def has_broken_key_pattern(text: str) -> bool:
@@ -113,27 +117,47 @@ DECL_HINT = re.compile(
 # 紧跟**单个 ASCII 数字**，数字是可解析的，只是低于阈值，不是正则失配。
 # 豁免须整段声明干净：单数字后只允许行尾/空白/句读终止符，禁止紧接另一数字
 # 或隔断符（- © · 等）——否则 n = 1-2-3 / n = 1©…©2 会被误当作小 n 放行。
+# 顿号/逗号后仍接数字（`n = 5、94`）属列表隔断，不得豁免；但中文/英文
+# 逗号后接字母声明（`n = 5，p = 0.111`）是合法多声明句，须豁免。
 _SMALL_N_DECL = re.compile(
-    r"n\s*=\s*\d(?=\s|$|[。，、；;)）\]])", re.I)
+    r"(?<![A-Za-z])n\s*=\s*\d(?=\s|$|[。）\]]|[,，](?=\s*[a-zA-Z]))", re.I)
+
+# R4.7（盲检 B🔴1/B🔴5）：原总闸只看「nums 是否全空」→ 诱饵声明（n = 30
+# 在权威源中）可洗白同段另一条静默失配的声明（p = 0,94 / D’=0.94）；
+# 原小 n 豁免把「、」「，」当句读 → `n = 5、94` 被当干净小 n 放行。
+# 根治：改为**逐声明判定**——每个声明标记都须有可解析的对应数字形态，
+# 否则 fail-closed。小 n 豁免收紧为「单数字后只接空白/句末/句号/右括号」，
+# 顿号/逗号后仍接数字即视为列表隔断，不得豁免。
+_DECL_SPEC = (
+    ("n", re.compile(r"(?<![A-Za-z])n\s*=", re.I),
+     re.compile(r"(?<![A-Za-z])n\s*=\s*\d{2,6}(?![A-Za-z])", re.I)),
+    ("p", re.compile(r"(?<![A-Za-z])p\s*=", re.I),
+     re.compile(r"(?<![A-Za-z])p\s*=\s*(?:0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z])", re.I)),
+    ("dprime", re.compile(r"[dD][′']\s*="),
+     re.compile(r"[dD][′']\s*=\s*[+-]?\d\.\d+")),
+    ("ci", re.compile(r"CI\s*[\[（(]", re.I),
+     re.compile(r"CI\s*[\[（(]\s*[+-]?\d\.\d+\s*,\s*[+-]?\d\.\d+\s*[\]）)]", re.I)),
+    ("pct", re.compile(r"\d{1,3}(?:\.\d+)?\s*[%％]"),
+     re.compile(r"\d{1,3}(?:\.\d+)?\s*[%％]")),
+)
 
 
 def has_declaration_without_number(text: str, nums: list, min_digits: int = 2) -> bool:
-    """文本含数字声明意图，但一个数字都没提取出来 → 疑正则失配，须 fail-closed。
+    """逐声明判定：任一数字声明标记无对应可解析数字形态 → fail-closed。
 
-    仅在 nums 为空时触发（有任一数字被提取说明正则在工作，不构成静默全放行）。
-    豁免：仅含小 n 声明（n = 5，1 位低于 min_digits）且无其它声明——该数字可
-    正常解析，属设计内跳过，非正则失配。多个声明其中之一可解析时仍按 fail-open。
+    替代原「nums 全空才检查」的全有/全无口径（诱饵短路）。`nums` 保留签名
+    兼容，不参与判定——判定只依据文本自身的声明结构与可解析形态。
     """
-    if nums:
+    if min_digits < 2:
         return False
-    if not DECL_HINT.search(text):
-        return False
-    # 小 n 豁免：文中所有声明都是干净的单数字 n= 时放行
-    hints = list(DECL_HINT.finditer(text))
-    small_matches = list(_SMALL_N_DECL.finditer(text))
-    if len(small_matches) >= len(hints) and min_digits >= 2:
-        return False
-    return True
+    for kind, hint_re, full_re in _DECL_SPEC:
+        for m in hint_re.finditer(text):
+            if full_re.match(text, m.start()):
+                continue
+            if kind == "n" and _SMALL_N_DECL.match(text, m.start()):
+                continue
+            return True
+    return False
 
 
 def prepare_numbers(text: str, min_digits: int = 2):
@@ -212,7 +236,10 @@ def pool_has_number(pool: str, cand: str) -> bool:
     """
     if not cand:
         return False
-    pat = re.compile(r"(?<![\d.])" + re.escape(cand) + r"(?![\d.])")
+    # R4.7（盲检 B🔴3）：逗号亦为数字延续符（欧洲小数 0,94 / 千分位 1,234），
+    # 原边界只禁 \d 与 . → 产出 `n = 94` 被权威池 `0,94` 洗白 → PASS。
+    # 边界统一为「前后不得紧邻数字 / . / ,」。
+    pat = re.compile(r"(?<![\d.,])" + re.escape(cand) + r"(?![\d.,])")
     return pat.search(pool) is not None
 
 

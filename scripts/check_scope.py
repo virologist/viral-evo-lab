@@ -66,7 +66,10 @@ def check_file(p: Path) -> list:
         # 正确处理：不再按前缀整行跳过，而是**照常扫描所有行**；脚本自检误报问题
         # 由 GOVERNANCE_BOUNDARIES.md 白名单处理（维持原特例），其余文件一视同仁。
         stripped = line.strip()
-        is_governance_doc = "GOVERNANCE_BOUNDARIES.md" in str(p)
+        # R4.7（盲检 B🟠2）：原用 `str(p)` 子串匹配 → 目录名
+        # `GOVERNANCE_BOUNDARIES.md_evil/evil.md` 也命中豁免，事故的标题叙事
+        # 再次被放行。改为文件名精确相等（治理正本只有一个）。
+        is_governance_doc = p.name == "GOVERNANCE_BOUNDARIES.md"
         for pat in PATTERNS:
             m = pat.search(line)
             if not m:
@@ -92,10 +95,13 @@ def main() -> int:
     else:
         targets = [p for p in base.rglob("*") if p.is_file() and p.suffix.lower() in (".md", ".py")]
     # 自检豁免：本脚本自身 + 纪律契约 + .learnings/（本身记录具体事件）
-    EXCLUDE = ("check_scope.py", "GOVERNANCE_BOUNDARIES.md", ".learnings/")
+    # R4.7（盲检 B🟠2）：原用 `x in str(t)` 子串匹配 → 任何路径里含
+    # `GOVERNANCE_BOUNDARIES.md` 字样的目录（如 ..._evil/）整目录被跳过，
+    # 标题叙事二次绕过。改为文件名精确相等 + 路径段精确相等。
+    EXCLUDE_NAMES = frozenset(("check_scope.py", "GOVERNANCE_BOUNDARIES.md"))
     total = 0
     for t in targets:
-        if any(x in str(t) for x in EXCLUDE):
+        if t.name in EXCLUDE_NAMES or ".learnings" in t.parts:
             continue
         hits = check_file(t)
         if hits:

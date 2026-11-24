@@ -1059,6 +1059,59 @@ def test_require_tag_gate() -> None:
                                 capture_output=True, text=True, timeout=60).returncode
             assert rc == 0, f"{label} 不得 fail-close 误拒，实为 {rc}"
 
+        # R4.7（两路盲检 6🔴，全部主代理独立复现）：
+        # A🔴 CJK 紧邻 n= 空白拆段（\b 边界漂移）；B1 诱饵数字短路声明总闸；
+        # B3 逗号未作数字边界（n=94 被池中 0,94 洗白）；B4 NFKC 不覆盖的排版/
+        # 同形字等价（D’ / CI【】 / ρ）；B5 小 n 豁免把顿号当句读。
+        cjk = d / "r47_cjk.md"
+        cjk.write_text("研究记录\n样本n = 1 2 3\n结论成立\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(cjk), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"CJK 紧邻空白拆段须 EXIT=3，实为 {rc}"
+
+        decoy_src = d / "s_decoy"
+        decoy_src.mkdir(exist_ok=True)
+        (decoy_src / "a.csv").write_text("n,30\np,0.05\n", encoding="utf-8")
+        for label, payload, want_rc in (
+                ("诱饵逗号", "样本 n = 30，结果 p = 0,94（伪造）\n", 3),
+                ("诱饵连字符", "样本 n = 30；另一声明 n = 1-2-3（伪造）\n", 3),
+                ("小n顿号", "样本 n = 5、94（伪造的 94 被顿号隔断）\n", 3)):
+            f_d = d / f"r47_{label}.md"
+            f_d.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_d), "--sources", str(decoy_src)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == want_rc and rc != 0, f"{label} 须 EXIT={want_rc}（不得 PASS），实为 {rc}"
+
+        comma_src = d / "s_comma"
+        comma_src.mkdir(exist_ok=True)
+        (comma_src / "a.csv").write_text("European value 0,94\n", encoding="utf-8")
+        f_comma = d / "r47_comma.md"
+        f_comma.write_text("样本 n = 94（池中只有 0,94）\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_comma), "--sources", str(comma_src)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 5, f"n=94 不得被池中 0,94 逗号洗白（须 EXIT=5），实为 {rc}"
+
+        for label, payload in (
+                ("弯引号D'", "结果 D’=0.94（U+2019，伪造）\n"),
+                ("中文方括号CI", "CI【0.10, 0.20】（假造 CI）\n"),
+                ("同形字rho", "结果 ρ=0.94（希腊 rho，伪造）\n")):
+            f_g = d / f"r47_{label}.md"
+            f_g.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_g), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 5, f"{label} 须归一化后提取并判未溯源 EXIT=5，实为 {rc}"
+
+        # 合法对照不得被逐声明总闸误拒（不得 EXIT=3）
+        for label, payload in (
+                ("小n句读", "样本 n = 5，p = 0.111\n"),
+                ("n示例", "样本量 n = 30 例\n"),
+                ("常规CI", "CI [0.1, 0.2]\n")):
+            f_l = d / f"r47_ok_{label}.md"
+            f_l.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_l), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc in (0, 5), f"合法对照 {label} 不得 fail-close 误拒为 3，实为 {rc}"
+
         # R4.3（盲检🟠4）：数字 grep 原为子串匹配——p=0.94 被权威源里的 0.9441
         # 洗白（假阳性 PASS）、p=0.98 被 10.980 洗白。改 token 边界匹配后，
         # 两者都必须判未溯源 EXIT=5。
@@ -1576,6 +1629,36 @@ def test_decision_records_guard() -> None:
                            capture_output=True, text=True, timeout=60, env=env)
         assert "未溯源数字" in p.stdout + p.stderr, \
             "0.94 不得被 0.9441 子串洗白，须 V1 告警未溯源"
+
+        # ⑦ R4.7 盲检 B🔴2：G2 必须与守卫同口径复用 prepare_numbers 的归一化结果。
+        # 原第二循环用 extract_numbers(原始文本) → 全角 ｎ＝９９ 在守卫处通过、
+        # 实际提取零命中 → check_gates 误判 PASS。修复后须 EXIT=5。
+        g2src = root / "g2src"
+        g2src.mkdir(exist_ok=True)
+        (g2src / "a.csv").write_text("source_tag: authoritative\nn = 30\n", encoding="utf-8")
+        g2run = root / "g2run"
+        g2rd = g2run / TASK_ID
+        g2rd.mkdir(parents=True)
+        (g2rd / f"{TASK_ID}__phylo-analyst.md").write_text(
+            json.dumps(BASE_ENV, ensure_ascii=False)
+            + "\n\n样本量 ｎ＝９９（全角，权威源无 99）\n", encoding="utf-8")
+        (g2rd / f"{TASK_ID}__checklist.json").write_text('{"verdict": "PASS"}', encoding="utf-8")
+        subprocess.run([sys.executable, str(PKG / "scripts" / "verify_member_output.py"),
+                        str(g2rd), TASK_ID, "--sources", str(g2src)],
+                       capture_output=True, text=True, timeout=60)
+        p = subprocess.run([sys.executable, str(CHECK_GATES), str(g2rd), TASK_ID,
+                            "--sources", str(g2src)], capture_output=True, text=True, timeout=90)
+        assert p.returncode == 5, f"G2 全角声明不得绕过（须 EXIT=5），实为 {p.returncode}"
+
+        # ⑧ R4.7 盲检 B🟠2：check_scope 治理正本豁免须文件名精确相等，
+        # 目录名 `GOVERNANCE_BOUNDARIES.md_evil` 不再享受注释行豁免。
+        scope_evil = root / "GOVERNANCE_BOUNDARIES.md_evil"
+        scope_evil.mkdir(exist_ok=True)
+        evil_md = scope_evil / "evil.md"
+        evil_md.write_text("# 复盘：PP 41034380\n", encoding="utf-8")
+        p = subprocess.run([sys.executable, str(PKG / "scripts" / "check_scope.py"), str(evil_md)],
+                           capture_output=True, text=True, timeout=60)
+        assert p.returncode == 3, f"伪治理目录的标题叙事不得豁免（须 EXIT=3），实为 {p.returncode}"
 
 
 def test_g6_evidence_gate() -> None:

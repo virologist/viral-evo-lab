@@ -77,18 +77,32 @@ def has_split_number(text: str) -> bool:
     return False
 
 
-def normalize_for_extraction(text: str) -> str:
-    """NFKC 归一化——仅用于数字/声明提取，不改动原始文本的其他用途。
+# R4.7（2026-11-24 · 盲检 B🔴4）：NFKC 不覆盖的**排版/同形字等价**——
+# 弯引号 U+2019、中文方括号【】、希腊 rho 冒充 p 等，均可让 ASCII-only
+# 声明正则静默失配 → checked=0 → PASS。按「语义等价类映射」（非码点区间枚举）
+# 统一到 ASCII 正字，与 NFKC 同类思路；仅用于提取，不改动原文其他用途。
+_EQUIV_TRANS = str.maketrans({
+    "\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'",
+    "\u2032": "'", "\u02bc": "'", "\uff07": "'",
+    "\u201c": '"', "\u201d": '"', "\uff02": '"',
+    "\u3010": "[", "\u3011": "]", "\u27e6": "[", "\u27e7": "]",
+    "\u03c1": "p", "\u03f1": "p", "\u0440": "p",   # ρ/ϱ/р → p（同形声明）
+    "\u03a1": "P", "\u0420": "P",                   # Ρ/Р → P
+})
 
-    R4.5（2026-11-24 · 两路盲检 + 主代理对抗实证）：Unicode 等价形态的声明
-     glyph 会让 ASCII-only 正则静默失配 → checked=0 → PASS fail-open。NFKC
-     在根因层消解这一整类变体（实测）：
-       ①(U+2460)→1  ⑧→8  ²(U+00B2)→2  ％(U+FF05)→%  ＝(U+FF1D)→=
-       ［］(U+FF3B/FF3D)→[]  ０．９４(U+FF10/FF0E)→0.94
-     归一化后由消费侧既有 PATTERNS 正常提取（EXIT=5 未溯源 或 命中 EXIT=0），
-     不再靠枚举每个等价码点。对照组（ASCII 正字、纯文本、n=5）NFKC 后逐字不变。
+
+def normalize_for_extraction(text: str) -> str:
+    """NFKC + 排版/同形字等价映射——仅用于数字/声明提取，不改原文其他用途。
+
+    R4.5（2026-11-24 · 两路盲检 + 主代理对抗实证）：NFKC 消解全角数字/等号/
+    百分号、圈号数字、上标数字、０．９４ 等（①→1、８→8、²→2、％→%、＝→=、
+    ［］→[]），不再靠枚举码点。
+
+    R4.7（2026-11-24 · 盲检 B🔴4）：NFKC 不覆盖的排版等价（D’= U+2019、
+    CI【】 U+3010/3011、ρ= 同形字）追加 str.translate 语义等价映射。
+    对照组（ASCII 正字、纯文本、n=5）归一化后逐字不变。
     """
-    return unicodedata.normalize("NFKC", text)
+    return unicodedata.normalize("NFKC", text).translate(_EQUIV_TRANS)
 
 
 def has_forbidden(text: str) -> bool:
