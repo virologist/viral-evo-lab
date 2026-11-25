@@ -4,6 +4,25 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.30] - 2026-11-25（R4.13 v1.5.29 双路盲检回补 · 8🔴 fail-open 根因级封堵）
+
+v1.5.29 双路盲检报 A=5🔴2🟠 / B=3🔴1🟠（报告正文因 agent 结束未送达主代理上下文，按纪律不凭计数采信）。主代理以对抗 payload 逐条独立复现，**8 项 fail-open 全部坐实**（含 checked=0/PASS、found=1/PASS、EXIT=1/崩溃实证），逐项修复；B2（未来日期）经精确 fixture 二次复现后亦坐实。核心根因三类：**Mn/Sm 符号插进关键 token 致正则/子串静默失配**、**token 边界与精度候选不完备致编造数字被池中洗白**、**容器类型未校验致契约外崩溃**。
+
+### Fixed（8🔴，全部主代理独立复现）
+- **A1 Sm/区间外 Mn 隔断声明**：`p⬰ = 0.94`（U+2B30 Sm）、`p\u1AB0 = 0.94`（区间外 Mn）→ `checked=0/PASS`。`normalize_for_extraction()` 改为**先剥 Mn 再 NFKC**（防 U+1AB0→U+2B30 转换绕过），`has_invisible_marker_gap()` 改 Unicode 类别动态判据（S*/C*/M*），不再靠码点区间枚举。合法 `p＝0.94`（全角等号 NFKC→`=`）经归一化文本扫描不误伤。
+- **A2 池中逗号延续洗白**：R4.11 修 CSV 三列字段时误删 v1.5.28 的右边界 `(?!,[0-9])` → `n = 94` 被池中 `94,500` 洗白 `PASS`。恢复整数候选右边界 `(?!,\d{1,3}(?![\d.,]))`：禁千分位/字段延续，放行 CSV 浮点字段 `30,0.9441`。
+- **A4 CI 花括号**：`CI ｛0.1, 0.2｝` → NFKC 转 `{}` 而 CI 正则只认 `[]（）` → 声明隐身。PATTERNS.ci / KEY_MARKERS / _DECL_SPEC / DECL_HINT / has_broken_key_pattern 五处统一加 `{}` 括号形态。
+- **A3 check_scope Mn 隔断**：`10\u030194` → 事故值正则失配 → clean/EXIT=0。归一化剥 Mn 后命中 EXIT=3。
+- **A5 poll 撞限标注 Mn 隔断**：`轮\u0301次耗尽` → 子串失配 → 不完整产出判 READY/EXIT=0。撞限判定改走 `normalize_for_extraction()` 后匹配 → EXIT=5。
+- **B1 float 截断候选洗白**：`float_candidates()` 无条件 `f"{f:.3f}"` 产生**截断候选**——产出 `0.94412` → 候选 `0.944` → 被池中 `0.944` 洗白，违反函数 docstring「禁截断」。改为仅补零（目标精度 ≥ 原值实际小数位且数值相等），绝不降精度。
+- **B2 未来同日 fatal 静默吞**：带毫秒 `last_updated == closed_date`（未来时刻）走 `cd > hyp_updated` 严格比较相等判「不晚于」→ CLEAN/EXIT=0。统一「同日即算晚于」判据（与纯日期口径一致，保守 fail-closed）→ EXIT=5 REVIEW_REQUIRED。
+- **B3 verification.rule 容器崩溃**：`rule=list/dict` → `rule not in RULE_ANCHORS` 抛 `TypeError: unhashable` → EXIT=1（契约仅 0/3/5）。先做字符串类型校验 → 结构错误 EXIT=3。
+
+### Verified
+- 8🔴 修复前后三态实测（PASS/EXIT=1 → EXIT 3/5），合法对照（CSV 双字段 / CI 方括号 / 全角等号 / emoji ZWJ / 普通 p）不误拒。
+- 回归断言复用既有 `test_require_tag_gate()` / `test_disposition_gate()` / `test_poll_hitlimit_and_manifest()` / `test_decision_records_guard()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件重生成 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / compileall 全过 / 四处 version 一致（1.5.30）。
+
 ## [1.5.29] - 2026-11-25（R4.11+R4.12 v1.5.28 双路盲检回补 · 不可见隔断扩展 + 多语小数点语义归一 + 台账严格读 + JSONL 巡检）
 
 v1.5.28 冻结前双路盲检：A=2🔴+2🟠、B=3🔴+3🟠。主代理**逐条独立复现**（含 fixture 原样复验）后确认：A🔴1（UTF-16BE 台账 fail-open）、A🔴2（多语小数点洗白）、B🔴1（`_MARKER_GAP` 漏检）、B🔴3（cron JSONL）、B🟠5/6（CSV 三列字段、合法小 n/千分位）坐实；另主代理自查发现 V1 降级路径 fail-open，一并修复。核心根因：**NFKC 不收敛的多语小数点被当普通隔断 → 数字截断后取片段被池中洗白**、**裸 open(utf-8-sig) 吞入 UTF-16BE 无 BOM 的 NUL → 列名污染 → fatal 证伪静默忽略**。

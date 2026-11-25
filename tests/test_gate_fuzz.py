@@ -477,6 +477,21 @@ def test_disposition_gate() -> None:
         assert rc == 3, f"无 BOM UTF-16 台账须严格读 EXIT=3（不得 CLEAN 放行），实为 {rc}: {out[-200:]}"
         assert "Traceback" not in out, f"UTF-16 台账不得抛未捕获异常: {out[-200:]}"
 
+        # R4.13（盲检 B🔴2）：future last_updated + 同日带毫秒 closed fatal，
+        # 原 `cd > hyp_updated` 严格比较相等即判「不晚于」→ CLEAN/EXIT=0
+        # （fatal 证伪静默吞）。须按「同日即算晚于」保守判 EXIT=5。
+        future = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%dT00:00:00.000000+08:00")
+        hyp_p.write_text(json.dumps({
+            "last_updated": future,
+            "active_hypotheses": [{"id": "H-1", "status": "active", "claim": "c"}]}) + "\n",
+            encoding="utf-8")
+        led_p.write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n"
+            f"F-R413,fatal,closed,{future},未来同日证伪\n", encoding="utf-8")
+        rc, out = run()
+        assert rc == 5 and "F-R413" in out, \
+            f"未来同日 fatal 须 REVIEW_REQUIRED/EXIT=5，实为 rc={rc}: {out[-200:]}"
+
 
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
@@ -1097,6 +1112,45 @@ def test_require_tag_gate() -> None:
             else:
                 assert rc == want_rc, f"R4.12 {label} 须 EXIT={want_rc}，实为 {rc}"
 
+        # R4.13（8🔴，主代理逐条独立复现）：Sm/fullwidth 符号隔断声明、池中
+        # 逗号延续洗白、CI 花括号、float 截断候选、check_scope Mn 隔断。
+        r13src = d / "r13_src"
+        r13src.mkdir(exist_ok=True)
+        (r13src / "pool.csv").write_text(
+            "metric,value\nx,94,500\np,0.944\n", encoding="utf-8")
+        for label, payload, want_rc in (
+                ("Sm符号隔断声明", "结果 p\u2b30 = 0.94（伪造）\n", 3),
+                ("CI花括号", "结果 CI ｛0.1, 0.2｝（伪造）\n", 5),
+                ("池中逗号延续洗白", "样本 n = 94（权威池仅 94,500）\n", 5),
+                ("float截断候选洗白", "结果 p = 0.94412（权威池仅 0.944）\n", 5)):
+            f_r13 = d / f"r13_{label}.md"
+            f_r13.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_r13), "--sources", str(r13src)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == want_rc, f"R4.13 {label} 须 EXIT={want_rc}（不得 PASS=0），实为 {rc}"
+        # 合法对照：CSV 双数字字段须正常溯源 EXIT=0；CI 方括号形态须正常
+        # 提取（源池无 0.1 → 未溯源 EXIT=5，但绝不可 fail-close 隔断 EXIT=3）。
+        csv_src = d / "s_csv"
+        csv_src.mkdir(exist_ok=True)
+        (csv_src / "p.csv").write_text("metric,value\nn,30\np,0.9441\n", encoding="utf-8")
+        f_csv = d / "r13ok_csv.md"
+        f_csv.write_text("样本 n = 30，p = 0.9441\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_csv), "--sources", str(csv_src)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 0, f"R4.13 合法 CSV 双字段须溯源 EXIT=0，实为 {rc}"
+        f_ci = d / "r13ok_ci.md"
+        f_ci.write_text("结果 CI [0.1, 0.2]\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_ci), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc != 3, f"R4.13 合法 CI 方括号不得 fail-close 隔断 EXIT=3，实为 {rc}"
+        # check_scope：Mn 插进事故值 1094 须仍判污染 EXIT=3
+        scope = PKG / "scripts" / "check_scope.py"
+        sc_f = d / "r13_scope.py"
+        sc_f.write_text("x = 10\u030194\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(scope), str(sc_f)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"R4.13 check_scope Mn 隔断事故值须 EXIT=3，实为 {rc}"
+
         # R4.7（两路盲检 6🔴，全部主代理独立复现）：
         # A🔴 CJK 紧邻 n= 空白拆段（\b 边界漂移）；B1 诱饵数字短路声明总闸；
         # B3 逗号未作数字边界（n=94 被池中 0,94 洗白）；B4 NFKC 不覆盖的排版/
@@ -1358,6 +1412,13 @@ def test_poll_hitlimit_and_manifest() -> None:
             "<!-- 轮次耗尽，产出不完整：已完成 1/3，剩余 2 -->\n# p\n", encoding="utf-8")
         rc, out = run("--expected", "literature-scout")
         assert rc == 5 and "撞限" in out, f"撞限标注必须 NOT_READY/EXIT=5，实际 rc={rc}"
+        # R4.13（盲检 A🔴5）：Mn 组合符插进「轮次耗尽」（轮\u0301次耗尽）让
+        # 子串失配 → 不完整产出被判 READY。归一化后须仍判撞限 EXIT=5。
+        (d / "T-P__literature-scout.md").write_text(
+            "<!-- 轮\u0301次耗尽，产出不完整 -->\n# p\n", encoding="utf-8")
+        rc, out = run("--expected", "literature-scout")
+        assert rc == 5 and "撞限" in out, \
+            f"Mn 隔断撞限标注须 NOT_READY/EXIT=5，实为 rc={rc}: {out[-200:]}"
         # 正常文件 → READY
         (d / "T-P__literature-scout.md").write_text("# 正常产出\n", encoding="utf-8")
         rc, _ = run("--expected", "literature-scout")
@@ -1665,6 +1726,19 @@ def test_decision_records_guard() -> None:
                                capture_output=True, text=True, timeout=60)
             assert p.returncode == 3 and "Traceback" not in p.stderr, \
                 f"{field} 非字符串元素应结构错误 EXIT=3，实为 {p.returncode}: {p.stderr[-200:]}"
+
+        # R4.13（盲检 B🔴3）：verification.rule 为 list/dict 时 unhashable →
+        # `rule not in RULE_ANCHORS` 抛 TypeError → EXIT=1（契约外崩溃）。
+        for bad_rule in (["x"], {"k": "v"}):
+            ver = {"rule": bad_rule, "cli_sites": ["scripts/check_gates.py"],
+                   "tests": ["test_require_tag_gate"]}
+            dr.write_text(json.dumps({"schema_version": 1,
+                                      "records": [dict(base_rec, verification=ver)]}),
+                          encoding="utf-8")
+            p = subprocess.run([sys.executable, str(script), "--pkg-root", str(root), "--json"],
+                               capture_output=True, text=True, timeout=60)
+            assert p.returncode == 3 and "Traceback" not in p.stderr, \
+                f"rule 容器 {bad_rule!r} 应结构错误 EXIT=3，实为 {p.returncode}: {p.stderr[-200:]}"
 
         # R4.3（盲检🟠A）：契约正本/SKILL 文件缺失不得被静默跳过却输出
         # 「全员契约完整」虚假 PASS（删文件反而 PASS、留空文件反而 FAIL）。

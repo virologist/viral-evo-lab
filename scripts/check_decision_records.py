@@ -110,6 +110,13 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
             rep["structural_errors"].append(f"{rid}: verification.rule 缺失")
             continue
         rule = ver["rule"]
+        # R4.13（盲检 B🔴3）：rule 为 list/dict 时 `rule not in RULE_ANCHORS`
+        # 抛 TypeError: unhashable → EXIT=1（契约仅 0/3/5）。先做类型校验，
+        # 非字符串记结构错误并跳过，落契约码 3。
+        if not isinstance(rule, str):
+            rep["structural_errors"].append(
+                f"{rid}: verification.rule 非字符串（{type(rule).__name__}）")
+            continue
         if rule not in RULE_ANCHORS:
             rep["structural_errors"].append(f"{rid}: 未知 rule={rule!r}（拒绝对未知裁决放行）")
             continue

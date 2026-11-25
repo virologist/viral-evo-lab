@@ -104,7 +104,11 @@ _EQUIV_TRANS = str.maketrans({
     # U+066C 是阿拉伯千分位分隔符，必须映射为 ','（非 '.'）。
     "\u066b": ".", "\u066c": ",", "\u00b7": ".", "\u30fb": ".",
     "\uff61": ".", "\u2022": ".", "\u06d4": ".", "\u0387": ".",
-    "\u2027": ".", "\uff0e": "."
+    "\u2027": ".", "\uff0e": ".",
+    # R4.13（盲检 A🔴4）：CI 括号用全角花括号 ｛｝ / 尖括号 〈〉 / 角括号 《》
+    # 时，NFKC 不收敛且 CI 正则只认 []（）→ 声明隐身 checked=0/PASS。
+    "\uff5b": "[", "\uff5d": "]", "\u3008": "[", "\u3009": "]",
+    "\u00ab": "[", "\u00bb": "]", "\u300a": "[", "\u300b": "]"
 })
 
 
@@ -119,7 +123,14 @@ def normalize_for_extraction(text: str) -> str:
     CI【】 U+3010/3011、ρ= 同形字）追加 str.translate 语义等价映射。
     对照组（ASCII 正字、纯文本、n=5）归一化后逐字不变。
     """
-    return unicodedata.normalize("NFKC", text).translate(_EQUIV_TRANS)
+    # R4.13（盲检 A🔴1/A🔴3/A🔴5）：NFKC 不收敛的 Mn（组合符，如 U+1AB0/
+    # U+0301 插进 p=/事故值/撞限词）会让声明正则与关键子串静默失配 →
+    # checked=0 → PASS（fail-open）。合法组合重音已被 NFKC 预组合（e+U+0301
+    # → é），残留 Mn 均为修饰性字符，删除不改变语义，统一剥离恢复 token。
+    # 关键顺序：先剥 Mn 再 NFKC——部分 Mn（如 U+1AB0）经 NFKC 会转成可见
+    # 符号（U+2B30 ⬰，So 类别），事后过滤挡不住；先剥则 token 直接复原。
+    no_mn = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return unicodedata.normalize("NFKC", no_mn).translate(_EQUIV_TRANS)
 
 
 def has_forbidden(text: str) -> bool:

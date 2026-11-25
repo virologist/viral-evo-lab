@@ -61,7 +61,7 @@ PATTERNS = [
     ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*[=:]\s*(\d{1,3}(?:,\d{3})+|\d{2,6})(?![A-Za-z\d.])", re.I)),
     ("p_val", re.compile(r"(?<![A-Za-z])p\s*[=:]\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z\d.])", re.I)),
     ("dprime",re.compile(r"[dD][′']\s*[=:]\s*([+-]?\d{1,3}(?:\.\d+)?)")),
-    ("ci",    re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]\s*([+-]?\d{1,3}(?:\.\d+)?)\s*,\s*([+-]?\d{1,3}(?:\.\d+)?)\s*[\]）)]", re.I)),
+    ("ci",    re.compile(r"CI\s*(?:[=:]\s*)?[\[（({]\s*([+-]?\d{1,3}(?:\.\d+)?)\s*,\s*([+-]?\d{1,3}(?:\.\d+)?)\s*[\]）)}]", re.I)),
 ]
 # 排除：年份 / 版本号（须带 v 前缀或多级 x.y.z，纯小数如 0.9441 不是版本）/ 纯小数序号
 # C6（2026-11-07）：年份 ^20[0-2]\d$ → ^20\d{2}$（原实现 2030+ 失效）
@@ -78,7 +78,7 @@ VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
 # 与 PATTERNS 的 (?<![A-Za-z]) 口径漂移 → CJK 紧邻的空白拆段绕过隔断检测。
 # 统一为「仅禁 ASCII 字母紧邻」，与 PATTERNS / DECL_HINT 同口径。
 KEY_MARKERS = re.compile(
-    r"(?:(?<![A-Za-z])n\s*[=:]|(?<![A-Za-z])p\s*[=:]|D[′']\s*[=:]|CI\s*(?:[=:]\s*)?[\[（(])", re.I)
+    r"(?:(?<![A-Za-z])n\s*[=:]|(?<![A-Za-z])p\s*[=:]|D[′']\s*[=:]|CI\s*(?:[=:]\s*)?[\[（({])", re.I)
 
 
 # R4.9（盲检 B🔴1）：ZWJ(U+200D)/VS16(U+FE0F) 等 Cf/Mn 插在 p/n 与 = 之间，
@@ -96,9 +96,34 @@ _MARKER_GAP_CI = re.compile(
 
 
 def has_invisible_marker_gap(text: str) -> bool:
-    """声明标记与 =/: 之间夹不可见格式符 → 正则会静默失配，须 fail-closed。"""
-    return (_MARKER_GAP.search(text) is not None
-            or _MARKER_GAP_CI.search(text) is not None)
+    """声明标记与 =/: 之间夹符号/格式/修饰符 → 正则会静默失配，须 fail-closed。
+
+    R4.13（主代理对抗实证）：原只覆盖 Cf/Mn 码点区间，U+2B30（Sm 方块符）
+    插在 `p` 与 `=` 之间（p⬰ = 0.94）仍 checked=0 → PASS。码点区间枚举补不
+    完，改用 Unicode 类别动态判定：标记（n/p/D'/CI）之后、首个 `=:`/括号之前
+    若出现 S*/C*/M* 类字符（符号/格式/修饰，排除空白），即判隔断。合法
+    `p = 0.94` / `CI [0.1,0.2]` / `家族 👨‍👩‍👧 n=888`（emoji 在标记前）不受影响。
+    """
+    if _MARKER_GAP.search(text) is not None or _MARKER_GAP_CI.search(text) is not None:
+        return True
+    import unicodedata as _ud
+    gap_cats = {"Sm", "Sk", "So", "Sc", "Cf", "Cs", "Co", "Mn", "Mc", "Me"}
+    # 在归一化文本上跑类别判据：全角等号 ＝(Sm) 经 NFKC 变 '=' 属合法终止符，
+    # 若用原始 text 会把 p＝0.94 误判为隔断（fail-close，既有测试断言 EXIT=5）。
+    scan = normalize_for_extraction(text)
+    markers = re.compile(r"(?<![A-Za-z])(?:[np]|D[′']|CI)", re.I)
+    for m in markers.finditer(scan):
+        j = m.end()
+        while j < len(scan) and scan[j].isspace():
+            j += 1
+        # 收集到首个 `=:` 或 CI 括号为止的中间字符
+        k = j
+        while k < len(scan) and scan[k] not in "=:[(":
+            k += 1
+        mid = scan[j:k]
+        if any(_ud.category(ch) in gap_cats for ch in mid):
+            return True
+    return False
 
 
 def has_broken_key_pattern(text: str) -> bool:
@@ -121,7 +146,7 @@ def has_broken_key_pattern(text: str) -> bool:
             if re.match(r"^\d{1,6}(?:\.\d+)?\s+\d", tail):
                 return True
             continue  # 标记后紧跟完整数字 → 正常
-        if m.group(0).rstrip().endswith(("(", "[", "（", "[")):
+        if m.group(0).rstrip().endswith(("(", "[", "（", "[", "{")):  # R4.13: CI 花括号
             continue  # CI 括号形态：标记后是括号，不是数字
         return True
     return False
@@ -135,7 +160,7 @@ def has_broken_key_pattern(text: str) -> bool:
 # 合法对照不误伤：纯文字（无声明）、n = 5（min_digits 有意跳过的小 n，
 # 但声明存在——需在调用侧按 checked==0 且无其它声明时才放行，见 main）。
 DECL_HINT = re.compile(
-    r"(?:[np]\s*[=:＝]|[dD][′']\s*[=:]|CI\s*(?:[=:]\s*)?[\[（(［]|"
+    r"(?:[np]\s*[=:＝]|[dD][′']\s*[=:]|CI\s*(?:[=:]\s*)?[\[（({［]|"
     r"(?:\d{1,3}(?:\.\d+)?)\s*[%％])",
     re.I)
 # 合法的小 n 声明（n = 5）——min_digits=2 有意跳过的 1 位样本量。此类声明后
@@ -158,7 +183,7 @@ _DECL_SPEC = (
     ("n", re.compile(r"(?<![A-Za-z])n\s*[=:]", re.I), _PAT_BY_KIND["n_eq"]),
     ("p", re.compile(r"(?<![A-Za-z])p\s*[=:]", re.I), _PAT_BY_KIND["p_val"]),
     ("dprime", re.compile(r"[dD][′']\s*[=:]"), _PAT_BY_KIND["dprime"]),
-    ("ci", re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]", re.I), _PAT_BY_KIND["ci"]),
+    ("ci", re.compile(r"CI\s*(?:[=:]\s*)?[\[（({]", re.I), _PAT_BY_KIND["ci"]),
     ("pct", re.compile(r"\d{1,3}(?:\.\d+)?\s*%"), _PAT_BY_KIND["pct"]),
 )
 
@@ -250,8 +275,19 @@ def float_candidates(val: str) -> set:
     cands = {val}
     try:
         f = float(val)
-        cands |= ({f"{f:.2f}", f"{f:.3f}", f"{f:.4f}"} if f >= 1
-                  else {f"{f:.3f}", f"{f:.4f}", f"{f:.5f}"})
+        # R4.13（盲检 B🔴1）：原实现无条件 f"{f:.3f}" 等会产生**截断候选**——
+        # 产出 0.94412 → 候选 0.944 → 被池中 0.944 洗白 → 假阳性 PASS，正违反
+        # 本函数 docstring「禁截断」承诺。改为仅补零：目标精度须 ≥ 原值实际
+        # 小数位，且格式化后与原值数值相等（去尾零后逐字相同），绝不降精度。
+        if "." in val and "e" not in val.lower():
+            frac_digits = len(val.split(".", 1)[1].rstrip("0"))
+            base = val.rstrip("0").rstrip(".")
+            for nd in (2, 3, 4, 5, 6):
+                if nd < frac_digits:
+                    continue
+                formatted = f"{f:.{nd}f}"
+                if formatted.rstrip("0").rstrip(".") == base:
+                    cands.add(formatted)
     except ValueError:
         pass
     return cands
@@ -272,8 +308,16 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # R4.7（盲检 B🔴3）：逗号亦为数字延续符（欧洲小数 0,94 / 千分位 1,234），
     # 原边界只禁 \d 与 . → 产出 `n = 94` 被权威池 `0,94` 洗白 → PASS。
     # 边界统一为「前后不得紧邻数字 / . / ,」。
-    pat = re.compile(((r"(?<![\d.])(?<![0-9],)" if "." not in cand else r"(?<![\d.])") +
-     re.escape(cand) + r"(?![\d.])"))
+    # R4.13（盲检 A🔴2）：v1.5.28 右边界曾为 `(?![\d.])(?!,[0-9])`，R4.11 修 CSV
+    # 三列字段时误删 `(?!,[0-9])` → 产出 `n = 94` 被权威池 `94,500` 洗白 PASS。
+    # 恢复：整数候选（无 `.`）右边界禁 `,\d`（千分位延续），浮点候选（含 `.`）
+    # 不禁逗号（合法 CSV 字段 `1,0.94,2` / `30,0.9441` 正常溯源）。
+    left = r"(?<![\d.])(?<![0-9],)" if "." not in cand else r"(?<![\d.])"
+    # 整数候选右边界只禁「逗号 + 1~3 位数字 + 非数字/点/逗号结尾」——命中
+    # 千分位/字段延续（94,500 / 1,94,2）；CSV 浮点字段 30,0.9441 的 `,0.`
+    # 因后随小数点不满足末项，合法放行（v1.5.28 CSV 双字段回归保住）。
+    right = r"(?![\d.])(?!,\d{1,3}(?![\d.,]))" if "." not in cand else r"(?![\d.])"
+    pat = re.compile(left + re.escape(cand) + right)
     return pat.search(pool) is not None
 
 

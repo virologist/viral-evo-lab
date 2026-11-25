@@ -332,10 +332,14 @@ def main() -> int:
             late_fatal.append(row)
             continue
         # H2 修复（审计 2026-10-15）：closed_date 为纯日期时按"同日即算晚于"（避免同日晚闭环漏报）
+        # R4.13（盲检 B🔴2）：带毫秒/时区的同一时刻闭环（closed_date == hyp_updated
+        # 且两者均为未来时间）此前走 `cd > hyp_updated` 严格比较→相等判「不晚于」
+        # → fatal 静默 CLEAN/EXIT=0。统一同日判据：带时间输入也按同日即算晚于，
+        # 与纯日期口径一致（保守 fail-closed，宁可多复查不可漏证伪）。
         if len(_row_str(closed_raw).strip()) <= 10:
             if cd.date() >= hyp_updated.date():
                 late_fatal.append(row)
-        elif cd > hyp_updated:
+        elif cd > hyp_updated or cd.date() >= hyp_updated.date():
             late_fatal.append(row)
 
     age_days = (now_canonical() - hyp_updated).days
