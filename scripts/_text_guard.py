@@ -190,8 +190,12 @@ def normalize_for_matching(text: str) -> str:
     # READY/clean/CLEAN fail-open。匹配用途下 emoji ZWJ 序列无语义，全剥 Cf。
     keep_ascii = frozenset(".,:-~′'")
     drop_cats = ("Sm", "Sk", "So", "Sc", "Pd", "Po", "Ps", "Pe", "Pi", "Pf", "Cf")
+    # R4.16（盲检 A🔴3）：ɲ(U+0272)/ŋ(U+014B) 等拉丁扩展/亚美尼亚字母（Ll/Lu/
+    # Lt/Lm，非 ASCII）插进「轮次耗尽」让子串失配 → READY。匹配用途下剥除；
+    # Lo（汉字/表意文字）保留，否则撞限词自身被剥光。
     return "".join(ch for ch in base
-                   if ch in keep_ascii or _ud.category(ch) not in drop_cats)
+                   if ch in keep_ascii or (_ud.category(ch) not in drop_cats
+                       and not (ord(ch) > 127 and _ud.category(ch) in ("Ll", "Lu", "Lt", "Lm"))))
 
 
 def has_forbidden(text: str) -> bool:

@@ -4,6 +4,24 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.33] - 2026-11-25（R4.16 v1.5.32 盲检 A 回补 · 3🔴 fail-open：同形声明 + 池字母后缀洗白 + 撞限字母隔断）
+
+v1.5.32 盲检 A（前台同步，报告送达）报 3🔴+2🟠。主代理逐条独立复现 3🔴 全部坐实后修复；2🟠（G4 artifact_mtimes 缺条目静默免除篡改检测、check_baseline_anchors bool bytes）经评估为「需配合其他门禁全绿才构成放行、且修之会误拒存量产出」——披露为已知限制，不修。
+
+### Fixed（3🔴，全部主代理独立复现）
+- **A1 同形声明标记隐身**：`ɲ=888`（U+0272）、`ŋ`、`ϕ`、`ն` 等单码点同形字 NFKC 不分解、`_EQUIV_TRANS` 未枚举 → `checked=0/PASS`，并传导 G2「全部溯源」PASS。码点枚举补不完，改 **Unicode 名称语义判定**：`has_homoglyph_declaration()` 检测非 ASCII 字母名称含 `LATIN...LETTER N/P/ENG/PHI` / `ARMENIAN...NOW/PEH` / `GREEK...PHI` 且紧跟 `=:`+数字 → fail-closed EXIT=3；预组合 ń/ṕ 经 NFD 已转 ASCII 者跳过（不误伤既有 EXIT=5）。
+- **A2 池字母后缀洗白**：`n = 94` 被权威池 `94e5`（=9400000）/`94%`/`94kg`/`94_5` 洗白 PASS。`pool_has_number` 整数候选右边界追加禁 `\w`/`%` 后缀 → EXIT=5；合法 CSV 字段 `n,94` 与双字段 `n=94,p=0.9441` 正常溯源。
+- **A3 撞限字母隔断**：`轮ɲ次耗尽` → poll READY/EXIT=0。`normalize_for_matching` 追加剥非 ASCII Ll/Lu/Lt/Lm（拉丁扩展/希腊/亚美尼亚），保留 Lo（CJK 表意文字，否则撞限词自身被剥光）→ EXIT=5。
+
+### Known Issues（2🟠，不阻塞）
+- G4 `artifact_mtimes` 缺条目时不判篡改（攻击者尚需让其他门禁全绿；强制要求条目会误拒存量无 mtimes 产出）。
+- `check_baseline_anchors` 将 `bytes:true`（bool 是 int 子类）当合法整数（sha256 仍匹配，不影响防篡改）。
+
+### Verified
+- 3🔴 修复前后三态实测（PASS → EXIT 3/5），合法对照（预组合 ń / CSV 双字段 / 中文撞限 / 普通 n=94）全过。
+- 回归断言复用既有 `test_require_tag_gate()` / `test_poll_hitlimit_and_manifest()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / compileall 全过 / 四处 version 一致（1.5.33）。
+
 ## [1.5.32] - 2026-11-25（R4.15 v1.5.31 盲检 A 回补 · 6🔴 fail-open：ZWJ 隔断三处 + 劈开检测三缺陷）
 
 v1.5.31 盲检 A（前台同步，报告送达）报 6🔴+0🟠，主代理**逐条独立复现全部坐实**（checked=0/found=1/PASS、CLEAN 等实证）后修复。6 项分两类根因：①ZWJ(Cf) 隔断关键 token（撞限词/事故叙事/severity），②上轮修复引入/遗留的劈开检测三缺陷。

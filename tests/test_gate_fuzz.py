@@ -1223,6 +1223,30 @@ def test_require_tag_gate() -> None:
                                 capture_output=True, text=True, timeout=60).returncode
             assert rc == 3, f"R4.15 {label} 须 EXIT=3（不得 PASS=0），实为 {rc}"
 
+        # R4.16（盲检 A🔴1/2）：Unicode 名称语义同形声明（ɲ/ŋ/ϕ 非 NFKC
+        # 可分解）→ 零提取 PASS；池中字母后缀（94e5/94kg）洗白整数声明。
+        for label, payload, pool, want_rc in (
+                ("IPA同形n声明", "样本 ɲ = 888 只\n", "other,0.5\n", 3),
+                ("希腊phi同形", "样本 ϕ = 0.94\n", "other,0.5\n", 3),
+                ("池中科学计数洗白", "n = 94\n", "val\n94e5\n", 5),
+                ("池中百分号洗白", "n = 94\n", "val\n94%\n", 5)):
+            (r14src / "pool.csv").write_text(pool, encoding="utf-8")
+            f_r16 = d / f"r16_{label}.md"
+            f_r16.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_r16),
+                                 "--sources", str(r14src)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == want_rc, \
+                f"R4.16 {label} 须 EXIT={want_rc}（不得 PASS=0），实为 {rc}"
+        # 合法对照：预组合 ń 经 NFD 转 ASCII（EXIT=5 非 3）、CSV 双字段正常溯源
+        f_nfd = d / "r16ok_nfd.md"
+        f_nfd.write_text("ń = 94\n", encoding="utf-8")
+        (r14src / "pool.csv").write_text("val\n0.11\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_nfd),
+                             "--sources", str(r14src)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc != 3, f"R4.16 预组合 ń 不得 fail-close EXIT=3，实为 {rc}"
+
         # R4.7（两路盲检 6🔴，全部主代理独立复现）：
         # A🔴 CJK 紧邻 n= 空白拆段（\b 边界漂移）；B1 诱饵数字短路声明总闸；
         # B3 逗号未作数字边界（n=94 被池中 0,94 洗白）；B4 NFKC 不覆盖的排版/
@@ -1506,6 +1530,14 @@ def test_poll_hitlimit_and_manifest() -> None:
         rc, out = run("--expected", "literature-scout")
         assert rc == 5 and "撞限" in out, \
             f"R4.15 ZWJ 隔断撞限须 EXIT=5，实为 rc={rc}: {out[-200:]}"
+        # R4.16（盲检 A🔴3）：拉丁扩展字母 ɲ(U+0272) 插进撞限词——
+        # normalize_for_matching 剥非 ASCII Ll/Lu/Lt/Lm（保留 CJK）→ EXIT=5。
+        for label, sep in (("IPA n", "\u0272"), ("ENG", "\u014b")):
+            (d / "T-P__literature-scout.md").write_text(
+                f"轮{sep}次耗尽：产出不完整\n# p\n", encoding="utf-8")
+            rc, out = run("--expected", "literature-scout")
+            assert rc == 5 and "撞限" in out, \
+                f"R4.16 {label} 隔断撞限须 EXIT=5，实为 rc={rc}: {out[-200:]}"
         # 正常文件 → READY
         (d / "T-P__literature-scout.md").write_text("# 正常产出\n", encoding="utf-8")
         rc, _ = run("--expected", "literature-scout")

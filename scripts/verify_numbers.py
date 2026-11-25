@@ -207,6 +207,41 @@ def has_declaration_without_number(text: str, nums: list, min_digits: int = 2) -
     return False
 
 
+# R4.16（盲检 A🔴1）：NFKC 不分解、_EQUIV_TRANS 未枚举的同形声明标记
+# （ɲ U+0272 / ŋ U+014B / ϕ U+03D5 / ն U+0576 等）让声明正则零命中 →
+# checked=0 → PASS。码点枚举补不完，改为 Unicode 名称语义判定：名称含
+# 'LATIN ... LETTER N/P' / 'ARMENIAN ... NOW' / 'GREEK ... PHI' 的非 ASCII
+# 字母若紧跟 =/: + 数字，视为 n/p 声明被同形字冒充 → fail-closed。
+_HOMOGLYPH_DECL = re.compile(
+    r"(?P<mark>[^\x00-\x7f\s])\s*[=:]\s*(?:\d{2,}|0\.\d+)", re.I)
+
+
+def _is_np_homoglyph(ch: str) -> bool:
+    import unicodedata as _ud
+    name = _ud.name(ch, "").upper()
+    if not name:
+        return False
+    return (("LATIN" in name and "LETTER" in name
+             and ("LETTER N" in name or "LETTER P" in name
+                  or "LETTER ENG" in name or "LETTER PHI" in name))
+            or ("ARMENIAN" in name and ("NOW" in name or "PEH" in name))
+            or ("GREEK" in name and "PHI" in name))
+
+
+def has_homoglyph_declaration(text: str) -> bool:
+    for m in _HOMOGLYPH_DECL.finditer(text):
+        mark = m.group("mark")
+        if not _is_np_homoglyph(mark):
+            continue
+        # 预组合 ń(U+0144)/ṕ(U+1E55) 等 NFD 剥 Mn 后已转成 ASCII n/p，
+        # 声明正则可正常提取（EXIT=5），无需 fail-closed。仅当归一化后
+        # 仍是非 ASCII 同形字（ɲ/ŋ/ϕ 等）才拦。
+        if normalize_for_extraction(mark) in ("n", "p", "N", "P"):
+            continue
+        return True
+    return False
+
+
 def prepare_numbers(text: str, min_digits: int = 2):
     """消费方共用的「归一化 → 提取 → 隔断/声明守卫」单一入口。
 
@@ -222,6 +257,8 @@ def prepare_numbers(text: str, min_digits: int = 2):
         return False, [], "关键数字模式被隔开"
     if has_invisible_marker_gap(text):
         return False, [], "声明标记被不可见字符隔断"
+    if has_homoglyph_declaration(text):
+        return False, [], "数字声明标记被同形字冒充"
     norm = normalize_for_extraction(text)
     # R4.12（盲检 A🔴2）：数字+中文句号+数字（含 NFKC(｡)→。）是小数点变体，
     # 定点检测（不动句尾句号），否则 30。5 被提取为 30 被池中 30 洗白。
@@ -319,7 +356,11 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # R4.14（盲检 A🔴4）：\d{1,3} 在 4+ 位逗号组（94,5000）回溯耗尽 →
     # lookahead 误通过。改 \d+ 并只排除「后随小数点」的 CSV 浮点字段
     # （30,0.9441 的 ,0.9441 合法放行），千分位/字段延续任意位数均拦。
-    right = r"(?![\d.])(?!,\d+(?!\.))" if "." not in cand else r"(?![\d.])"
+    # R4.16（盲检 A🔴2）：原右边界只禁数字/点/逗号，产出 `n = 94` 被池中
+    # `94e5`（数值 9400000）/ `94%` / `94kg` / `94_5` 洗白 PASS。整数候选
+    # 追加禁字母/数字/下划线/百分号后缀（\w 含字母数字下划线，% 单列）。
+    right = (r"(?![\d.\w%])(?!,\d+(?!\.))" if "." not in cand
+             else r"(?![\d.])")
     pat = re.compile(left + re.escape(cand) + right)
     return pat.search(pool) is not None
 
