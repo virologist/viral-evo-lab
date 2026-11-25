@@ -1151,6 +1151,43 @@ def test_require_tag_gate() -> None:
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 3, f"R4.13 check_scope Mn 隔断事故值须 EXIT=3，实为 {rc}"
 
+        # R4.14（盲检 A 7🔴，全部主代理独立复现）：Sm/Pd/Po 劈开数字前缀洗白、
+        # 预组合同形/希腊同形声明标记、prime 变体、池逗号 4+ 位回溯绕过、
+        # check_scope/poll 非 Mn 符号隔断、G6 line=true（后者在 G6 函数内）。
+        r14src = d / "r14_src"
+        r14src.mkdir(exist_ok=True)
+        for label, payload, pool, want_rc in (
+                ("Sm劈开前缀洗白", "样本 n = 88\u2b3088（伪造）\n", "value\n88\n", 3),
+                ("Po全角感叹劈开", "样本 n = 94\uff0194（伪造）\n", "value\n94\n", 3),
+                ("预组合同形n", "ń = 94\n", "value\n0.11\n", 5),
+                ("希腊同形nu", "ν = 94\n", "value\n0.11\n", 5),
+                ("prime变体acute", "d\u00b4=0.94\n", "value\n0.11\n", 5),
+                ("池逗号4位洗白", "样本 n = 94\n", "value\n94,5000\n", 5)):
+            (r14src / "pool.csv").write_text(pool, encoding="utf-8")
+            f_r14 = d / f"r14_{label}.md"
+            f_r14.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_r14), "--sources", str(r14src)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == want_rc, \
+                f"R4.14 {label} 须 EXIT={want_rc}（不得 PASS=0），实为 {rc}"
+        # 合法对照：多语小数点 / 全角逗号 CI / 合法数字格式不得 fail-close 误拒
+        for label, payload in (("多语小数点", "p = 0\u00b794\n"),
+                               ("全角逗号CI", "CI ［0.1\uff0c0.2］\n"),
+                               ("千分位", "1,234.5\n"), ("时间", "10:30\n")):
+            f_ok = d / f"r14ok_{label}.md"
+            f_ok.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_ok), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc != 3, f"R4.14 合法 {label} 不得 fail-close EXIT=3，实为 {rc}"
+        # check_scope 非 Mn 符号隔断（Sm ⬰ / Po ！ / Pd —）须判污染 EXIT=3
+        for label, payload in (("Sm", "x = 10\u2b3094\n"),
+                               ("Po", "x = 10\uff0194\n"), ("Pd", "x = 10\u201494\n")):
+            sc_f = d / f"r14_scope_{label}.py"
+            sc_f.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(scope), str(sc_f)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 3, f"R4.14 check_scope {label} 隔断事故值须 EXIT=3，实为 {rc}"
+
         # R4.7（两路盲检 6🔴，全部主代理独立复现）：
         # A🔴 CJK 紧邻 n= 空白拆段（\b 边界漂移）；B1 诱饵数字短路声明总闸；
         # B3 逗号未作数字边界（n=94 被池中 0,94 洗白）；B4 NFKC 不覆盖的排版/
@@ -1419,6 +1456,14 @@ def test_poll_hitlimit_and_manifest() -> None:
         rc, out = run("--expected", "literature-scout")
         assert rc == 5 and "撞限" in out, \
             f"Mn 隔断撞限标注须 NOT_READY/EXIT=5，实为 rc={rc}: {out[-200:]}"
+        # R4.14（盲检 A🔴6）：非 Mn 符号（Sm ⬰ / So ★ / Po ！）隔断撞限词同样
+        # 让子串失配 → READY。匹配用途归一化须剥非 ASCII S*/P* → EXIT=5。
+        for label, sep in (("Sm", "\u2b30"), ("So", "\u2605"), ("Po", "\uff01")):
+            (d / "T-P__literature-scout.md").write_text(
+                f"<!-- 轮{sep}次耗尽，产出不完整 -->\n# p\n", encoding="utf-8")
+            rc, out = run("--expected", "literature-scout")
+            assert rc == 5 and "撞限" in out, \
+                f"R4.14 {label} 隔断撞限须 EXIT=5，实为 rc={rc}: {out[-200:]}"
         # 正常文件 → READY
         (d / "T-P__literature-scout.md").write_text("# 正常产出\n", encoding="utf-8")
         rc, _ = run("--expected", "literature-scout")
@@ -2002,6 +2047,12 @@ def test_g6_evidence_gate() -> None:
         man.write_text("{not json}\n", encoding="utf-8")
         rc, rep = run_v(rd)
         assert rc == 3 and rep["verdict"] == "MANIFEST_INVALID", f"坏 JSON 应 EXIT=3: {rep}"
+        # R4.14（盲检 A🔴7）：bool 是 int 子类，line=true 曾被当合法行号 →
+        # 两条畸形抽查仍判 PASS（valid=2）。须显式排除 bool → FAIL/EXIT=5。
+        man.write_text(ev(True) + "\n" + ev(True) + "\n", encoding="utf-8")
+        rc, rep = run_v(rd)
+        assert rc == 5 and rep["valid"] == 0, \
+            f"line=true 须判非行号 FAIL，实为 rc={rc} valid={rep.get('valid')}"
 
         # check_gates 接线：SKIP 留名 / 显式启用 / 策略文件启用 / 启用后不合格判 FAIL
         (rd / f"{TASK_ID}__phylo-analyst.md").write_text(json.dumps(BASE_ENV) + "\n", encoding="utf-8")

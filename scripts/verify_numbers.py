@@ -316,7 +316,10 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # 整数候选右边界只禁「逗号 + 1~3 位数字 + 非数字/点/逗号结尾」——命中
     # 千分位/字段延续（94,500 / 1,94,2）；CSV 浮点字段 30,0.9441 的 `,0.`
     # 因后随小数点不满足末项，合法放行（v1.5.28 CSV 双字段回归保住）。
-    right = r"(?![\d.])(?!,\d{1,3}(?![\d.,]))" if "." not in cand else r"(?![\d.])"
+    # R4.14（盲检 A🔴4）：\d{1,3} 在 4+ 位逗号组（94,5000）回溯耗尽 →
+    # lookahead 误通过。改 \d+ 并只排除「后随小数点」的 CSV 浮点字段
+    # （30,0.9441 的 ,0.9441 合法放行），千分位/字段延续任意位数均拦。
+    right = r"(?![\d.])(?!,\d+(?!\.))" if "." not in cand else r"(?![\d.])"
     pat = re.compile(left + re.escape(cand) + right)
     return pat.search(pool) is not None
 

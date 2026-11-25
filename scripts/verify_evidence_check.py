@@ -67,7 +67,11 @@ def _validate(ev: dict, task_id: str) -> list[str]:
         if not _is_nonempty(val.get("file")):
             bad.append("value.file 缺失")
         line = val.get("line")
-        if not (isinstance(line, int) or (_is_nonempty(line) and str(line).isdigit())):
+        # R4.14（盲检 A🔴7）：bool 是 int 子类，line=true 曾被当合法行号 →
+        # 两条畸形抽查仍判 PASS（fail-open）。显式排除 bool。
+        if not (isinstance(line, int) and not isinstance(line, bool)
+                or (_is_nonempty(line) and not isinstance(line, bool)
+                    and str(line).isdigit())):
             bad.append("value.line 非行号")
         if not _is_nonempty(val.get("excerpt")):
             bad.append("value.excerpt 缺失（无原文摘录）")

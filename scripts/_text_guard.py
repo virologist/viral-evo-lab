@@ -59,20 +59,45 @@ def _is_emoji_cp(ch: str) -> bool:
 # 组合音标(Mn U+0301)、符号。字符类别补区间补不完（U+203C‼ 是 Po），
 # 故按「类别属于符号/修饰/格式/货币，且不含常规数字分隔符(. ,)」判劈开。
 # 说明：常规排版（1,234.5 / 10:30 / 20°C / 10~20）不含此类字符，不误判。
-_SPLIT_NUM = re.compile(r"\d(?P<x>[^\d\s]{1,8})\d")
-_SPLIT_BAD_CATS = ("So", "Sk", "Mn", "Cf", "Sc")
+# R4.14：右侧数字改正向前瞻（不消耗），否则 `0.9⬰4` 中 `0.9` 先匹配消耗掉
+# 数字 9，`9⬰4` 无法再匹配 → 前缀劈开洗白漏检。前瞻使每次匹配从下一位数字
+# 重新开始，覆盖连续小数点后的符号劈开形态。
+_SPLIT_NUM = re.compile(r"\d(?P<x>[^\d\s]{1,8})(?=\d)")
+_SPLIT_BAD_CATS = ("So", "Sk", "Mn", "Cf", "Sc", "Sm", "Pd", "Po", "Ps", "Pe", "Pi", "Pf")
+# 合法的数字内部分隔符：ASCII 标点/符号放行（1-2-3 / 10:30 / 1,234 / 10~20 /
+# 0.94-1.0 / D′）。非 ASCII 的同类字符（⬰ U+2B30 Sm / ～ U+FF5E Sm /
+# ！ U+FF01 Po / — U+2014 Pd）才判劈开污染。
+_SPLIT_ASCII_OK = frozenset(".,:-~′'()")
 
 
 def has_split_number(text: str) -> bool:
     """文本中是否存在被符号/修饰/格式类字符劈开的数字串。
 
     命中即意味着数字正则可能静默失配（checked=0 → PASS），调用方须 fail-closed。
+    R4.14（盲检 A🔴1）：原白名单只有 So/Sk/Mn/Cf/Sc，Sm(⬰ ～ ±)/Pd(—)/Po(！)
+    劈开数字（88⬰88 / 94～500 / 0.9⬰4）时 core 不命中 → 前缀被池中洗白 PASS。
+    扩展类别到全 S*/P*/M*/C*，但显式放行 ASCII 合法分隔符与常见排版符号，
+    防误伤 1-2-3 / 10:30 / 1,234.5 / 10~20 / 20°C。
     """
     for m in _SPLIT_NUM.finditer(text):
         core = m.group("x").rstrip(".,")
         if not core:
             continue
-        if all(unicodedata.category(c) in _SPLIT_BAD_CATS for c in core):
+        def is_split_char(ch: str) -> bool:
+            if ch in _SPLIT_ASCII_OK:
+                return False
+            # 全角/多语分隔符（，U+FF0C／．U+FF0E／·U+00B7 等）经 NFKC 或
+            # _EQUIV_TRANS 后是 ASCII 合法分隔符，放行——否则 CI ［0.1，0.2］
+            # 与多语小数点 p = 0·94 被误判劈开 fail-close（既有 EXIT=5 回归）。
+            mapped = unicodedata.normalize("NFKC", ch).translate(_EQUIV_TRANS)
+            if mapped in _SPLIT_ASCII_OK and unicodedata.category(ch) == "Po":
+                return False
+            cat = unicodedata.category(ch)
+            if cat in _SPLIT_BAD_CATS:
+                return True
+            # °(So) 已在白名单但后随字母时 core 混合 → all() 自然不命中
+            return False
+        if all(is_split_char(c) for c in core):
             return True
     return False
 
@@ -84,9 +109,13 @@ def has_split_number(text: str) -> bool:
 _EQUIV_TRANS = str.maketrans({
     "\u2018": "'", "\u2019": "'", "\u201a": "'", "\u201b": "'",
     "\u2032": "'", "\u02bc": "'", "\uff07": "'",
+    # R4.14（盲检 A🔴3）：prime/acute 变体冒充 D′ 声明标记（d´ / dʹ / d‵）
+    "\u00b4": "'", "\u02b9": "'", "\u2035": "'", "\u02ba": "'",
+    "\u02cb": "'", "\u02c8": "'", "\u02b8": "'", "\u055a": "'",
     "\u201c": '"', "\u201d": '"', "\uff02": '"',
     "\u3010": "[", "\u3011": "]", "\u27e6": "[", "\u27e7": "]",
     "\u03c1": "p", "\u03f1": "p", "\u0440": "p",   # ρ/ϱ/р → p（同形声明）
+    "\u03bd": "n", "\u03bf": "o",                   # ν/ο → n/o（希腊同形）
     "\u03a1": "P", "\u0420": "P",                   # Ρ/Р → P
     # R4.8（盲检 A🔴1）：西里尔同形字冒充声明标记（СІ [..] / р: 0.94）
     "\u0421": "C", "\u0441": "c", "\u0406": "I", "\u0456": "i",
@@ -127,10 +156,38 @@ def normalize_for_extraction(text: str) -> str:
     # U+0301 插进 p=/事故值/撞限词）会让声明正则与关键子串静默失配 →
     # checked=0 → PASS（fail-open）。合法组合重音已被 NFKC 预组合（e+U+0301
     # → é），残留 Mn 均为修饰性字符，删除不改变语义，统一剥离恢复 token。
-    # 关键顺序：先剥 Mn 再 NFKC——部分 Mn（如 U+1AB0）经 NFKC 会转成可见
-    # 符号（U+2B30 ⬰，So 类别），事后过滤挡不住；先剥则 token 直接复原。
-    no_mn = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    # 关键顺序：NFD 分解 → 剥 Mn → 语义映射 → NFKC——
+    # ① 预组合同形字 ń(U+0144)/ṕ(U+1E55) 的 NFKC 不分解，须先 NFD 拆成
+    #    n+Mn 再剥 Mn 才能复原 ASCII 标记（R4.14 盲检 A🔴2）；
+    # ② 组合 Mn（如 U+1AB0）经 NFKC 会转成可见符号（U+2B30 ⬰），事后过滤
+    #    挡不住，须在 NFKC 前剥除。
+    # ③ prime 变体 U+00B4(´) 经 NFD 会拆成空格+Mn 再被剥掉，须在 NFD 前
+    #    先做一次等价映射（´→'），NFKC 后再映射一次处理新生成形态。
+    pre = text.translate(_EQUIV_TRANS)
+    decomposed = unicodedata.normalize("NFD", pre)
+    no_mn = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
     return unicodedata.normalize("NFKC", no_mn).translate(_EQUIV_TRANS)
+
+
+def normalize_for_matching(text: str) -> str:
+    """匹配用途归一化：在 normalize_for_extraction 基础上再剥非 ASCII 的
+    符号/标点类字符（S*/P*），供关键子串匹配（撞限标注/事故叙事）使用。
+
+    R4.14（盲检 A🔴5/🔴6）：Mn 之外的 Sm(⬰)/So(★)/Po(！)/Pd(—) 插进
+    「轮次耗尽」/事故值同样让子串失配 → READY/clean fail-open。此类字符
+    在匹配用途下无语义，剥离后恢复原 token；ASCII 标点（.,:-~）保留以
+    维持合法数字格式。仅用于匹配，不改原文其它用途。
+    """
+    import unicodedata as _ud
+    base = normalize_for_extraction(text)
+    # 全角 ！经 NFKC 已变 ASCII !（Po），故不按 ord 区分，改按类别 + 显式
+    # 保留合法数字分隔标点（.,:-~′'）——事故值/撞限词匹配用途下安全。
+    keep_ascii = frozenset(".,:-~′'")
+    return "".join(ch for ch in base
+                   if ch in keep_ascii or (ord(ch) < 128 and _ud.category(ch) not in
+                   ("Sm", "Sk", "So", "Sc", "Pd", "Po", "Ps", "Pe", "Pi", "Pf"))
+                   or _ud.category(ch) not in
+                   ("Sm", "Sk", "So", "Sc", "Pd", "Po", "Ps", "Pe", "Pi", "Pf"))
 
 
 def has_forbidden(text: str) -> bool:

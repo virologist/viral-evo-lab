@@ -4,6 +4,26 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.31] - 2026-11-25（R4.14 v1.5.30 盲检 A 回补 · 7🔴 fail-open：Sm/Pd 劈开 + 同形/prime 声明 + 池逗号 4+ 位 + 符号隔断匹配 + G6 bool）
+
+v1.5.30 盲检 A 前台同步调用成功（报告正文实际送达，规避上轮后台 agent 报告丢失）。报 7🔴 + 若干🟠。主代理**逐条独立复现全部 7🔴**（含 checked=0/PASS、found=1/PASS、valid=2/PASS 实证）后修复；🟠 均为 fail-close 误拒合法输入（CI `+0.1` / d′=`+0.94` / 科学计数 `1.2e-3` / 超长补零 `0.944100000` / 千分位池 `1,234`），按「fail-open 优先」不阻塞冻结，作已知限制披露。
+
+### Fixed（7🔴，全部主代理独立复现）
+- **A1 Sm/Pd/Po 劈开数字前缀洗白**：`n=88⬰88`、`p=0.9⬰4`、`n=94～500`、`10！94` → 前缀 `88/0.9/94` 被池中洗白 PASS。`_text_guard._SPLIT_BAD_CATS` 扩到全 S*/P*/M*/C* 类（ASCII 合法分隔符 `.,:-~′'`、`·` 多语小数点、全角 `，．` 显式放行）；`_SPLIT_NUM` 右侧数字改正向前瞻（不消耗），修 `0.9⬰4` 因 `0.9` 先匹配消耗数字致 `9⬰4` 漏检的正则贪心 bug。
+- **A2 预组合同形/希腊同形声明标记**：`ń=94`/`ṕ=0.94`/`ν=94` → checked=0/PASS。`normalize_for_extraction` 改 NFD 分解 → 剥 Mn → 语义映射 → NFKC，复原预组合字母的 ASCII 基底；`_EQUIV_TRANS` 加 ν/ο 同形映射。
+- **A3 prime 变体声明隐身**：`d´`/`dʹ`/`d‵` → checked=0/PASS。`_EQUIV_TRANS` 扩 prime/acute 变体（U+00B4/02B9/2035/02BA/02CB/02C8/02B8/055A），NFD 前先映射一次防 U+00B4 被拆成空格+Mn。
+- **A4 池逗号 4+ 位回溯绕过**：`n=94` 被池中 `94,5000` 洗白（`\d{1,3}` 回溯耗尽）。右边界改 `(?!,\d+(?!\.))`——任意位数千分位/字段延续均拦，CSV 浮点字段 `30,0.9441` 因后随小数点放行。
+- **A5/A6 非 Mn 符号隔断匹配**：`10⬰94`/`10！94` check_scope clean、`轮⬰次耗尽` poll READY。新增 `normalize_for_matching()`（剥 Mn + 非 ASCII S*/P*，保留合法数字分隔符），check_scope/poll 共用；全角 `！` 经 NFKC→ASCII `!` 后按类别剥离。
+- **A7 G6 `line=true`**：bool 是 int 子类，两条 `line=true` 抽查判 valid=2/PASS。`verify_evidence_check` 显式排除 bool。
+
+### Known Issues（🟠 fail-close，不阻塞）
+- `CI [+0.1, +0.2]`（池 0.1/0.2）、`d′=+0.94`、科学计数 `p=1.2e-3`（池 0.0012）、超长补零 `0.9441` vs `0.944100000`、`n=1234` vs 池 `1,234` 会误拒（EXIT=3/5）。均为拒绝合法输入，不放行恶意输入；为避免新 fail-open 面，本轮不修。
+
+### Verified
+- 7🔴 修复前后三态实测（PASS → EXIT 3/5；valid=2/PASS → EXIT=5/valid=0），合法对照（多语小数点 / 全角逗号 CI / 千分位 / 时间 / 20°C / emoji ZWJ）不误拒；中途两次 fail-close 误伤（`CI ［0.1，0.2］` 全角逗号、`p=0·94` 多语小数点、`～` 全角波浪）均已加等价分隔符放行判据消除。
+- 回归断言复用既有 `test_require_tag_gate()` / `test_poll_hitlimit_and_manifest()` / `test_g6_evidence_gate()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / compileall 全过 / 四处 version 一致（1.5.31）。
+
 ## [1.5.30] - 2026-11-25（R4.13 v1.5.29 双路盲检回补 · 8🔴 fail-open 根因级封堵）
 
 v1.5.29 双路盲检报 A=5🔴2🟠 / B=3🔴1🟠（报告正文因 agent 结束未送达主代理上下文，按纪律不凭计数采信）。主代理以对抗 payload 逐条独立复现，**8 项 fail-open 全部坐实**（含 checked=0/PASS、found=1/PASS、EXIT=1/崩溃实证），逐项修复；B2（未来日期）经精确 fixture 二次复现后亦坐实。核心根因三类：**Mn/Sm 符号插进关键 token 致正则/子串静默失配**、**token 边界与精度候选不完备致编造数字被池中洗白**、**容器类型未校验致契约外崩溃**。
