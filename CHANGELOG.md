@@ -4,6 +4,23 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.32] - 2026-11-25（R4.15 v1.5.31 盲检 A 回补 · 6🔴 fail-open：ZWJ 隔断三处 + 劈开检测三缺陷）
+
+v1.5.31 盲检 A（前台同步，报告送达）报 6🔴+0🟠，主代理**逐条独立复现全部坐实**（checked=0/found=1/PASS、CLEAN 等实证）后修复。6 项分两类根因：①ZWJ(Cf) 隔断关键 token（撞限词/事故叙事/severity），②上轮修复引入/遗留的劈开检测三缺陷。
+
+### Fixed（6🔴，全部主代理独立复现）
+- **A1 ZWJ 隔断撞限词**：`轮‍次耗尽` → poll READY/EXIT=0。`has_forbidden` 原只拒 ZWJ span 紧贴**数字**，CJK 侧放行；`normalize_for_matching` 不剥 Cf → 子串失配。改：`has_forbidden` span 左右任一 `isalnum()`（数字/字母/CJK）即拒（合法 emoji ZWJ 两侧均 emoji 仍放行）；`normalize_for_matching` 匹配用途全剥 Cf。
+- **A2 ZWJ 隔断事故叙事**：`位‍置映射错` → check_scope clean/EXIT=0。同上根因，双防线修复后 EXIT=3。
+- **A6 ZWJ 附 severity**：`fatal‍` → `_row_str` 只 strip（ZWJ 非空白）→ 精确比较失配 → fatal 证伪静默 CLEAN/EXIT=0。`has_forbidden` 拒字母侧 ZWJ → 严格读 EXIT=3（证据源污染，不可放行）。
+- **A3 劈开上限 `{1,8}`**：`94×9×7`（9 个分隔符）→ 正则零匹配，前缀 94 被池洗白 PASS。上限放宽 `{1,64}`（有界防 ReDoS）。
+- **A4 前置分隔符破坏 `all()`**：`94,⬰7` 的 `,⬰` 中逗号留在 core 使 `all(is_split_char)` 整体 False → 洗白 PASS。改：剔除 core 中所有合法分隔符后再判剩余是否全劈开类。
+- **A5 Co/Me 类漏检**：`94\ue0007`(Co 私有区)/`94\u20dd7`(Me 封闭组合环) → PASS。`_SPLIT_BAD_CATS` 补全 Co/Cs/Mc/Me（原注释声称「全 S*/P*/M*/C*」实际漏四类）。
+
+### Verified
+- 6🔴 修复前后三态实测（PASS/CLEAN/READY → EXIT 3/5），合法对照（1,234.5 / 10:30 / 10~20 / 20°C / 1e-3 / 多语小数点 / 全角逗号 CI / D′）不误拒。
+- 回归断言复用既有 `test_require_tag_gate()` / `test_poll_hitlimit_and_manifest()` / `test_disposition_gate()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / compileall 全过 / 四处 version 一致（1.5.32）。
+
 ## [1.5.31] - 2026-11-25（R4.14 v1.5.30 盲检 A 回补 · 7🔴 fail-open：Sm/Pd 劈开 + 同形/prime 声明 + 池逗号 4+ 位 + 符号隔断匹配 + G6 bool）
 
 v1.5.30 盲检 A 前台同步调用成功（报告正文实际送达，规避上轮后台 agent 报告丢失）。报 7🔴 + 若干🟠。主代理**逐条独立复现全部 7🔴**（含 checked=0/PASS、found=1/PASS、valid=2/PASS 实证）后修复；🟠 均为 fail-close 误拒合法输入（CI `+0.1` / d′=`+0.94` / 科学计数 `1.2e-3` / 超长补零 `0.944100000` / 千分位池 `1,234`），按「fail-open 优先」不阻塞冻结，作已知限制披露。

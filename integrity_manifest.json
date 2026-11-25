@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-25T23:33:03",
+ "generated": "2026-11-25T23:46:59",
  "file_count": 80,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "3d93e419d8bffce6",
+   "sha16": "e6f115e19c10a15c",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "e162b6a770ba8b59",
+   "sha16": "6c119213a37e6058",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "e95dc093287bde54",
+   "sha16": "11c8c456b1e82135",
    "bytes": 6722
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "09e28c5be2790ead",
-   "bytes": 110312
+   "sha16": "09562d453b6da6af",
+   "bytes": 112657
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
@@ -163,8 +163,8 @@
    "bytes": 6211
   },
   "scripts/_text_guard.py": {
-   "sha16": "9150d130bc668a4b",
-   "bytes": 14940
+   "sha16": "273fe2aa619dfa88",
+   "bytes": 15876
   },
   "scripts/assemble_spawn_prompt.py": {
    "sha16": "5a393bffb87ce07d",
@@ -307,8 +307,8 @@
    "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "27345d78ab983b7e",
-   "bytes": 147861
+   "sha16": "168be873f3ef3186",
+   "bytes": 150642
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

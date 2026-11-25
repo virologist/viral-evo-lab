@@ -62,8 +62,13 @@ def _is_emoji_cp(ch: str) -> bool:
 # R4.14：右侧数字改正向前瞻（不消耗），否则 `0.9⬰4` 中 `0.9` 先匹配消耗掉
 # 数字 9，`9⬰4` 无法再匹配 → 前缀劈开洗白漏检。前瞻使每次匹配从下一位数字
 # 重新开始，覆盖连续小数点后的符号劈开形态。
-_SPLIT_NUM = re.compile(r"\d(?P<x>[^\d\s]{1,8})(?=\d)")
-_SPLIT_BAD_CATS = ("So", "Sk", "Mn", "Cf", "Sc", "Sm", "Pd", "Po", "Ps", "Pe", "Pi", "Pf")
+# R4.15（盲检 A🔴3）：{1,8} 上限导致 9+ 分隔符时正则零匹配 → 前缀被池洗白。
+# 放宽到 {1,64}（有界防 ReDoS，覆盖任意现实攻击串）。
+_SPLIT_NUM = re.compile(r"\d(?P<x>[^\d\s]{1,64})(?=\d)")
+# R4.15（盲检 A🔴5）：原声称「全 S*/P*/M*/C*」实际漏 Co(私有区)/Cs(代理)/
+# Mc(间距组合符)/Me(封闭组合符)——U+E000/U+20DD 隔断数字仍 PASS。补全。
+_SPLIT_BAD_CATS = ("So", "Sk", "Mn", "Mc", "Me", "Cf", "Sc", "Cs", "Co",
+                   "Sm", "Pd", "Po", "Ps", "Pe", "Pi", "Pf")
 # 合法的数字内部分隔符：ASCII 标点/符号放行（1-2-3 / 10:30 / 1,234 / 10~20 /
 # 0.94-1.0 / D′）。非 ASCII 的同类字符（⬰ U+2B30 Sm / ～ U+FF5E Sm /
 # ！ U+FF01 Po / — U+2014 Pd）才判劈开污染。
@@ -79,25 +84,23 @@ def has_split_number(text: str) -> bool:
     扩展类别到全 S*/P*/M*/C*，但显式放行 ASCII 合法分隔符与常见排版符号，
     防误伤 1-2-3 / 10:30 / 1,234.5 / 10~20 / 20°C。
     """
+    def is_legal_sep(ch: str) -> bool:
+        if ch in _SPLIT_ASCII_OK:
+            return True
+        # 全角/多语分隔符（，U+FF0C／．U+FF0E／·U+00B7）NFKC/映射后是
+        # ASCII 合法分隔符，放行——CI ［0.1，0.2］ / p = 0·94 不误判。
+        mapped = unicodedata.normalize("NFKC", ch).translate(_EQUIV_TRANS)
+        return mapped in _SPLIT_ASCII_OK and unicodedata.category(ch) == "Po"
+
     for m in _SPLIT_NUM.finditer(text):
-        core = m.group("x").rstrip(".,")
+        # R4.15（盲检 A🔴4）：原 rstrip(".,") 只剥尾部；前置合法分隔符
+        # （94,⬰7 的逗号）留在 core 使 all() 判据整体失效 → 洗白 PASS。
+        # 剔除 core 中所有合法分隔符后再判定剩余是否全为劈开类字符。
+        core = "".join(ch for ch in m.group("x") if not is_legal_sep(ch))
         if not core:
             continue
-        def is_split_char(ch: str) -> bool:
-            if ch in _SPLIT_ASCII_OK:
-                return False
-            # 全角/多语分隔符（，U+FF0C／．U+FF0E／·U+00B7 等）经 NFKC 或
-            # _EQUIV_TRANS 后是 ASCII 合法分隔符，放行——否则 CI ［0.1，0.2］
-            # 与多语小数点 p = 0·94 被误判劈开 fail-close（既有 EXIT=5 回归）。
-            mapped = unicodedata.normalize("NFKC", ch).translate(_EQUIV_TRANS)
-            if mapped in _SPLIT_ASCII_OK and unicodedata.category(ch) == "Po":
-                return False
-            cat = unicodedata.category(ch)
-            if cat in _SPLIT_BAD_CATS:
-                return True
-            # °(So) 已在白名单但后随字母时 core 混合 → all() 自然不命中
-            return False
-        if all(is_split_char(c) for c in core):
+        # 剩余字符中若含非劈开类（如字母 e/'°'），整体不判（防 1e-3/20°C 误伤）
+        if all(unicodedata.category(ch) in _SPLIT_BAD_CATS for ch in core):
             return True
     return False
 
@@ -180,14 +183,15 @@ def normalize_for_matching(text: str) -> str:
     """
     import unicodedata as _ud
     base = normalize_for_extraction(text)
-    # 全角 ！经 NFKC 已变 ASCII !（Po），故不按 ord 区分，改按类别 + 显式
-    # 保留合法数字分隔标点（.,:-~′'）——事故值/撞限词匹配用途下安全。
+    # 全角 ！经 NFKC 已变 ASCII !（Po），故按类别剥离 + 显式保留合法数字
+    # 分隔符（.,:-~′'）——事故值/撞限词匹配用途下安全。
+    # R4.15（盲检 A🔴1/2/6）：Cf（ZWJ U+200D 等）此前保留，插进「轮次耗尽」
+    # /「位置映射错」/ severity="fatal‍" 均让子串或精确比较失配 →
+    # READY/clean/CLEAN fail-open。匹配用途下 emoji ZWJ 序列无语义，全剥 Cf。
     keep_ascii = frozenset(".,:-~′'")
+    drop_cats = ("Sm", "Sk", "So", "Sc", "Pd", "Po", "Ps", "Pe", "Pi", "Pf", "Cf")
     return "".join(ch for ch in base
-                   if ch in keep_ascii or (ord(ch) < 128 and _ud.category(ch) not in
-                   ("Sm", "Sk", "So", "Sc", "Pd", "Po", "Ps", "Pe", "Pi", "Pf"))
-                   or _ud.category(ch) not in
-                   ("Sm", "Sk", "So", "Sc", "Pd", "Po", "Ps", "Pe", "Pi", "Pf"))
+                   if ch in keep_ascii or _ud.category(ch) not in drop_cats)
 
 
 def has_forbidden(text: str) -> bool:
@@ -232,8 +236,12 @@ def has_forbidden(text: str) -> bool:
             # 非 ZWJ 的 Cf（ZWSP/BOM/软连字符/U+2060）夹在任意位置都拒绝
             if has_non_zwj_cf:
                 return True
-            # emoji/ZWJ span 紧贴数字 = 数字串被隔断 = fail-open，拒绝
-            if (left.isdigit() or right.isdigit()):
+            # R4.15（盲检 A🔴1/2/6）：emoji/ZWJ span 紧贴数字**或字母/汉字**
+            # 均可能是隔断 fail-open——`轮‍次耗尽` / `位置‍映射错` /
+            # `fatal‍` 的 ZWJ 两侧是 CJK/字母，原只拒数字侧故放行 →
+            # 撞限/事故叙事/severity 静默失配。合法 emoji ZWJ 序列两侧均为
+            # emoji（非 alnum），继续放行。
+            if left.isalnum() or right.isalnum():
                 return True
             i = j
             continue

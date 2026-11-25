@@ -492,6 +492,20 @@ def test_disposition_gate() -> None:
         assert rc == 5 and "F-R413" in out, \
             f"未来同日 fatal 须 REVIEW_REQUIRED/EXIT=5，实为 rc={rc}: {out[-200:]}"
 
+        # R4.15（盲检 A🔴6）：ZWJ(Cf) 附在 severity 'fatal‍' 末尾——_row_str
+        # 只 strip（ZWJ 非空白），精确比较失配 → fatal 证伪静默 CLEAN。
+        # has_forbidden 现拒字母侧 ZWJ → 严格读 EXIT=3（证据源污染）。
+        today = datetime.now().strftime("%Y-%m-%d")
+        hyp_p.write_text(json.dumps({
+            "last_updated": today,
+            "active_hypotheses": [{"id": "H-1", "status": "active", "claim": "c"}]}) + "\n",
+            encoding="utf-8")
+        led_p.write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n"
+            f"F-R415,fatal\u200d,closed,{today},ZWJ证伪\n", encoding="utf-8")
+        rc, out = run()
+        assert rc == 3, f"severity ZWJ 污染须 EXIT=3（不得 CLEAN），实为 rc={rc}: {out[-200:]}"
+
 
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
@@ -1188,6 +1202,27 @@ def test_require_tag_gate() -> None:
                                 capture_output=True, text=True, timeout=60).returncode
             assert rc == 3, f"R4.14 check_scope {label} 隔断事故值须 EXIT=3，实为 {rc}"
 
+        # R4.15（盲检 A🔴2/3/4/5，主代理逐条独立复现）：ZWJ 隔断事故叙事、
+        # 劈开上限 {1,8} 绕过（9 分隔符）、前置分隔符破坏 all() 判据、
+        # Co/Me 类漏检——四者均让前缀被池中洗白或黑名单失配。
+        sc_zwj = d / "r15_scope_zwj.md"
+        sc_zwj.write_text("位\u200d置映射错（具体事故）\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(scope), str(sc_zwj)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"R4.15 ZWJ 隔断事故叙事须 EXIT=3，实为 {rc}"
+        for label, payload in (
+                ("9分隔符上限", "样本 n = 94" + "×" * 9 + "7，伪造。\n"),
+                ("前置分隔符", "样本 n = 94,⬰7，伪造。\n"),
+                ("Co私有区", "样本 n = 94\ue0007，伪造。\n"),
+                ("Me组合环", "样本 n = 94\u20dd7，伪造。\n")):
+            (r14src / "pool.csv").write_text("value\n94\n", encoding="utf-8")
+            f_r15 = d / f"r15_{label}.md"
+            f_r15.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_r15),
+                                 "--sources", str(r14src)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 3, f"R4.15 {label} 须 EXIT=3（不得 PASS=0），实为 {rc}"
+
         # R4.7（两路盲检 6🔴，全部主代理独立复现）：
         # A🔴 CJK 紧邻 n= 空白拆段（\b 边界漂移）；B1 诱饵数字短路声明总闸；
         # B3 逗号未作数字边界（n=94 被池中 0,94 洗白）；B4 NFKC 不覆盖的排版/
@@ -1464,6 +1499,13 @@ def test_poll_hitlimit_and_manifest() -> None:
             rc, out = run("--expected", "literature-scout")
             assert rc == 5 and "撞限" in out, \
                 f"R4.14 {label} 隔断撞限须 EXIT=5，实为 rc={rc}: {out[-200:]}"
+        # R4.15（盲检 A🔴1）：ZWJ(Cf U+200D) 插进「轮次耗尽」—has_forbidden
+        # 原只拒 ZWJ 紧贴数字，CJK 侧放行 → READY fail-open。须 EXIT=5。
+        (d / "T-P__literature-scout.md").write_text(
+            "轮\u200d次耗尽：产出不完整\n# p\n", encoding="utf-8")
+        rc, out = run("--expected", "literature-scout")
+        assert rc == 5 and "撞限" in out, \
+            f"R4.15 ZWJ 隔断撞限须 EXIT=5，实为 rc={rc}: {out[-200:]}"
         # 正常文件 → READY
         (d / "T-P__literature-scout.md").write_text("# 正常产出\n", encoding="utf-8")
         rc, _ = run("--expected", "literature-scout")
