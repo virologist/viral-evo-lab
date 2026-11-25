@@ -1152,6 +1152,72 @@ def test_require_tag_gate() -> None:
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 0, f"CSV 字段值须正常溯源 EXIT=0，实为 {rc}"
 
+        # R4.9（盲检 B🔴1）：ZWJ(U+200D)/VS16(U+FE0F) 插在声明标记与 = 之间，
+        # 原 has_forbidden 放行、KEY_MARKERS 漏检 → checked=0 → PASS。
+        for label, payload in (("ZWJ的p", "p\u200d=0.94\n"),
+                               ("ZWJ的n", "n\u200d=94\n"),
+                               ("VS16的p", "p\ufe0f=0.94\n")):
+            f_z = d / f"r49_{label}.md"
+            f_z.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_z), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc in (3, 5), f"{label} 不可见隔断须 fail-closed，实为 {rc}"
+        # R4.9（盲检 B🔴2）：同形字/多语百分号（NFKC 不收敛）——п/η/٪ 原全 PASS
+        for label, payload in (("西里尔п", "п = 94\n"),
+                               ("希腊eta", "η = 94\n"),
+                               ("阿文百分号", "保护率 95\u066a\n")):
+            f_e = d / f"r49_{label}.md"
+            f_e.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_e), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc in (3, 5), f"{label} 同形字须 fail-closed，实为 {rc}"
+        # R4.9（盲检 B🟠4）：CSV 双数字字段 30,0.9441 中两值均须正常溯源
+        d_csv = d / "s3"
+        d_csv.mkdir(exist_ok=True)
+        (d_csv / "a.csv").write_text("source_tag: authoritative\nn,p\n30,0.9441\n", encoding="utf-8")
+        f_dual = d / "r49_csv_dual.md"
+        f_dual.write_text("样本 n = 30，p = 0.9441\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_dual), "--sources", str(d_csv)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 0, f"CSV 双数字字段须正常溯源 EXIT=0，实为 {rc}"
+        # 合法 emoji ZWJ 不得被 ZWJ 隔断守卫误伤
+        f_ezwj = d / "r49_emoji.md"
+        f_ezwj.write_text("家族 👨‍👩‍👧 样本量 n = 30\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_ezwj), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc in (0, 5), f"合法 emoji ZWJ 不得 fail-close 误拒，实为 {rc}"
+
+        # R4.10（盲检 A🔴2/3/4）：守卫独立于 min_digits + 提取 token 边界。
+        # --min-digits 1 不得关闭声明守卫；n=1234567 / 1234% 不得截断洗白。
+        f_m1 = d / "r410_min1.md"; f_m1.write_text("p = 0,94\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_m1), "--sources", str(d / "s2"),
+                             "--min-digits", "1"], capture_output=True, text=True,
+                            timeout=60).returncode
+        assert rc == 3, f"min-digits=1 不得关闭声明守卫（须 EXIT=3），实为 {rc}"
+        for label, payload, pool_val in (("n超长", "n = 1234567\n", "123456"),
+                                         ("pct超长", "1234%\n", "234")):
+            sub = d / f"r410_{label}"; sub.mkdir(exist_ok=True)
+            (sub / "a.csv").write_text(f"metric,value\nother,{pool_val}\n", encoding="utf-8")
+            f_x = d / f"r410_{label}.md"; f_x.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_x), "--sources", str(sub)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc in (3, 5), f"{label} 截断片段不得洗白，实为 {rc}"
+        # CI/dprime 个位整数部分合法（原 \d\.\d+ 只认个位 → fail-close 误拒）
+        d_ci = d / "r410_ci"; d_ci.mkdir(exist_ok=True)
+        (d_ci / "a.csv").write_text("metric,value\nlow,12.3\nhigh,45.6\n", encoding="utf-8")
+        f_ci = d / "r410_ci.md"; f_ci.write_text("CI [12.3, 45.6]\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_ci), "--sources", str(d_ci)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 0, f"CI 多位整数部分须正常溯源 EXIT=0，实为 {rc}"
+        # 合法并列声明不得被 token 右边界误伤
+        d_multi = d / "r410_multi_src"; d_multi.mkdir(exist_ok=True)
+        (d_multi / "a.csv").write_text("metric,value\nn,30\np,0.111\n", encoding="utf-8")
+        f_multi = d / "r410_multi.md"
+        f_multi.write_text("样本 n = 30，p = 0.111\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_multi), "--sources", str(d_multi)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 0, f"中文逗号并列声明不得误拒 EXIT=0，实为 {rc}"
+
         # R4.3（盲检🟠4）：数字 grep 原为子串匹配——p=0.94 被权威源里的 0.9441
         # 洗白（假阳性 PASS）、p=0.98 被 10.980 洗白。改 token 边界匹配后，
         # 两者都必须判未溯源 EXIT=5。
@@ -1724,6 +1790,38 @@ def test_decision_records_guard() -> None:
         rc = subprocess.run(["bash", str(PKG / "scripts" / "cron_watch.sh"), "--run-dir"],
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 3, f"cron 参数缺值须参数错误 EXIT=3，实为 {rc}"
+
+        # R4.9（盲检 B🟠3 + 主代理自查）：超大整数 JSON（>4300 位）使 json.loads
+        # 抛 ValueError，多处入口漏捕获 → 契约外 EXIT=1。统一扩捕获面后须落契约码。
+        big9 = "9" * 5000
+        va = root / "anchors_big.json"
+        va.write_text('{"files":{},"source":{"tag":%s}}' % big9, encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(PKG / "scripts" / "check_baseline_anchors.py"),
+                             "--anchors", str(va)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"锚文件超大整数须结构失败 EXIT=3，实为 {rc}"
+        ctx = root / "ro" / "context_stack"
+        ctx.mkdir(parents=True, exist_ok=True)
+        (ctx / "confirmed_hypotheses.json").write_text('{"last_updated":%s}' % big9,
+                                                        encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(PKG / "scripts" / "render_context_stack.py"),
+                             "--research-ops", str(root / "ro"), "--which", "hyp"],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"上下文真源超大整数须结构失败 EXIT=3，实为 {rc}"
+
+        # R4.10（盲检 A🟠6/7）：check_scope 事故值全角归一化；cron manifest
+        # 含 task_id 字段却全非法时须 fail-closed（不得静默 exit 0）。
+        sc_full = root / "scope_fullwidth.md"
+        sc_full.write_text("# 编号１０９４号 错误值０．２０５８的复盘\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(PKG / "scripts" / "check_scope.py"),
+                             str(sc_full)], capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"全角事故值须归一化命中 EXIT=3，实为 {rc}"
+        crun = root / "cron_bad"; crun.mkdir(exist_ok=True)
+        (crun / "spawn_manifest.jsonl").write_text('{"task_id":12345}\n', encoding="utf-8")
+        rc = subprocess.run(["bash", str(PKG / "scripts" / "cron_watch.sh"),
+                             "--run-dir", str(crun), "--state-dir", str(root / "cstate_bad")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"非法 task_id 须 fail-closed EXIT=3，实为 {rc}"
 
 
 def test_g6_evidence_gate() -> None:

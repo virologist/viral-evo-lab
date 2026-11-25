@@ -57,11 +57,11 @@ from _text_guard import (read_text_checked, has_split_number,  # noqa: E402
 # 提取层却零命中 → checked=0 → PASS。根治：提取 PATTERNS 统一大小写不敏感、
 # 分隔符 [=:]、CI 可选分隔符，且下方 _DECL_SPEC 的 full_re **直接复用同一对象**。
 PATTERNS = [
-    ("pct",   re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")),
-    ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*[=:]\s*(\d{2,6})(?![A-Za-z])", re.I)),
-    ("p_val", re.compile(r"(?<![A-Za-z])p\s*[=:]\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z])", re.I)),
-    ("dprime",re.compile(r"[dD][′']\s*[=:]\s*([+-]?\d\.\d+)")),
-    ("ci",    re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]", re.I)),
+    ("pct",   re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d+)?)\s*%")),
+    ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*[=:]\s*(\d{2,6})(?![A-Za-z\d.])", re.I)),
+    ("p_val", re.compile(r"(?<![A-Za-z])p\s*[=:]\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z\d.])", re.I)),
+    ("dprime",re.compile(r"[dD][′']\s*[=:]\s*([+-]?\d{1,3}\.\d+)")),
+    ("ci",    re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]\s*([+-]?\d{1,3}\.\d+)\s*,\s*([+-]?\d{1,3}\.\d+)\s*[\]）)]", re.I)),
 ]
 # 排除：年份 / 版本号（须带 v 前缀或多级 x.y.z，纯小数如 0.9441 不是版本）/ 纯小数序号
 # C6（2026-11-07）：年份 ^20[0-2]\d$ → ^20\d{2}$（原实现 2030+ 失效）
@@ -79,6 +79,19 @@ VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
 # 统一为「仅禁 ASCII 字母紧邻」，与 PATTERNS / DECL_HINT 同口径。
 KEY_MARKERS = re.compile(
     r"(?:(?<![A-Za-z])n\s*[=:]|(?<![A-Za-z])p\s*[=:]|D[′']\s*[=:]|CI\s*(?:[=:]\s*)?[\[（(])", re.I)
+
+
+# R4.9（盲检 B🔴1）：ZWJ(U+200D)/VS16(U+FE0F) 等 Cf/Mn 插在 p/n 与 = 之间，
+# has_forbidden 放行（span 左右非数字）、KEY_MARKERS 漏检 → 声明隐身 → PASS。
+# 判据：关键标记后紧跟 Cf/Mn 不可见字符再接 =/: → 视为声明被隔断，fail-closed。
+_MARKER_GAP = re.compile(
+    r"(?<![A-Za-z])[npDdCI]\s*[\u200b-\u200f\u2060\ufeff\u200c\u200d\uFE0F\u0300-\u036F]{1,8}\s*[=:]",
+    re.I)
+
+
+def has_invisible_marker_gap(text: str) -> bool:
+    """声明标记与 =/: 之间夹不可见格式符 → 正则会静默失配，须 fail-closed。"""
+    return _MARKER_GAP.search(text) is not None
 
 
 def has_broken_key_pattern(text: str) -> bool:
@@ -149,8 +162,9 @@ def has_declaration_without_number(text: str, nums: list, min_digits: int = 2) -
     替代原「nums 全空才检查」的全有/全无口径（诱饵短路）。`nums` 保留签名
     兼容，不参与判定——判定只依据文本自身的声明结构与可解析形态。
     """
-    if min_digits < 2:
-        return False
+    # R4.10（盲检 A🔴2）：守卫是「声明存在但无法解析」的结构判定，
+    # 与提取阈值 min_digits 无关；原 min_digits<2 直接 return False 会
+    # 让 --min-digits 1 关闭守卫 → p = 0,94 静默 PASS。
     for kind, hint_re, full_re in _DECL_SPEC:
         for m in hint_re.finditer(text):
             if full_re.match(text, m.start()):
@@ -174,6 +188,8 @@ def prepare_numbers(text: str, min_digits: int = 2):
         return False, [], "数字被符号劈开"
     if has_broken_key_pattern(text):
         return False, [], "关键数字模式被隔开"
+    if has_invisible_marker_gap(text):
+        return False, [], "声明标记被不可见字符隔断"
     norm = normalize_for_extraction(text)
     # 归一化后再查一次劈开（全角→ASCII 后可能出现新的相邻数字-符号结构）
     if has_split_number(norm) or has_broken_key_pattern(norm):
@@ -240,7 +256,8 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # R4.7（盲检 B🔴3）：逗号亦为数字延续符（欧洲小数 0,94 / 千分位 1,234），
     # 原边界只禁 \d 与 . → 产出 `n = 94` 被权威池 `0,94` 洗白 → PASS。
     # 边界统一为「前后不得紧邻数字 / . / ,」。
-    pat = re.compile(r"(?<![\d.])(?<![0-9],)" + re.escape(cand) + r"(?![\d.])(?!,[0-9])")
+    pat = re.compile(((r"(?<![\d.])(?<![0-9],)" if "." not in cand else r"(?<![\d.])") +
+     re.escape(cand) + r"(?![\d.])(?!,[0-9](?!\.))"))
     return pat.search(pool) is not None
 
 

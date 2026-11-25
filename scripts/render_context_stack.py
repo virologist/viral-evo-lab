@@ -156,7 +156,7 @@ def main() -> int:
             if not isinstance(d, dict):
                 raise TypeError(f"顶层须为对象（实为 {type(d).__name__}）")
             rendered = fn(d)
-        except (json.JSONDecodeError, OSError, UnicodeError,
+        except (json.JSONDecodeError, ValueError, OSError, UnicodeError,
                 KeyError, TypeError, AttributeError, IndexError) as e:
             print(f"  ❌ {stem}: 真源结构异常 {type(e).__name__}: {e}")
             rc = 3

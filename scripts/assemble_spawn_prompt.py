@@ -202,25 +202,33 @@ _V1_EXCLUDE_VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
 
 
 def _v1_extract(payload: str) -> list[tuple[str, str]]:
-    """从 task_payload 文本提取关键数字（与 verify_numbers.py 同口径）。"""
+    """R4.10：改走 verify_numbers.prepare_numbers 单一入口（原自带正则副本无
+    NFKC/隔断/声明守卫，p = 0,94 / n = 1 2 3 / 全角声明静默漏检 → V1 零告警）。"""
+    vn = _load_verify_numbers()
+    if vn is not None and callable(getattr(vn, "prepare_numbers", None)):
+        _ok, nums, _why = vn.prepare_numbers(payload, 2)
+        out, seen = [], set()
+        for item in nums:
+            kind, v = item[0], item[1]
+            if not v or _V1_EXCLUDE_YEAR.match(v) or _V1_EXCLUDE_VERSION.match(v):
+                continue
+            key = (kind, v)
+            if key not in seen:
+                seen.add(key); out.append((kind, v))
+        return out
+    # 降级：模块加载失败时用本地 PATTERNS（R4.8 同步口径）
     out, seen = [], set()
     for kind, pat in _V1_PATTERNS:
         for m in pat.finditer(payload):
             vals = list(m.groups())
-            if kind == "ci":
-                # CI 区间取两端
-                vals = [vals[0], vals[1]]
-            else:
-                vals = [vals[0]]
+            vals = [vals[0], vals[1]] if kind == "ci" else [vals[0]]
             for v in vals:
                 if not v or _V1_EXCLUDE_YEAR.match(v) or _V1_EXCLUDE_VERSION.match(v):
                     continue
                 key = (kind, v)
-                if key in seen:
-                    continue
-                seen.add(key); out.append((kind, v))
+                if key not in seen:
+                    seen.add(key); out.append((kind, v))
     return out
-
 
 def _auto_verify_payload(expert_dir: Path, payload: str, research_ops: str) -> dict:
     """
@@ -247,8 +255,20 @@ def _auto_verify_payload(expert_dir: Path, payload: str, research_ops: str) -> d
         log(f"V1 跳过：未找到权威源目录（{research_ops} 下无 outputs/data/results）")
         return {"unverified": [], "warning_text": None, "skipped": True}
 
-    # 复用 verify_numbers.py 的提取与匹配逻辑
-    nums = _v1_extract(payload)
+    # R4.10（盲检 A🔴5）：先过 prepare_numbers 单一入口——隔断/声明失配时
+    # 原 _v1_extract 返回空 → V1 零告警（fail-open）。现 fail 时写哨兵进
+    # unverified，装配层照常告警（与 G2 消费同口径）。
+    _vn_mod = _load_verify_numbers()
+    if _vn_mod is not None and callable(getattr(_vn_mod, "prepare_numbers", None)):
+        ok_p, nums, why_p = _vn_mod.prepare_numbers(payload, 2)
+        if not ok_p and nums == []:
+            return {"unverified": [{"kind": "split_number",
+                                    "value": f"<{why_p}:V1正则会失配>"}],
+                    "warning_text": None, "skipped": False}
+    else:
+        nums = _v1_extract(payload)
+    # prepare_numbers 返回 (kind, value, norm) 三元组；下游按 (kind, value) 消费
+    nums = [(item[0], item[1]) for item in nums]
     if not nums:
         return {"unverified": [], "warning_text": None}
     # 加载权威源池
@@ -327,7 +347,7 @@ def load_plugin(expert_dir: Path) -> dict:
         if c.is_file():
             try:
                 obj = json.loads(c.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            except (json.JSONDecodeError, ValueError, UnicodeDecodeError) as e:
                 # R3.2：非 UTF-8 plugin.json 与解析失败同通道（既有码 3）。
                 log(f"❌ plugin.json 解析失败：{c} -> {e}")
                 sys.exit(3)

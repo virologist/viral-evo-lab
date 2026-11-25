@@ -4,6 +4,31 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.28] - 2026-11-25（R4.9+R4.10 v1.5.27 双路盲检回补 · 不可见隔断/同形字 + 提取 token 边界 + 契约外崩溃全入口）
+
+v1.5.27 冻结前双路盲检：A=5🔴+4🟠、B=2🔴+3🟠。主代理**逐条独立复现**（含在当前工作树复验），确认 A🔴2/3/4/5、B🔴1/2 及两路🟠全部坐实；A🔴1（超大整数）与 B🟠3（ValueError 捕获遗漏）经主代理自查合并修复。核心根因两类：**不可见字符/同形字让声明正则静默失配**、**提取正则无 token 边界导致截断片段被池中无 token 洗白**。
+
+### Fixed（🔴）
+- **B🔴1 不可见字符隔断声明**：ZWJ(U+200D)/VS16(U+FE0F) 插在 `p/n` 与 `=` 之间 → `checked=0/PASS`。`has_forbidden` 对非数字邻 ZWJ 放行、`KEY_MARKERS` 漏检。新增 `_MARKER_GAP` 判「标记与 =/: 之间夹 Cf/Mn」→ fail-closed EXIT=3；合法 emoji ZWJ（`家族 👨‍👩‍👧 n=888`）不误伤。
+- **B🔴2 同形字/多语百分号**：`п=94`（西里尔）、`η=94`（希腊）、`95٪`（阿文百分号）→ `checked=0/PASS`。`_EQUIV_TRANS` 扩同形字等价类 + 多语 `%` → EXIT=5。
+- **A🔴2 min-digits 关闭守卫**：`--min-digits 1` + `p = 0,94` → PASS。守卫原 `if min_digits < 2: return False`，与提取阈值耦合。改为逐声明判定独立于 min_digits → EXIT=3。
+- **A🔴3 n_eq 截断洗白**：`n = 1234567` + 池中 `123456` → `checked=1/PASS`（只核前 6 位）。`\d{2,6}` 加右边界 `(?![A-Za-z\d.])`，超长声明正则失配 → EXIT=3。
+- **A🔴4 pct 截断洗白**：`1234%` + 池中 `234` → PASS。`\d{1,3}` 加左边界 `(?<![\d.])` → EXIT=3。
+- **A🔴5 V1 装配零告警**：`assemble_spawn_prompt._v1_extract` 自带正则副本无 NFKC/隔断/声明守卫，`p = 0,94` / `n = 1 2 3` 静默跳过。改走 `verify_numbers.prepare_numbers` 单一入口；守卫 fail 时写 `split_number` 哨兵进 unverified → 装配告警可见；三元组归一化修复下游解包。
+- **A🔴1/B🟠3 超大整数契约外 EXIT=1**（主代理自查合并）：>4300 位整数抛 `ValueError`（非 `JSONDecodeError`），`check_baseline_anchors`(×2) / `render_context_stack` / `check_gates` policy+sidecar / `assemble_spawn_prompt` plugin.json / `reconcile_decisions` 共 8 处漏捕获 → 统一扩捕获面，落契约码 3/5。
+
+### Fixed（🟠）
+- **B🟠4 CSV 双数字字段误降级**：v1.5.27 的 pool 逗号边界把 `30,0.9441` 的字段分隔符当数字延续 → 合法值 EXIT=5。改为「仅整数候选且前逗号紧邻数字才算延续」；欧洲小数 `0,94` 洗白、千分位 `1,234` 洗白仍拦。
+- **A🟠6 check_scope 全角**：事故值 `１０９４号` / `０．２０５８` → clean(0)。扫描前经 `normalize_for_extraction` 归一化 → EXIT=3。
+- **A🟠7 cron 非法 task_id 静默跳过**：manifest 含 `task_id: 12345`（非字符串）被白名单过滤后 exit 0。改为含 task_id 字段却全非法 → EXIT=3；无字段仍 exit 0（空 list 对照通过）。
+- **A🟠8 CI/dprime 个位整数误拒**：`CI [12.3, 45.6]` → EXIT=3。正则 `\d\.\d+` 扩为 `\d{1,3}\.\d+` → 正常溯源 EXIT=0。
+- A🟠9（机器锚口径）：已由既有守卫第 6/9/10 项 + manifest 双重覆盖，本轮不额外放宽。
+
+### Verified
+- 双路盲检 7🔴 全部主代理独立复现（复现 → 修复 → 反向对照三态），零证伪；变异测试确认 min-digits 守卫断言有效（回退即失败，真包通过）。
+- 回归断言复用既有 `test_require_tag_gate()` / `test_decision_records_guard()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件 `--check` EXIT=0 / pytest 19 passed（含 `-W error`）/ fuzz 61/61 / 守卫 11/11 / py_compile 全过 / 四处 version 一致。
+
 ## [1.5.27] - 2026-11-25（R4.8 v1.5.26 双路盲检回补 · 口径漂移二次收敛 + 契约外崩溃封堵）
 
 v1.5.26 冻结前双路盲检：A=3🔴+4🟠、B=2🔴+2🟠。主代理**逐条独立复现**（含 B 用 `git show 37a3990` 钉纯净基线复核），确认 A3🔴 + B 残留 1🔴（B🔴1 小写 d'/ci 与 A🔴1 同源已并修）全部坐实，零证伪。核心根因仍是**同一语义在多处各写正则导致口径漂移**（这次是 v1.5.26 新引入的 `_DECL_SPEC` 与 `PATTERNS`、`KEY_MARKERS` 之间）。

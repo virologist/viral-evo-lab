@@ -63,7 +63,9 @@ def check_file(p: Path) -> list:
     if has_forbidden(text):
         # 无 BOM UTF-16 的 NUL/Cf 零宽字符交错是合法 UTF-8，解码不抛异常——显式检测
         return [(-1, "UNREADABLE", "含 Cc/Cf 不可见字符或 U+FFFD（疑二进制污染），无法核验")]
-    for lineno, line in enumerate(text.splitlines(), 1):
+    from _text_guard import normalize_for_extraction  # R4.10: 事故值全角归一化
+    for lineno, raw_line in enumerate(text.splitlines(), 1):
+        line = normalize_for_extraction(raw_line)
         # R4.6（盲检🔴 B3）：原实现把整行 `#`/`//` 开头的行全部跳过——md 标题
         # （`# 事故复盘：PP 41034380`）同样以 `#` 开头 → 事故叙事藏在标题里即可
         # 绕过 scope 检查 → 误判 clean EXIT=0（fail-open）。

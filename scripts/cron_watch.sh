@@ -139,7 +139,13 @@ else
 fi
 
 if [ -z "$TASKS" ]; then
-  echo "⏭ manifest 中无有效 task_id，本轮无巡检对象" >&2; exit 0
+  # R4.10（盲检 A🟠7）：manifest 含 task_id 字段却全被白名单过滤 = 监控静默失效，
+  # 不得以「无任务」跳过；显式 EXIT=3 让失效可见。
+  if python3 -c 'import json,sys;d=json.load(open(sys.argv[1]));rows = d if isinstance(d, list) else [d]
+raise SystemExit(0 if any(isinstance(x,dict) and "task_id" in x for x in rows) else 1)' "$RUN_DIR/spawn_manifest.jsonl" 2>/dev/null; then
+    echo "❌ manifest 含 task_id 字段但全部非法——拒绝静默跳过巡检" >&2; exit 3
+  fi
+  echo "⏭ manifest 无 task_id 字段，本轮无巡检对象" >&2; exit 0
 fi
 
 WORST=0

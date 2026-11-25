@@ -110,7 +110,7 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
 
     try:
         obj = json.loads(anchors.read_text(encoding="utf-8-sig"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as e:
         rep["structural_errors"].append(
             f"锚文件不可读或非合法 JSON: {type(e).__name__}: {e}")
         rep["verdict"] = "ANCHOR_UNREADABLE"
@@ -218,7 +218,7 @@ def refresh(anchors: Path, pkg_root: Path, reason: str, ack: bool,
 
     try:
         obj = json.loads(anchors.read_text(encoding="utf-8-sig"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as e:
         return fail(EXIT_STRUCT, f"锚不可读: {type(e).__name__}: {e}")
     files = obj.get("files") if isinstance(obj, dict) else None
     if not isinstance(files, dict) or not files:

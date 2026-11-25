@@ -46,7 +46,7 @@ def _load_json(path: Path, warnings: list[str]):
     """畸形 JSON 不崩溃：记 warning 并返回 None。"""
     try:
         return json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as e:
         warnings.append(f"{path.name}: {type(e).__name__}: {e}")
         return None
 

@@ -123,7 +123,7 @@ def _evidence_policy_enabled(run_dir: Path) -> bool:
     try:
         obj = json.loads(p.read_text(encoding="utf-8-sig"))
         return isinstance(obj, dict) and obj.get("enabled") is True
-    except (OSError, UnicodeError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
         return False
 
 
@@ -181,7 +181,7 @@ def load_workflow_sidecar(run_dir: Path, task_id: str) -> tuple[dict | None, str
         return None, ""
     try:
         obj = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
         # R3.1（2026-11-17 盲检回补）：非 UTF-8 sidecar 此前 UnicodeDecodeError
         # traceback → G1 起点即崩、gates.json 不落盘、六门全失效。解码失败按
         # 「sidecar 解析失败」同通道处理（G1 FAIL 语义），不再炸主流程。
