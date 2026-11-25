@@ -101,8 +101,8 @@ def _events_from(run_dir: Path, task_id: str, warnings: list[str]) -> list[dict]
                     continue
                 try:
                     ev = json.loads(line)
-                except json.JSONDecodeError as e:
-                    warnings.append(f"spawn_manifest 第 {i} 行非法 JSON: {e.msg}")
+                except (json.JSONDecodeError, ValueError) as e:
+                    warnings.append(f"spawn_manifest 第 {i} 行非法 JSON: {e}")
                     continue
                 if isinstance(ev, dict) and ev.get("event") == "decision":
                     add("spawn-decision", ev.get("value", ""), ev.get("reason", ""),

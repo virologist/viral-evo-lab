@@ -107,8 +107,8 @@ def check(run_dir: Path, task_id: str = "") -> tuple[int, dict]:
             continue
         try:
             ev = json.loads(line)
-        except json.JSONDecodeError as e:
-            rep["structural_errors"].append(f"第 {i} 行非法 JSON: {e.msg}")
+        except (json.JSONDecodeError, ValueError) as e:
+            rep["structural_errors"].append(f"第 {i} 行非法 JSON: {e}")
             continue
         if not isinstance(ev, dict):
             rep["structural_errors"].append(f"第 {i} 行非 JSON 对象")

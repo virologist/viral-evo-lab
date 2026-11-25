@@ -305,7 +305,7 @@ def check_envelope(art: Path, sidecar_wf: str = "", sidecar_note: str = "") -> t
             continue
         try:
             obj = json.loads(line)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError):
             continue
         # P3-R4：行首 '{' 前缀检查已挡住多数非对象，此处补显式判定作防御性兜底
         if not isinstance(obj, dict):

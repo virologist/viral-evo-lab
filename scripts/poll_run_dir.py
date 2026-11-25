@@ -103,7 +103,7 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
             continue
         try:
             obj = json.loads(line)
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError):
             bad += 1
             continue
         if isinstance(obj, dict):

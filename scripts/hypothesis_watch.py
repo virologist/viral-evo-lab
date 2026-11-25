@@ -127,7 +127,7 @@ def load_json_obj(path: Path) -> tuple[dict | None, str]:
         return None, f"读取失败: {type(e).__name__}: {e}"
     try:
         obj = json.loads(raw)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, ValueError) as e:
         return None, f"JSON 不可解析: {e}"
     if not isinstance(obj, dict):
         return None, f"顶层须为对象（实为 {type(obj).__name__}）"

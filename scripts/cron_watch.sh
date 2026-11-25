@@ -25,10 +25,15 @@ PKG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --run-dir)   RUN_DIR="$2"; shift 2 ;;
-    --state-dir) STATE_DIR="$2"; shift 2 ;;
-    --task-id)   TASK_ID="$2"; shift 2 ;;
-    --pkg-root)  PKG_ROOT="$2"; shift 2 ;;
+    --run-dir|--state-dir|--task-id|--pkg-root)
+      [ $# -ge 2 ] || { echo "❌ $1 缺少参数值" >&2; exit 3; }
+      case "$1" in
+        --run-dir)   RUN_DIR="$2" ;;
+        --state-dir) STATE_DIR="$2" ;;
+        --task-id)   TASK_ID="$2" ;;
+        --pkg-root)  PKG_ROOT="$2" ;;
+      esac
+      shift 2 ;;
     -h|--help)   sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "❌ 未知参数: $1" >&2; exit 3 ;;
   esac

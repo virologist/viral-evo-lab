@@ -27,12 +27,18 @@ from _text_guard import has_forbidden  # noqa: E402
 # G140 mapping error 等具体事件记忆）——黑名单只保留「结构性污染信号」
 # （具体 PMID/commit 片段/错误数值/草稿状态），位点级叙事防复发改由
 # spawn 时的知识态注入（R11）+ T1 审判关卡承担。具体事件史归工作空间 ledger。
+# R4.8（盲检 A🟠2/B🟠）：同名治理正本在任意目录均享受豁免 → 伪造目录绕过。
+# 改为包内绝对路径精确匹配，仅真治理正本与本脚本自身豁免。
+_PKG_ROOT = Path(__file__).resolve().parent.parent
+_GOV_DOC = (_PKG_ROOT / "GOVERNANCE_BOUNDARIES.md").resolve()
+_SELF_EXEMPT = frozenset((_GOV_DOC, (_PKG_ROOT / "scripts" / "check_scope.py").resolve()))
+
 PATTERNS = [
     re.compile(r"PP\s*41034380"),                                # 具体 PMID
     re.compile(r"\.pre-[A-Za-z0-9_-]+"),                          # 特定事故的 backup 命名
-    re.compile(r"1094\b"),                                        # commit hash 片段
+    re.compile(r"1094(?![0-9A-Za-z])"),                                        # commit hash 片段
     re.compile(r"20\.58%"),                                      # 事故具体错误值
-    re.compile(r"0\.2058\b"),                                    # 事故具体错误值（裸数字）
+    re.compile(r"0\.2058(?![0-9A-Za-z])"),                                    # 事故具体错误值（裸数字）
     re.compile(r"\[39,40\]|\[40,39\]"),                          # 事故草稿引用号冲突
     re.compile(r"v6\.6\s*草稿"),                                 # 事故草稿状态
     re.compile(r"d211094"),                                      # 事故 commit
@@ -69,7 +75,7 @@ def check_file(p: Path) -> list:
         # R4.7（盲检 B🟠2）：原用 `str(p)` 子串匹配 → 目录名
         # `GOVERNANCE_BOUNDARIES.md_evil/evil.md` 也命中豁免，事故的标题叙事
         # 再次被放行。改为文件名精确相等（治理正本只有一个）。
-        is_governance_doc = p.name == "GOVERNANCE_BOUNDARIES.md"
+        is_governance_doc = p.resolve() == _GOV_DOC
         for pat in PATTERNS:
             m = pat.search(line)
             if not m:
@@ -98,10 +104,9 @@ def main() -> int:
     # R4.7（盲检 B🟠2）：原用 `x in str(t)` 子串匹配 → 任何路径里含
     # `GOVERNANCE_BOUNDARIES.md` 字样的目录（如 ..._evil/）整目录被跳过，
     # 标题叙事二次绕过。改为文件名精确相等 + 路径段精确相等。
-    EXCLUDE_NAMES = frozenset(("check_scope.py", "GOVERNANCE_BOUNDARIES.md"))
     total = 0
     for t in targets:
-        if t.name in EXCLUDE_NAMES or ".learnings" in t.parts:
+        if t.resolve() in _SELF_EXEMPT or ".learnings" in t.parts:
             continue
         hits = check_file(t)
         if hits:

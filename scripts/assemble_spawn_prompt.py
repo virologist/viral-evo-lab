@@ -189,12 +189,13 @@ def _detect_team_version(expert_dir: Path) -> str | None:
 
 # V1 关键数字模式（B5 2026-11-07：与 verify_numbers.py PATTERNS 逐条同源——
 # dprime 统一为 D[′'] 单引号/双 prime 二选一口径；修改任一侧须同步另一侧）
+# R4.8：与 verify_numbers.PATTERNS 逐条同源（大小写不敏感 / [=:] / CI 可选分隔符）
 _V1_PATTERNS = [
     ("pct",    re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")),
-    ("n_eq",   re.compile(r"\bn\s*=\s*(\d{2,6})\b", re.I)),
-    ("p_val",  re.compile(r"\bp\s*=\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)", re.I)),
-    ("dprime", re.compile(r"D[′']\s*=\s*([+-]?\d\.\d+)")),
-    ("ci",     re.compile(r"CI\s*[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]")),
+    ("n_eq",   re.compile(r"(?<![A-Za-z])n\s*[=:]\s*(\d{2,6})(?![A-Za-z])", re.I)),
+    ("p_val",  re.compile(r"(?<![A-Za-z])p\s*[=:]\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z])", re.I)),
+    ("dprime", re.compile(r"[dD][′']\s*[=:]\s*([+-]?\d\.\d+)")),
+    ("ci",     re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]", re.I)),
 ]
 _V1_EXCLUDE_YEAR = re.compile(r"^20\d{2}$")  # C6（2026-11-07）：与 verify_numbers.py YEAR 同步，2030+ 不再失效
 _V1_EXCLUDE_VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")

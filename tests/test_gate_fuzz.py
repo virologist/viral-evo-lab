@@ -1112,6 +1112,46 @@ def test_require_tag_gate() -> None:
                                 capture_output=True, text=True, timeout=60).returncode
             assert rc in (0, 5), f"合法对照 {label} 不得 fail-close 误拒为 3，实为 {rc}"
 
+        # R4.8（盲检 A🔴1）：守卫层与提取层各写正则导致口径漂移——11 个声明
+        # 变体（小写 d/ci、CI 冒号/等号、p 冒号、西里尔同形字）原全 PASS。
+        # 提取 PATTERNS 统一大小写/[=:]/CI 可选分隔符，守卫 full_re 复用同一对象。
+        for label, payload in (
+                ("小写d", "结果 d'=0.94（伪造）\n"),
+                ("大写D", "结果 D'=0.94（伪造）\n"),
+                ("prime符", "结果 d′=0.94（伪造）\n"),
+                ("小写ci", "结果 ci [0.10, 0.20]（伪造）\n"),
+                ("CI冒号", "结果 CI: [0.10, 0.20]（伪造）\n"),
+                ("CI等号", "结果 CI = [0.10, 0.20]（伪造）\n"),
+                ("p冒号", "结果 p: 0.94（伪造）\n"),
+                ("西里尔CI", "结果 СІ [0.10, 0.20]（伪造）\n"),
+                ("西里尔p", "结果 р: 0.94（伪造）\n")):
+            f_v = d / f"r48_{label}.md"
+            f_v.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_v), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 5, f"{label} 须提取后判未溯源 EXIT=5（不得 PASS），实为 {rc}"
+        # 顿号并列的小 n 声明是合法中文句，不得被 B5 修复误伤为 EXIT=3
+        f_dun = d / "r48_dunhao.md"
+        f_dun.write_text("样本量 n = 5、p = 0.111\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_dun), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc in (0, 5), f"顿号并列合法声明不得 fail-close 误拒，实为 {rc}"
+
+        # R4.8（盲检 B🔴2）：冒号声明的隔断检测须与提取/小 n 判定同口径。
+        # KEY_MARKERS 原只认 '='，n: 1 2 3 零提取 → checked=0 → PASS。
+        f_colon = d / "r48_colon_split.md"
+        f_colon.write_text("样本 n: 1 2 3\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_colon), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"冒号空白拆段须 fail-closed EXIT=3，实为 {rc}"
+        # R4.8（盲检 B🟠3）：CSV 字段分隔符逗号不得当数字延续，否则 p,0.111
+        # 中的合法字段值无法溯源（fail-close 误拒）。
+        f_csv = d / "r48_csv_field.md"
+        f_csv.write_text("结果 p = 0.111 与权威一致\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(vn), str(f_csv), "--sources", str(d / "s2")],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 0, f"CSV 字段值须正常溯源 EXIT=0，实为 {rc}"
+
         # R4.3（盲检🟠4）：数字 grep 原为子串匹配——p=0.94 被权威源里的 0.9441
         # 洗白（假阳性 PASS）、p=0.98 被 10.980 洗白。改 token 边界匹配后，
         # 两者都必须判未溯源 EXIT=5。
@@ -1567,12 +1607,13 @@ def test_decision_records_guard() -> None:
         rc = subprocess.run([sys.executable, str(cs), str(hidden)],
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 3, f"md 标题隐藏事故数字须 EXIT=3，实为 {rc}"
-        # 对照：治理正本自描述黑名单词仍豁免
+        # R4.8（盲检 A🟠2/B🟠4）：治理正本豁免改为包内规范路径精确匹配。
+        # 任意副本目录的同名文件不得借 basename 骗取豁免（须 EXIT=3）。
         gov = root / "GOVERNANCE_BOUNDARIES.md"
         gov.write_text("# 黑名单词说明：PP 41034380 是事故编号\n", encoding="utf-8")
         rc = subprocess.run([sys.executable, str(cs), str(gov)],
                             capture_output=True, text=True, timeout=60).returncode
-        assert rc == 0, f"治理正本自描述须豁免，实为 {rc}"
+        assert rc == 3, f"副本同名治理文件不得豁免，实为 {rc}"
 
         # ③ hypothesis_watch：closed fatal 空日期 / 尾空格 severity 均须进 REVIEW_REQUIRED
         hw = PKG / "scripts" / "hypothesis_watch.py"
@@ -1659,6 +1700,30 @@ def test_decision_records_guard() -> None:
         p = subprocess.run([sys.executable, str(PKG / "scripts" / "check_scope.py"), str(evil_md)],
                            capture_output=True, text=True, timeout=60)
         assert p.returncode == 3, f"伪治理目录的标题叙事不得豁免（须 EXIT=3），实为 {p.returncode}"
+
+        # ⑨ R4.8（盲检 A🔴2）：>4300 位整数使 json.loads 抛 ValueError（非
+        # JSONDecodeError），原 except 漏捕获 → 契约外 EXIT=1 且报告不落盘。
+        big = "9" * 5000
+        (root / "spawn_manifest.jsonl").write_text(
+            '{"event":"evidence_check","actor":"lead","value":%s}\n' % big, encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(PKG / "scripts" / "verify_evidence_check.py"),
+                             str(root)], capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"超大整数 JSON 须结构失败 EXIT=3（不得契约外 1），实为 {rc}"
+        rc = subprocess.run([sys.executable, str(script), "--records",
+                             str(root / "spawn_manifest.jsonl"), "--pkg-root", str(root)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"decision_records 超大整数须 EXIT=3，实为 {rc}"
+        # ⑩ R4.8（盲检 A🔴3）：check_scope 的 \b 在 CJK 紧邻处不成立，
+        # 具体事故值「1094号」「0.2058的」须照常命中 EXIT=3。
+        scope_cjk = root / "scope_cjk.md"
+        scope_cjk.write_text("事故编号1094号与错误值0.2058的复盘。\n", encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(cs), str(scope_cjk)],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"CJK 紧邻事故值须命中 EXIT=3，实为 {rc}"
+        # ⑪ R4.8（盲检 A🟠1）：cron_watch 参数缺值不得在 set -u 下 unbound EXIT=1。
+        rc = subprocess.run(["bash", str(PKG / "scripts" / "cron_watch.sh"), "--run-dir"],
+                            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"cron 参数缺值须参数错误 EXIT=3，实为 {rc}"
 
 
 def test_g6_evidence_gate() -> None:

@@ -82,7 +82,7 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
 
     try:
         obj = json.loads(_read_text(records_path))
-    except (OSError, UnicodeError, json.JSONDecodeError) as e:
+    except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as e:
         rep["structural_errors"].append(
             f"裁决文件不可读或非合法 JSON: {type(e).__name__}: {e}")
         rep["verdict"] = "RECORDS_UNREADABLE"

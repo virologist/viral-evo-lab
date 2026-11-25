@@ -52,12 +52,16 @@ from _text_guard import (read_text_checked, has_split_number,  # noqa: E402
 # （CJK 属 \w），导致声明被静默漏掉 → checked=0 → PASS。改用「左侧非 ASCII 字母」
 # 判据：CJK/数字紧邻放行提取，ASCII 单词（如 exp=0.8）仍不误抓成 p 值。
 # 配合 NFKC 归一化（消费侧 main 中），全角/圈号/上标等价形态一并收敛。
+# R4.8（盲检 A🔴1）：守卫层与提取层原各写一套正则（大小写 / 分隔符 / 冒号），
+# 11 个声明变体（d'= / ci / CI: / p: / 西里尔 СІ 等）在守卫层判「声明合法」、
+# 提取层却零命中 → checked=0 → PASS。根治：提取 PATTERNS 统一大小写不敏感、
+# 分隔符 [=:]、CI 可选分隔符，且下方 _DECL_SPEC 的 full_re **直接复用同一对象**。
 PATTERNS = [
     ("pct",   re.compile(r"(\d{1,3}(?:\.\d+)?)\s*%")),
-    ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*=\s*(\d{2,6})(?![A-Za-z])", re.I)),
-    ("p_val", re.compile(r"(?<![A-Za-z])p\s*=\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z])", re.I)),
-    ("dprime",re.compile(r"D[′']\s*=\s*([+-]?\d\.\d+)")),
-    ("ci",    re.compile(r"CI\s*[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]")),
+    ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*[=:]\s*(\d{2,6})(?![A-Za-z])", re.I)),
+    ("p_val", re.compile(r"(?<![A-Za-z])p\s*[=:]\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z])", re.I)),
+    ("dprime",re.compile(r"[dD][′']\s*[=:]\s*([+-]?\d\.\d+)")),
+    ("ci",    re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]\s*([+-]?\d\.\d+)\s*,\s*([+-]?\d\.\d+)\s*[\]）)]", re.I)),
 ]
 # 排除：年份 / 版本号（须带 v 前缀或多级 x.y.z，纯小数如 0.9441 不是版本）/ 纯小数序号
 # C6（2026-11-07）：年份 ^20[0-2]\d$ → ^20\d{2}$（原实现 2030+ 失效）
@@ -74,7 +78,7 @@ VERSION = re.compile(r"^[vV]\d+(\.\d+){1,2}$|^\d+\.\d+\.\d+$")
 # 与 PATTERNS 的 (?<![A-Za-z]) 口径漂移 → CJK 紧邻的空白拆段绕过隔断检测。
 # 统一为「仅禁 ASCII 字母紧邻」，与 PATTERNS / DECL_HINT 同口径。
 KEY_MARKERS = re.compile(
-    r"(?:(?<![A-Za-z])n\s*=|(?<![A-Za-z])p\s*=|D[′']\s*=|CI\s*[\[（(])", re.I)
+    r"(?:(?<![A-Za-z])n\s*[=:]|(?<![A-Za-z])p\s*[=:]|D[′']\s*[=:]|CI\s*(?:[=:]\s*)?[\[（(])", re.I)
 
 
 def has_broken_key_pattern(text: str) -> bool:
@@ -111,7 +115,8 @@ def has_broken_key_pattern(text: str) -> bool:
 # 合法对照不误伤：纯文字（无声明）、n = 5（min_digits 有意跳过的小 n，
 # 但声明存在——需在调用侧按 checked==0 且无其它声明时才放行，见 main）。
 DECL_HINT = re.compile(
-    r"(?:[np]\s*[=＝]|[dD][′']\s*=|CI\s*[\[（(［]|(?:\d{1,3}(?:\.\d+)?)\s*[%％])",
+    r"(?:[np]\s*[=:＝]|[dD][′']\s*[=:]|CI\s*(?:[=:]\s*)?[\[（(［]|"
+    r"(?:\d{1,3}(?:\.\d+)?)\s*[%％])",
     re.I)
 # 合法的小 n 声明（n = 5）——min_digits=2 有意跳过的 1 位样本量。此类声明后
 # 紧跟**单个 ASCII 数字**，数字是可解析的，只是低于阈值，不是正则失配。
@@ -120,7 +125,7 @@ DECL_HINT = re.compile(
 # 顿号/逗号后仍接数字（`n = 5、94`）属列表隔断，不得豁免；但中文/英文
 # 逗号后接字母声明（`n = 5，p = 0.111`）是合法多声明句，须豁免。
 _SMALL_N_DECL = re.compile(
-    r"(?<![A-Za-z])n\s*=\s*\d(?=\s|$|[。）\]]|[,，](?=\s*[a-zA-Z]))", re.I)
+    r"(?<![A-Za-z])n\s*[=:]\s*\d(?=\s|$|[。）\]]|[,，、](?=\s*[a-zA-Z]))", re.I)
 
 # R4.7（盲检 B🔴1/B🔴5）：原总闸只看「nums 是否全空」→ 诱饵声明（n = 30
 # 在权威源中）可洗白同段另一条静默失配的声明（p = 0,94 / D’=0.94）；
@@ -128,17 +133,13 @@ _SMALL_N_DECL = re.compile(
 # 根治：改为**逐声明判定**——每个声明标记都须有可解析的对应数字形态，
 # 否则 fail-closed。小 n 豁免收紧为「单数字后只接空白/句末/句号/右括号」，
 # 顿号/逗号后仍接数字即视为列表隔断，不得豁免。
+_PAT_BY_KIND = {kind: pat for kind, pat in PATTERNS}
 _DECL_SPEC = (
-    ("n", re.compile(r"(?<![A-Za-z])n\s*=", re.I),
-     re.compile(r"(?<![A-Za-z])n\s*=\s*\d{2,6}(?![A-Za-z])", re.I)),
-    ("p", re.compile(r"(?<![A-Za-z])p\s*=", re.I),
-     re.compile(r"(?<![A-Za-z])p\s*=\s*(?:0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z])", re.I)),
-    ("dprime", re.compile(r"[dD][′']\s*="),
-     re.compile(r"[dD][′']\s*=\s*[+-]?\d\.\d+")),
-    ("ci", re.compile(r"CI\s*[\[（(]", re.I),
-     re.compile(r"CI\s*[\[（(]\s*[+-]?\d\.\d+\s*,\s*[+-]?\d\.\d+\s*[\]）)]", re.I)),
-    ("pct", re.compile(r"\d{1,3}(?:\.\d+)?\s*[%％]"),
-     re.compile(r"\d{1,3}(?:\.\d+)?\s*[%％]")),
+    ("n", re.compile(r"(?<![A-Za-z])n\s*[=:]", re.I), _PAT_BY_KIND["n_eq"]),
+    ("p", re.compile(r"(?<![A-Za-z])p\s*[=:]", re.I), _PAT_BY_KIND["p_val"]),
+    ("dprime", re.compile(r"[dD][′']\s*[=:]"), _PAT_BY_KIND["dprime"]),
+    ("ci", re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]", re.I), _PAT_BY_KIND["ci"]),
+    ("pct", re.compile(r"\d{1,3}(?:\.\d+)?\s*%"), _PAT_BY_KIND["pct"]),
 )
 
 
@@ -239,7 +240,7 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # R4.7（盲检 B🔴3）：逗号亦为数字延续符（欧洲小数 0,94 / 千分位 1,234），
     # 原边界只禁 \d 与 . → 产出 `n = 94` 被权威池 `0,94` 洗白 → PASS。
     # 边界统一为「前后不得紧邻数字 / . / ,」。
-    pat = re.compile(r"(?<![\d.,])" + re.escape(cand) + r"(?![\d.,])")
+    pat = re.compile(r"(?<![\d.])(?<![0-9],)" + re.escape(cand) + r"(?![\d.])(?!,[0-9])")
     return pat.search(pool) is not None
 
 

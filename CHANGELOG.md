@@ -4,6 +4,27 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.27] - 2026-11-25（R4.8 v1.5.26 双路盲检回补 · 口径漂移二次收敛 + 契约外崩溃封堵）
+
+v1.5.26 冻结前双路盲检：A=3🔴+4🟠、B=2🔴+2🟠。主代理**逐条独立复现**（含 B 用 `git show 37a3990` 钉纯净基线复核），确认 A3🔴 + B 残留 1🔴（B🔴1 小写 d'/ci 与 A🔴1 同源已并修）全部坐实，零证伪。核心根因仍是**同一语义在多处各写正则导致口径漂移**（这次是 v1.5.26 新引入的 `_DECL_SPEC` 与 `PATTERNS`、`KEY_MARKERS` 之间）。
+
+### Fixed（🔴，全部主代理独立复现后修复）
+- **A🔴1 守卫/提取正则口径漂移**：`d'=0.94`（小写 d）、`ci [0.10,0.20]`（小写）、`CI: [...]`、`p: 0.94`、西里尔 `СІ [...]` 共 11 变体 → `checked=0/PASS`（大写 `D'=0.94` 正确 EXIT=5）。根因：`_DECL_SPEC.full_re` 大小写不敏感 `[dD]`、`PATTERNS.dprime` 仅大写 `D`；`ci` 一侧 `re.I` 一侧无。根治：`PATTERNS` 统一 `[dD]`/大小写不敏感/分隔符 `[=:]`/CI 可选分隔符，`_DECL_SPEC.full_re` **直接复用 `_PAT_BY_KIND` 同一对象**（单一事实源，杜绝双份正则漂移）；`_text_guard._EQUIV_TRANS` 补西里尔同形字映射（С/І/р 等）。
+- **A🔴2 超大整数 JSON → 契约外 EXIT=1**：>4300 位整数使 `json.loads` 抛 `ValueError`（非 `JSONDecodeError` 子类），5 处 except 漏捕获；且 `e.msg` 在普通 `ValueError` 上不存在引发二次 `AttributeError`。修复：`verify_evidence_check` / `check_gates` / `hypothesis_watch` / `poll_run_dir` / `check_decision_records` / `reconcile_decisions` 六处捕获面扩至 `(json.JSONDecodeError, ValueError)`，错误文案统一 `str(e)` → 统一 EXIT=3 结构失败，`gates.json` 正常落盘。
+- **A🔴3 check_scope `\b` CJK 漂移**：`事故编号1094号与错误值0.2058的复盘` → clean(0)（`1094\b`、`0\.2058\b` 在 CJK 紧邻处不成立）。改为 `(?![0-9A-Za-z])`，v1.5.26 在 `verify_numbers` 的同类修复同步到 `check_scope`。
+- **B🔴2（R4.8 后残留）冒号声明隔断漂移**：`n: 1 2 3` → `checked=0/PASS`（等号形式正确 EXIT=3）。根因：`KEY_MARKERS` 仍只认 `=`，而 `_DECL_SPEC`/`_SMALL_N_DECL` 已支持 `:`。`KEY_MARKERS` 同步 `[=:]`，与提取/小 n 判定第三处口径对齐。
+
+### Fixed（🟠）
+- **B🟠3 逗号边界过严 fail-close**：v1.5.26 把 pool 边界一律扩到 `[\d.,]`，把 CSV 字段分隔符逗号当数字延续 → `metric,value\np,0.11` 中合法 `p = 0.11` 被误降级 EXIT=5。改为「仅当前后**紧邻数字**的逗号才视为延续」：`(?<![\d.])(?<![0-9],)…(?![\d.])(?!,[0-9])`；欧洲小数 `0,94` 洗白、千分位 `1,234` 洗白、`0.9441` 子串洗白全部保持拦截，`p,0.11` / `v,0.11,` 正常溯源。
+- **A🟠1 cron 参数缺值**：`bash cron_watch.sh --run-dir` 在 `set -u` 下 `$2` unbound → EXIT=1（契约 3）。参数分支先判 `$# >= 2`，缺值统一 EXIT=3。
+- **A🟠2 check_scope 同名文件豁免**：治理正本豁免从 basename 相等改为包内规范路径精确匹配 `_GOV_DOC`，任意目录同名 `GOVERNANCE_BOUNDARIES.md`/`check_scope.py` 不再骗取豁免。
+- **A🟠3 V1 装配口径**：`assemble_spawn_prompt._V1_PATTERNS` 与 `verify_numbers.PATTERNS` 逐条同源（大小写/[=:]/CI 可选分隔符），CJK 紧邻 `实验p=0.8` 正常告警。
+
+### Verified
+- 全部🔴/🟠主代理独立复现（复现 → 修复 → 反向对照三态），变异测试确认 CSV 字段/冒号隔断两项新断言均非空转（回退修复即断言失败，真包通过）。
+- 回归断言全部复用既有 `test_require_tag_gate()` / `test_decision_records_guard()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件 `--check` EXIT=0 / pytest 19 passed（含 `-W error`）/ fuzz 61/61 / 守卫 11/11 / py_compile 全过 / 四处 version 一致。
+
 ## [1.5.26] - 2026-11-24（R4.7 双路盲检再回补 · 声明总闸逐条化 + 边界/字形/消费口径统一）
 
 v1.5.25 基础上重启两路独立盲检：A=1🔴+2🟠、B=5🔴+3🟠（部分交叉印证）。主代理**逐条独立复现**后确认 6🔴 全部坐实，证伪 0 项；3🟠 中 2 项随根因修复自动闭合，1 项（`check_scope` 路径子串豁免）单独修复。
