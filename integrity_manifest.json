@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-25T22:14:59",
+ "generated": "2026-11-25T22:42:52",
  "file_count": 80,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "1946d2e0f3e71abc",
+   "sha16": "7b7e6069dcc84b30",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "91e9ee0e96e7e886",
+   "sha16": "4a266f11387dee14",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "8950fef17d938893",
+   "sha16": "4b1d555fe1586e9f",
    "bytes": 6722
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "39e5d0866a45ca3b",
-   "bytes": 100304
+   "sha16": "5b0e73ee85f843fe",
+   "bytes": 103656
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
@@ -163,12 +163,12 @@
    "bytes": 6211
   },
   "scripts/_text_guard.py": {
-   "sha16": "b5a6db9c63c2e924",
-   "bytes": 9764
+   "sha16": "ca610886c92e8e6f",
+   "bytes": 10191
   },
   "scripts/assemble_spawn_prompt.py": {
-   "sha16": "10ff740e16aa9583",
-   "bytes": 44140
+   "sha16": "5a393bffb87ce07d",
+   "bytes": 44775
   },
   "scripts/audit_decision_log.py": {
    "sha16": "8a52b91e7add991b",
@@ -191,8 +191,8 @@
    "bytes": 7680
   },
   "scripts/cron_watch.sh": {
-   "sha16": "8f175285cf04c314",
-   "bytes": 7794
+   "sha16": "e916ea3dd6c97794",
+   "bytes": 7939
   },
   "scripts/find_knowledge.py": {
    "sha16": "180c06ee5265e0c7",
@@ -207,8 +207,8 @@
    "bytes": 6361
   },
   "scripts/hypothesis_watch.py": {
-   "sha16": "46b9a8b23afc009a",
-   "bytes": 20591
+   "sha16": "c792c8ebdcc88677",
+   "bytes": 21205
   },
   "scripts/install_cron_watch.sh": {
    "sha16": "2ad7aad9a46c4895",
@@ -243,8 +243,8 @@
    "bytes": 10843
   },
   "scripts/verify_numbers.py": {
-   "sha16": "b692058b17006f01",
-   "bytes": 20674
+   "sha16": "a03acd814f630fed",
+   "bytes": 21650
   },
   "scripts/write_checklist.py": {
    "sha16": "c78c56df37da400c",
@@ -307,8 +307,8 @@
    "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "7865f89c7e6c4528",
-   "bytes": 134808
+   "sha16": "aba6ac2ddd2c27e5",
+   "bytes": 139080
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

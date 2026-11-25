@@ -266,7 +266,17 @@ def _auto_verify_payload(expert_dir: Path, payload: str, research_ops: str) -> d
                                     "value": f"<{why_p}:V1正则会失配>"}],
                     "warning_text": None, "skipped": False}
     else:
+        # 降级路径：模块加载失败时仍须本地守卫——含数字声明却零提取 = 正则失配，
+        # 写哨兵告警而非静默 PASS（与 prepare_numbers 单一入口同语义）。
         nums = _v1_extract(payload)
+        if not nums:
+            import re as _re
+            hint = _re.search(r"(?<![A-Za-z])[np]\s*[=:]|D[′']\s*[=:]|CI\s*[\[（(]|\d{1,3}\s*%",
+                              payload, _re.I)
+            if hint:
+                return {"unverified": [{"kind": "split_number",
+                                        "value": "<V1降级:声明零提取>"}],
+                        "warning_text": None, "skipped": False}
     # prepare_numbers 返回 (kind, value, norm) 三元组；下游按 (kind, value) 消费
     nums = [(item[0], item[1]) for item in nums]
     if not nums:

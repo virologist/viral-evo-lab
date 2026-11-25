@@ -58,10 +58,10 @@ from _text_guard import (read_text_checked, has_split_number,  # noqa: E402
 # 分隔符 [=:]、CI 可选分隔符，且下方 _DECL_SPEC 的 full_re **直接复用同一对象**。
 PATTERNS = [
     ("pct",   re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d+)?)\s*%")),
-    ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*[=:]\s*(\d{2,6})(?![A-Za-z\d.])", re.I)),
+    ("n_eq",  re.compile(r"(?<![A-Za-z])n\s*[=:]\s*(\d{1,3}(?:,\d{3})+|\d{2,6})(?![A-Za-z\d.])", re.I)),
     ("p_val", re.compile(r"(?<![A-Za-z])p\s*[=:]\s*(0\.\d+|\d\.\d+e-?\d+|\d\.\d+)(?![A-Za-z\d.])", re.I)),
-    ("dprime",re.compile(r"[dD][′']\s*[=:]\s*([+-]?\d{1,3}\.\d+)")),
-    ("ci",    re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]\s*([+-]?\d{1,3}\.\d+)\s*,\s*([+-]?\d{1,3}\.\d+)\s*[\]）)]", re.I)),
+    ("dprime",re.compile(r"[dD][′']\s*[=:]\s*([+-]?\d{1,3}(?:\.\d+)?)")),
+    ("ci",    re.compile(r"CI\s*(?:[=:]\s*)?[\[（(]\s*([+-]?\d{1,3}(?:\.\d+)?)\s*,\s*([+-]?\d{1,3}(?:\.\d+)?)\s*[\]）)]", re.I)),
 ]
 # 排除：年份 / 版本号（须带 v 前缀或多级 x.y.z，纯小数如 0.9441 不是版本）/ 纯小数序号
 # C6（2026-11-07）：年份 ^20[0-2]\d$ → ^20\d{2}$（原实现 2030+ 失效）
@@ -85,13 +85,20 @@ KEY_MARKERS = re.compile(
 # has_forbidden 放行（span 左右非数字）、KEY_MARKERS 漏检 → 声明隐身 → PASS。
 # 判据：关键标记后紧跟 Cf/Mn 不可见字符再接 =/: → 视为声明被隔断，fail-closed。
 _MARKER_GAP = re.compile(
-    r"(?<![A-Za-z])[npDdCI]\s*[\u200b-\u200f\u2060\ufeff\u200c\u200d\uFE0F\u0300-\u036F]{1,8}\s*[=:]",
+    r"(?<![A-Za-z])[npDdCI]\s*[\u200b-\u200f\u2060-\u206f\ufeff\u200c\u200d\uFE0F\u0300-\u036F\u20d0-\u20ff]{1,}\s*[=:]",
+    re.I)
+
+
+# B🔴1：CI 后直接接括号（CI\u200d[0.1,0.2]）不经过 =/:，单列判据
+_MARKER_GAP_CI = re.compile(
+    r"(?<![A-Za-z])CI[\u200b-\u200f\u2060-\u206f\ufeff\u200c\u200d\uFE0F\u0300-\u036F\u20d0-\u20ff]{1,}\s*[\[（(]",
     re.I)
 
 
 def has_invisible_marker_gap(text: str) -> bool:
     """声明标记与 =/: 之间夹不可见格式符 → 正则会静默失配，须 fail-closed。"""
-    return _MARKER_GAP.search(text) is not None
+    return (_MARKER_GAP.search(text) is not None
+            or _MARKER_GAP_CI.search(text) is not None)
 
 
 def has_broken_key_pattern(text: str) -> bool:
@@ -138,7 +145,7 @@ DECL_HINT = re.compile(
 # 顿号/逗号后仍接数字（`n = 5、94`）属列表隔断，不得豁免；但中文/英文
 # 逗号后接字母声明（`n = 5，p = 0.111`）是合法多声明句，须豁免。
 _SMALL_N_DECL = re.compile(
-    r"(?<![A-Za-z])n\s*[=:]\s*\d(?=\s|$|[。）\]]|[,，、](?=\s*[a-zA-Z]))", re.I)
+    r"(?<![A-Za-z])n\s*[=:]\s*\d(?=\s|$|[。；;）\]]|[,，、](?=\s*[^0-9\s，,、；;]))", re.I)
 
 # R4.7（盲检 B🔴1/B🔴5）：原总闸只看「nums 是否全空」→ 诱饵声明（n = 30
 # 在权威源中）可洗白同段另一条静默失配的声明（p = 0,94 / D’=0.94）；
@@ -191,6 +198,11 @@ def prepare_numbers(text: str, min_digits: int = 2):
     if has_invisible_marker_gap(text):
         return False, [], "声明标记被不可见字符隔断"
     norm = normalize_for_extraction(text)
+    # R4.12（盲检 A🔴2）：数字+中文句号+数字（含 NFKC(｡)→。）是小数点变体，
+    # 定点检测（不动句尾句号），否则 30。5 被提取为 30 被池中 30 洗白。
+    # 必须在 norm 生成后同时查原始 text 与归一化 norm（｡ NFKC→。）。
+    if re.search(r"\d[。]\d", text) or re.search(r"\d[。]\d", norm):
+        return False, [], "数字被句号型小数点隔断"
     # 归一化后再查一次劈开（全角→ASCII 后可能出现新的相邻数字-符号结构）
     if has_split_number(norm) or has_broken_key_pattern(norm):
         return False, [], "归一化后数字被隔断"
@@ -216,7 +228,11 @@ def extract_numbers(text: str, min_digits: int):
                 if YEAR.match(v) or VERSION.match(v):
                     continue
                 # n= 太小（如 n=5）多为示意，跳过；min_digits 默认 2 位以上
-                if kind == "n_eq" and len(v.lstrip("0")) < min_digits:
+                if kind == "n_eq":
+                    v_norm = v.replace(",", "")  # R4.11: 千分位 1,234 → 1234
+                    if len(v_norm.lstrip("0")) < min_digits:
+                        continue
+                    out.append((kind, v_norm, v_norm))
                     continue
                 out.append((kind, v, v))
     # 去重
@@ -257,7 +273,7 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # 原边界只禁 \d 与 . → 产出 `n = 94` 被权威池 `0,94` 洗白 → PASS。
     # 边界统一为「前后不得紧邻数字 / . / ,」。
     pat = re.compile(((r"(?<![\d.])(?<![0-9],)" if "." not in cand else r"(?<![\d.])") +
-     re.escape(cand) + r"(?![\d.])(?!,[0-9](?!\.))"))
+     re.escape(cand) + r"(?![\d.])"))
     return pat.search(pool) is not None
 
 

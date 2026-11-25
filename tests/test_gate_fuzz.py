@@ -463,6 +463,20 @@ def test_disposition_gate() -> None:
         assert "Traceback" not in out, f"非 dict 假说条目不得抛未捕获异常: {out[-300:]}"
         assert rc in (0, 3, 5, 6), f"非 dict 假说条目退出码越界: {rc}"
 
+        # R4.12（盲检 A🔴1）：UTF-16BE 无 BOM 台账的 NUL 在 UTF-8 下是合法
+        # 字节，裸 open(utf-8-sig) 吞入后列名含 NUL → finding_id 取不到 →
+        # fatal 证伪被静默忽略（CLEAN/EXIT=0，fail-open）。须严格读 → EXIT=3。
+        hyp_p.write_text(json.dumps({
+            "last_updated": "2026-11-18T00:00:00+08:00",
+            "active_hypotheses": [{"id": "H-1", "status": "active", "claim": "c"}]}) + "\n",
+            encoding="utf-8")
+        led_p.write_bytes(
+            ("finding_id,severity,status,closed_date,finding_summary\n"
+             "F-R412,fatal,closed,2026-11-19T10:30:00+08:00,证伪\n").encode("utf-16-be"))
+        rc, out = run()
+        assert rc == 3, f"无 BOM UTF-16 台账须严格读 EXIT=3（不得 CLEAN 放行），实为 {rc}: {out[-200:]}"
+        assert "Traceback" not in out, f"UTF-16 台账不得抛未捕获异常: {out[-200:]}"
+
 
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
@@ -1041,8 +1055,11 @@ def test_require_tag_gate() -> None:
                 ("小数点空白拆", "p = 0 . 8，差异显著。\n", 3),
                 ("全角数字小数点", "p = ０．９４\n", 5),
                 ("逗号小数点", "p = 0,94\n", 3),
-                ("中点小数点", "p = 0·94\n", 3),
-                ("阿拉伯小数点", "p = ٠٫٩٤\n", 3),
+                # R4.12：中点/阿拉伯小数点 NFKC 不收敛，经 _EQUIV_TRANS 语义
+                # 等价映射为 ASCII '.' 后正确提取 0.94 → 权威源无 → EXIT=5
+                # （旧口径 rc=3 是隔断 fail-closed，现已精确化为「未溯源」）。
+                ("中点小数点", "p = 0·94\n", 5),
+                ("阿拉伯小数点", "p = ٠٫٩٤\n", 5),
                 ("连字符拆段", "n = 1-2-3\n", 3)):
             f_u = d / f"uni_{label}.md"
             f_u.write_text(payload, encoding="utf-8")
@@ -1058,6 +1075,27 @@ def test_require_tag_gate() -> None:
             rc = subprocess.run([sys.executable, str(vn), str(f_ok), "--sources", str(d / "s2")],
                                 capture_output=True, text=True, timeout=60).returncode
             assert rc == 0, f"{label} 不得 fail-close 误拒，实为 {rc}"
+
+        # R4.12（盲检 A🔴2 多语小数点 + 主代理对抗实证）：语义等价映射后正确
+        # 提取（未溯源 EXIT=5），句号型小数点定点 fail-closed（EXIT=3），
+        # 合法中文句号句读不得误拒（EXIT=0）。
+        for label, payload, want_rc in (
+                ("片假名中点", "p = 0･94\n", 5),
+                ("全角句点", "p = 0．94\n", 5),
+                ("阿拉伯千分位", "n = 1٬234\n", 5),
+                ("中文句号小数点", "n = 30。5\n", 3),
+                ("半角句点小数点", "n = 30｡5\n", 3),
+                # 合法句读：源池 s2 无 30 → 正常 EXIT=5（未溯源），但绝不可
+                # 被句号型定点检测误判为隔断 fail-close（EXIT=3）。
+                ("合法中文句号句读", "样本 n = 30。结果显示有效。\n", None)):
+            f_r = d / f"r412_{label}.md"
+            f_r.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_r), "--sources", str(d / "s2")],
+                                capture_output=True, text=True, timeout=60).returncode
+            if want_rc is None:
+                assert rc != 3, f"R4.12 {label} 不得 fail-close 误拒（EXIT=3），实为 {rc}"
+            else:
+                assert rc == want_rc, f"R4.12 {label} 须 EXIT={want_rc}，实为 {rc}"
 
         # R4.7（两路盲检 6🔴，全部主代理独立复现）：
         # A🔴 CJK 紧邻 n= 空白拆段（\b 边界漂移）；B1 诱饵数字短路声明总闸；
@@ -1736,6 +1774,32 @@ def test_decision_records_guard() -> None:
                            capture_output=True, text=True, timeout=60, env=env)
         assert "未溯源数字" in p.stdout + p.stderr, \
             "0.94 不得被 0.9441 子串洗白，须 V1 告警未溯源"
+
+        # R4.11（主代理自查）：V1 降级路径（verify_numbers 模块加载失败）不得
+        # 重新引入 fail-open——含声明却零提取仍须告警，合法文本不误报。
+        probe = root / "v1_degrade_probe.py"
+        probe.write_text(
+            "import importlib.util,sys\n"
+            "from pathlib import Path\n"
+            "spec=importlib.util.spec_from_file_location('asp',sys.argv[1])\n"
+            "m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)\n"
+            "m._load_verify_numbers=lambda: None\n"
+            "r=m._auto_verify_payload(Path('/tmp'),sys.argv[2],sys.argv[3])\n"
+            "print(len(r['unverified']))\n", encoding="utf-8")
+        v1src = root / "v1_degrade_src"
+        (v1src / "context_stack" / "outputs").mkdir(parents=True, exist_ok=True)
+        (v1src / "context_stack" / "outputs" / "auth.csv").write_text(
+            "n,30\np,0.05\n", encoding="utf-8")
+        for label, payload, want_alert in (("攻击", "p = 0,94", True),
+                                           ("合法", "样本 n = 30，p = 0.05", False)):
+            pr = subprocess.run([sys.executable, str(probe),
+                                 str(PKG / "scripts" / "assemble_spawn_prompt.py"),
+                                 payload, str(v1src)],
+                                capture_output=True, text=True, timeout=60)
+            assert pr.returncode == 0, f"V1 降级探针崩溃: {pr.stderr[-300:]}"
+            n_alert = int(pr.stdout.strip().splitlines()[-1])
+            assert (n_alert > 0) == want_alert, \
+                f"V1 降级{label}告警数={n_alert}，期望告警={want_alert}"
 
         # ⑦ R4.7 盲检 B🔴2：G2 必须与守卫同口径复用 prepare_numbers 的归一化结果。
         # 原第二循环用 extract_numbers(原始文本) → 全角 ｎ＝９９ 在守卫处通过、

@@ -293,8 +293,17 @@ def main() -> int:
     # 统一走 _row_str 归一化，避免 .lower() 抛 AttributeError。
     late_fatal = []
     try:
-        with led_p.open(encoding="utf-8-sig") as f:
-            rows = list(csv.DictReader(f))
+        # R4.12（盲检 A🔴1）：原裸 open(utf-8-sig) 会把 UTF-16BE 无 BOM 的
+        # NUL 字节当合法 UTF-8 吞入 → 列名含 NUL → finding_id 取不到 →
+        # fatal 证伪被静默忽略（CLEAN/EXIT=0，fail-open）。统一走严格读 +
+        # 控制字符检测（与 verify_numbers/vmo 同口径），污染即 EXIT=3。
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _text_guard import read_text_checked
+        ledger_text, why = read_text_checked(led_p)
+        if ledger_text is None:
+            print(f"❌ 台账读取失败: {why}", file=sys.stderr)
+            return 3
+        rows = list(csv.DictReader(ledger_text.splitlines()))
     except (OSError, csv.Error, UnicodeDecodeError) as e:
         # R3.1（2026-11-17 盲检回补）：非 UTF-8 台账此前 UnicodeDecodeError
         # traceback + EXIT=1，违反「证据源畸形 → EXIT=3」契约（CSV 路径漏网）。

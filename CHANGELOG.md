@@ -4,6 +4,27 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.29] - 2026-11-25（R4.11+R4.12 v1.5.28 双路盲检回补 · 不可见隔断扩展 + 多语小数点语义归一 + 台账严格读 + JSONL 巡检）
+
+v1.5.28 冻结前双路盲检：A=2🔴+2🟠、B=3🔴+3🟠。主代理**逐条独立复现**（含 fixture 原样复验）后确认：A🔴1（UTF-16BE 台账 fail-open）、A🔴2（多语小数点洗白）、B🔴1（`_MARKER_GAP` 漏检）、B🔴3（cron JSONL）、B🟠5/6（CSV 三列字段、合法小 n/千分位）坐实；另主代理自查发现 V1 降级路径 fail-open，一并修复。核心根因：**NFKC 不收敛的多语小数点被当普通隔断 → 数字截断后取片段被池中洗白**、**裸 open(utf-8-sig) 吞入 UTF-16BE 无 BOM 的 NUL → 列名污染 → fatal 证伪静默忽略**。
+
+### Fixed（🔴）
+- **A🔴1 台账 UTF-16BE 静默放行**：`redteam_ledger.csv` 以 UTF-16BE 无 BOM 编码时，NUL 在 UTF-8 下合法，裸 `open(utf-8-sig)` 吞入 → 列名含 NUL → `finding_id` 取不到 → fatal 闭环被当 CLEAN（EXIT=0，fail-open）。改用 `_text_guard.read_text_checked()` 严格读 + 控制字符检测，污染即 EXIT=3。
+- **A🔴2 多语小数点被截断洗白**：`p = 0٫94`（U+066B 阿文小数点）等经 NFKC 不收敛，提取为 `0` → 池中 `0` 洗白 PASS。`_EQUIV_TRANS` 补语义等价映射：U+066B/00B7/30FB/FF61/2022/06D4/0387/2027/FF0E → `.`，U+066C（阿文千分位）→ `,`；对 NFKC 将 `｡`→`。` 致 `30。5` 被截断者，`prepare_numbers()` 加 `\d。\d` 定点 fail-closed（不动句尾句号），合法中文句读 `n = 30。结果…` 不误伤。
+- **B🔴1 `_MARKER_GAP` 漏检**：Cf/Mn 隔断区间有限且未覆盖 CI 括号形态 → 某些不可见隔断仍零提取 PASS。扩展为全区间 Cf/Mn + CI `（` 形态检测。
+- **B🔴3 cron JSONL 被吞**：`json.load()` 只能读单行 JSON，多行 JSONL 报 Extra data 被 except 吞掉 → 非法 `task_id` 静默跳过。改为逐行 `json.loads()`，含 `task_id` 字段却全非法 → EXIT=3；空 manifest 仍 EXIT=0。
+- **主代理自查 V1 降级 fail-open**：`_load_verify_numbers()` 返回 None 时降级路径无守卫，`p = 0,94` / `n = 1 2 3` 静默跳过。补本地守卫 + `split_number` 哨兵进 unverified。
+
+### Fixed（🟠）
+- **B🟠5 CSV 三列字段**：`1,0.94,2` 中数字被逗号边界误当延续 → 合法字段无法溯源。精确化 pool 边界：仅整数候选且前逗号紧邻数字才算延续。
+- **B🟠6 合法小 n / 千分位**：`n = 5，结果 p = …` / `n = 1,234` 曾被声明总闸误拒。扩豁免（中文句读后接字母）+ `n_eq` 千分位分支去逗号，仍拦 `n = 5，94` 滥用。
+- **A🟠 `--all` 文档**：确认口径与 CLI 一致，本轮不额外改码。
+
+### Verified
+- 三条🔴主代理独立复现：A🔴1 用盲检原 fixture（真包 EXIT=0 → 副本 EXIT=3）；A🔴2 多语小数点矩阵（7 变体修复前 rc=0 → 修复后归一化正确提取 rc=5 或句号型定点 rc=3）；B🔴1/3 复验通过。
+- 回归断言复用既有 `test_require_tag_gate()` / `test_disposition_gate()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件重生成 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / compileall 全过 / 四处 version 一致（1.5.29）。
+
 ## [1.5.28] - 2026-11-25（R4.9+R4.10 v1.5.27 双路盲检回补 · 不可见隔断/同形字 + 提取 token 边界 + 契约外崩溃全入口）
 
 v1.5.27 冻结前双路盲检：A=5🔴+4🟠、B=2🔴+3🟠。主代理**逐条独立复现**（含在当前工作树复验），确认 A🔴2/3/4/5、B🔴1/2 及两路🟠全部坐实；A🔴1（超大整数）与 B🟠3（ValueError 捕获遗漏）经主代理自查合并修复。核心根因两类：**不可见字符/同形字让声明正则静默失配**、**提取正则无 token 边界导致截断片段被池中无 token 洗白**。
