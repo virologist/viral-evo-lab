@@ -47,8 +47,15 @@ EXIT_VIOLATION = 5
 # 形态锚：`add_argument("--require-tag", action="store_true"`（容忍空白与换行）
 RE_STORE_TRUE = re.compile(
     r"""add_argument\(\s*["']--require-tag["']\s*,\s*action=["']store_true["']""")
-# 任何把默认值翻成 True 的写法都算违反（容忍空白）
-RE_DEFAULT_TRUE = re.compile(r"""default\s*=\s*True""")
+# 任何把默认值翻成 True 的写法都算违反（容忍空白）。
+# R4.20（盲检 A🔴3）：`argparse.set_defaults(require_tag=True)` 与 default=True
+# 语义等价，却绕过了只认字面 `default=True` 的形态锚。补 set_defaults 的
+# 关键字与字典两种写法；固定真源仍是 ADR-001「三处 CLI 默认关闭」，不枚举
+# 具体调用形态之外的业务字段。
+RE_DEFAULT_TRUE = re.compile(
+    r"""default\s*=\s*True"""
+    r"""|set_defaults\s*\(\s*[^)]*require_tag\s*=\s*True"""
+    r"""|set_defaults\s*\(\s*[^)]*["']require_tag["']\s*:\s*True""")
 
 # 各 rule 的额外形态锚：(文件, 必须出现的子串元组)
 RULE_ANCHORS: dict[str, dict[str, tuple[str, ...]]] = {
@@ -105,7 +112,11 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
         rep["verdict"] = "RECORDS_UNREADABLE"
         return EXIT_STRUCT, rep
 
-    if not isinstance(obj, dict) or obj.get("schema_version") != 1:
+    # R4.20（盲检 A🟠10）：bool 是 int 子类，`True == 1` 使 schema_version:true
+    # 蒙混过关。契约要求整数 1，显式排除 bool。
+    _sv = obj.get("schema_version") if isinstance(obj, dict) else None
+    if (not isinstance(obj, dict) or not isinstance(_sv, int)
+            or isinstance(_sv, bool) or _sv != 1):
         rep["structural_errors"].append("schema_version 非 1 / 顶层非对象")
     recs = obj.get("records") if isinstance(obj, dict) else None
     if not isinstance(recs, list) or not recs:
@@ -145,6 +156,16 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
         if not isinstance(sites, list) or not sites:
             rep["structural_errors"].append(f"{rid}: cli_sites 缺失 / 为空")
             continue
+        # R4.20（盲检 B🔴3）：白名单只验「元素合法」，不验「覆盖完整」——
+        # 把已翻转的站点从 cli_sites 删掉即可完全跳过检查。ADR-001 固定
+        # 三处 CLI 为不可缩水的检查范围，不足即结构错误 EXIT=3。
+        if rule == "require_tag_default_off":
+            listed = {r for r in sites if isinstance(r, str)}
+            missing_sites = _SITE_WHITELIST[rule] - listed
+            if missing_sites:
+                rep["structural_errors"].append(
+                    f"{rid}: cli_sites 未覆盖 ADR-001 三处 CLI"
+                    f"（缺 {', '.join(sorted(missing_sites))}）——拒绝对固定站点缩水检查范围")
         for rel in sites:
             # R4.3（2026-11-20 · 盲检🔴4）：元素非字符串时 pkg_root / rel 抛
             # TypeError → EXIT=1（契约仅 0/3/5）。记结构错误并跳过该元素。

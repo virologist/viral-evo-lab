@@ -521,6 +521,44 @@ def test_disposition_gate() -> None:
             assert rc == 5, f"R4.19 severity {label} 同形须 REVIEW_REQUIRED EXIT=5，实为 {rc}"
 
 
+    # R4.20（盲检 A🔴5 / A🔴6）：ZWSP waiver 空口放行、核验记录写完后
+    # 再改写 artifact 的时序篡改，均须 G4 FAIL。
+    with tempfile.TemporaryDirectory(prefix="g4_r420_") as td:
+        d = Path(td)
+        (d / "T-FUZZ__phylo-analyst.md").write_text("n = 777\n", encoding="utf-8")
+        oc = {"artifact_mtimes": {}, "gate_mode": "block", "verdict": "DEGRADE",
+              "unverified": [{"member": "phylo-analyst", "kind": "n_eq", "value": "777"}]}
+        (d / "T-FUZZ__output-check.json").write_text(json.dumps(oc), encoding="utf-8")
+        (d / "T-FUZZ__waivers.json").write_text(json.dumps({"waivers": [
+            {"gate": "G2", "value": "777", "reason": "\u200b",
+             "authorized_by": "lead"}]}), encoding="utf-8")
+        (d / "T-FUZZ__checklist.json").write_text(json.dumps(PASS_CHECKLIST), encoding="utf-8")
+        cg = PKG / "scripts" / "check_gates.py"
+        r = subprocess.run([sys.executable, str(cg), str(d), "T-FUZZ"],
+                           capture_output=True, text=True)
+        assert r.returncode == 5, "R4.20 ZWSP waiver 不得放行 G2/G4"
+        # 合法明文理由对照：waiver 生效，整体可 PASS
+        (d / "T-FUZZ__waivers.json").write_text(json.dumps({"waivers": [
+            {"gate": "G2", "value": "777", "reason": "已核对权威源 URL",
+             "authorized_by": "lead"}]}), encoding="utf-8")
+        r = subprocess.run([sys.executable, str(cg), str(d), "T-FUZZ"],
+                           capture_output=True, text=True)
+        rep = json.loads((d / "T-FUZZ__gates.json").read_text(encoding="utf-8"))
+        g4 = next(g for g in rep["gates"] if str(g["gate"]).startswith("G4"))
+        assert g4["ok"] is True, "R4.20 明文理由 waiver 应解除 G4 阻断"
+        # 时序篡改：核验记录写完后 artifact 又被改（无指纹映射也须捕获）
+        (d / "T-FUZZ__waivers.json").write_text("null\n", encoding="utf-8")
+        (d / "T-FUZZ__output-check.json").write_text(
+            json.dumps({"artifact_mtimes": {}, "gate_mode": "block",
+                        "verdict": "PASS"}), encoding="utf-8")
+        (d / "T-FUZZ__phylo-analyst.md").write_text("n = 777\n改动\n", encoding="utf-8")
+        r = subprocess.run([sys.executable, str(cg), str(d), "T-FUZZ"],
+                           capture_output=True, text=True)
+        rep = json.loads((d / "T-FUZZ__gates.json").read_text(encoding="utf-8"))
+        g4 = next(g for g in rep["gates"] if str(g["gate"]).startswith("G4"))
+        assert g4["ok"] is False, "R4.20 核验后时序篡改须 G4 FAIL"
+
+
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
     不得静默丢弃偏移量。旧实现 dt.replace(tzinfo=None) 对 Z/+0000/-05:00 丢 8h，
@@ -1597,6 +1635,24 @@ def test_require_tag_gate() -> None:
                     f"R4.19 池 0.94{sep!r}5 不得洗白 p=0.94"
 
 
+    # R4.20（盲检 B🔴6 / A🟠8）：ASCII 隔断与池符号前缀 fail-closed，
+    # 合法 `p = 0.94` 不误伤。
+    with tempfile.TemporaryDirectory(prefix="vn_r420_") as td:
+        d = Path(td)
+        (d / "pool.csv").write_text("metric,value\nother,0.94\n", encoding="utf-8")
+        (d / "sym.csv").write_text("metric,value\nother,\u20ac0.94\n", encoding="utf-8")
+        vn = PKG / "scripts" / "verify_numbers.py"
+        for text, src, want in (("结果 pA=0.94\n", "pool.csv", 3),
+                                ("样本 nA=94\n", "pool.csv", 3),
+                                ("结果 p = 0.94\n", "pool.csv", 0),
+                                ("结果 p=0.94\n", "sym.csv", 5)):
+            (d / "a.md").write_text(text, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(d / "a.md"),
+                                 "--sources", str(d / src), "--json"],
+                                capture_output=True, text=True).returncode
+            assert rc == want, f"R4.20 vn {text!r}/{src} 须 EXIT={want}，实为 {rc}"
+
+
 def test_poll_hitlimit_and_manifest() -> None:
     """R-13a/c（2026-11-09）：撞限标注消费 + --from-manifest 行为级守卫。
 
@@ -1717,6 +1773,24 @@ def test_poll_hitlimit_and_manifest() -> None:
         rc, out = run("--from-manifest")
         assert rc == 0, \
             f"R4.19 spawn+evidence_check 混合清单须正常 READY，实为 rc={rc}: {out[-200:]}"
+
+
+    # R4.20（盲检 B🔴7）：type=spawn + 非字符串 member 不得被当非 spawn
+    # 事件静默跳过；合法清单仍 READY。
+    with tempfile.TemporaryDirectory(prefix="poll_r420_") as td:
+        d = Path(td)
+        (d / "T-X__literature-scout.md").write_text("产出\n", encoding="utf-8")
+        mf = d / "spawn_manifest.jsonl"
+        good = '{"task_id":"T-X","member":"literature-scout"}\n'
+        mf.write_text(good, encoding="utf-8")
+        poll = PKG / "scripts" / "poll_run_dir.py"
+        def prc():
+            return subprocess.run([sys.executable, str(poll), str(d), "T-X",
+                                   "--from-manifest"], capture_output=True, text=True).returncode
+        assert prc() == 0, "R4.20 合法 manifest 须 READY"
+        mf.write_text(good + '{"task_id":"T-X","type":"spawn",'
+                      '"member":["research-diagnostician"]}\n', encoding="utf-8")
+        assert prc() == 5, "R4.20 type=spawn 非字符串 member 须 EXIT=5"
 
 
 def test_legacy_package_check_fallback() -> None:
@@ -1921,6 +1995,60 @@ def test_baseline_anchor_roundtrip() -> None:
 
     assert all((PKG / r).read_bytes() == b for r, b in before.items()), \
         "对账脚本改动了包内文件（只读契约被破坏）"
+
+
+    # R4.20（盲检 A🔴3 / B🔴3 / A🟠10）：set_defaults 翻转、cli_sites
+    # 白名单内子集缩水、schema_version bool 均须 fail-closed。
+    with tempfile.TemporaryDirectory(prefix="drec_r420_") as td:
+        d = Path(td)
+        (d / "scripts").mkdir(); (d / "tests").mkdir()
+        base = json.loads((PKG / "docs" / "decision_records.json").read_text(encoding="utf-8"))
+        art = next(r for r in base["records"]
+                   if r["verification"]["rule"] == "require_tag_default_off")
+        base["records"] = [art]
+        pj = d / "records.json"
+        for name in ("check_gates.py", "verify_numbers.py", "verify_member_output.py"):
+            (d / "scripts" / name).write_text(
+                'ap.add_argument("--require-tag", action="store_true")\n', encoding="utf-8")
+        (d / "tests" / "anchors.py").write_text(
+            "# test_require_tag_gate\n# require_tag 闸三点接线存活\n", encoding="utf-8")
+        pj.write_text(json.dumps(base), encoding="utf-8")
+        drec = PKG / "scripts" / "check_decision_records.py"
+        def drc():
+            return subprocess.run([sys.executable, str(drec), "--pkg-root", str(d),
+                                   "--records", str(pj), "--json"],
+                                  capture_output=True, text=True).returncode
+        assert drc() == 0, "R4.20 未翻转裁决基线须 OK"
+        (d / "scripts" / "verify_numbers.py").write_text(
+            'ap.add_argument("--require-tag", action="store_true")\n'
+            'ap.set_defaults(require_tag=True)\n', encoding="utf-8")
+        assert drc() == 5, "R4.20 set_defaults(require_tag=True) 须 VIOLATION"
+        (d / "scripts" / "verify_numbers.py").write_text(
+            'ap.add_argument("--require-tag", action="store_true", default=True)\n',
+            encoding="utf-8")
+        art["verification"]["cli_sites"] = ["scripts/check_gates.py"]
+        pj.write_text(json.dumps(base), encoding="utf-8")
+        assert drc() == 3, "R4.20 cli_sites 子集须结构错误"
+        art["verification"]["cli_sites"] = ["scripts/check_gates.py",
+                                            "scripts/verify_numbers.py",
+                                            "scripts/verify_member_output.py"]
+        base["schema_version"] = True
+        pj.write_text(json.dumps(base), encoding="utf-8")
+        assert drc() == 3, "R4.20 schema_version true 须结构错误"
+
+
+    # R4.20（盲检 A🟠11）：删除锚 source 字段不得绕过 commit 溯源校验。
+    with tempfile.TemporaryDirectory(prefix="anchor_r420_") as td:
+        d = Path(td)
+        anchor = d / "anchors.json"
+        anchor.write_text(json.dumps({"schema_version": 1,
+                                      "files": {"scripts/_text_guard.py": {
+                                          "sha256": "0" * 64, "bytes": 1}}}), encoding="utf-8")
+        r = subprocess.run([sys.executable, str(PKG / "scripts" / "check_baseline_anchors.py"),
+                            "--anchors", str(anchor), "--json"], capture_output=True, text=True)
+        rep = json.loads(r.stdout)
+        assert r.returncode == 3 and rep["verdict"] == "ANCHOR_SOURCE_INVALID", \
+            f"R4.20 锚 source 缺失须结构错误，实为 rc={r.returncode} rep={rep}"
 
 
 def test_decision_records_guard() -> None:
@@ -2280,6 +2408,25 @@ def test_decision_records_guard() -> None:
             assert rc == 3, f"R4.19 数字紧凑投影须命中 EXIT=3: {text!r}"
 
 
+    # R4.20（盲检 A🔴4 / B🔴4）：U+2800 / 私用区视觉空白不得凑满 G6，
+    # R4.19 已修的 U+115F 与 Cf 须继续 fail-closed。
+    with tempfile.TemporaryDirectory(prefix="g6_r420_") as td:
+        d = Path(td)
+        mf = d / "spawn_manifest.jsonl"
+        def g6rc(ch):
+            mf.write_text("".join(
+                json.dumps({"event": "evidence_check", "actor": "lead", "task_id": "T-X",
+                            "reason": ch * 4,
+                            "value": {"file": "src.md", "line": i + 1,
+                                      "excerpt": ch * 6}}, ensure_ascii=False) + "\n"
+                for i in range(2)), encoding="utf-8")
+            return subprocess.run([sys.executable,
+                                   str(PKG / "scripts" / "verify_evidence_check.py"),
+                                   str(d), "--json"], capture_output=True, text=True).returncode
+        for ch in ("\u2800", "\ue000", "\u115f", "\u200b"):
+            assert g6rc(ch) == 5, f"R4.20 G6 视觉空白 {ch!r} 须 EXIT=5"
+
+
 def test_g6_evidence_gate() -> None:
     """ADR-002 / SOP T-D1：G6 从软门变成可触发硬门，且 SKIP 必须留痕。"""
     script = PKG / "scripts" / "verify_evidence_check.py"
@@ -2388,6 +2535,26 @@ def test_g6_evidence_gate() -> None:
         rc, rep = run_g("--require-evidence-check")
         assert rc == 5 and rep.get("verdict") == "FAIL", \
             f"R4.19 纯 filler 空壳须 EXIT=5 FAIL，实为 rc={rc}: {rep.get('verdict')}"
+
+
+    # R4.20（盲检 B🔴5）：status 同形字让 fatal 闭环整行隐身，
+    # 且与已修 severity 同形构成组合攻击。
+    with tempfile.TemporaryDirectory(prefix="hw_r420_") as td:
+        d = Path(td)
+        (d / "context_stack").mkdir(); (d / "00_governance").mkdir()
+        (d / "context_stack" / "confirmed_hypotheses.json").write_text(
+            json.dumps({"active_hypotheses": [{"id": "H-1", "status": "active"}],
+                        "last_updated": "2026-11-20"}, ensure_ascii=False), encoding="utf-8")
+        led = d / "00_governance" / "redteam_ledger.csv"
+        hw = PKG / "scripts" / "hypothesis_watch.py"
+        def hwrc(sev, status):
+            led.write_text("finding_id,severity,status,closed_date,finding_summary\n"
+                           f"F-RT,{sev},{status},2026-11-26,证伪\n", encoding="utf-8")
+            return subprocess.run([sys.executable, str(hw), "--research-ops", str(d)],
+                                  capture_output=True, text=True).returncode
+        assert hwrc("fatal", "clo\u0561ed") == 5, "R4.20 status 同形须 REVIEW_REQUIRED"
+        assert hwrc("fat\u0430l", "clo\u0561ed") == 5, "R4.20 双字段组合攻击须 REVIEW_REQUIRED"
+        assert hwrc("fatal", "closed") == 5, "R4.20 合法 closed 基线须 REVIEW_REQUIRED"
 
 
 def test_reconcile_decisions() -> None:

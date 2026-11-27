@@ -34,6 +34,7 @@ R4.3 复核（2026-11-20 · 两路独立盲检交叉验证的 fail-open）：
 """
 import re
 import unicodedata
+import unicodedata
 from pathlib import Path
 
 # R4.3（2026-11-19 · 盲检①🔴6 + 主代理对抗实证）：从「枚举 C0 字符」升级为
@@ -301,6 +302,29 @@ def has_forbidden(text: str) -> bool:
             i = j
             continue
         i += 1
+    return False
+
+
+def has_visible_content(text: str) -> bool:
+    """文本是否含至少一个「可见语义字符」（字母 L 或数字 N）。
+
+    R4.20（盲检 A🔴4/B🔴4/A🔴5）：按 Unicode 名称枚举 FILLER 是死路——
+    U+2800 BRAILLE PATTERN BLANK(So)、私用区(Co)、未分配(Cn) 均不含 FILLER，
+    `strip()` 也不剥；靠 `reason.strip()` 判非空同样放过了 ZWSP。
+    根因改白名单语义判据：G6 的 reason/excerpt 与 waiver 的 reason/署名
+    都是「人类可读文字」，必须含字母或数字；纯符号、视觉空白、格式/控制
+    字符一律视为空壳。中文/英文/数字正文均含 L/N，不受误伤。
+    """
+    if not isinstance(text, str):
+        return False
+    for ch in normalize_for_extraction(text):
+        if unicodedata.category(ch)[0] not in ("L", "N"):
+            continue
+        # Hangul Jamo filler 属 Lo 但视觉上是空白占位符（R4.19 已修向量），
+        # 白名单保留这一处具名排除——它是「字母类别却非可见内容」的已知例外。
+        if "FILLER" in unicodedata.name(ch, "").upper():
+            continue
+        return True
     return False
 
 

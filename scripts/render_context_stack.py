@@ -177,6 +177,10 @@ def main() -> int:
     if missing:
         print(f"⚠ {len(missing)} 个 JSON 缺失（未渲染）: {', '.join(missing)}"
               f"——真源未建或路径漂移，md 视图不完整", file=sys.stderr)
+        # R4.20（盲检 A🔴1）：docstring 明示 3=真源缺失/解析/结构异常，但此前
+        # 缺失只打印警告、rc 保持 0——4/4 真源全丢、零文件渲染仍报成功。
+        # 根因：缺失是「同步未完成」而非「可跳过的提示」，与解析异常同契约。
+        rc = 3
     print("\n纪律：md 由本脚本生成，禁手改；改 JSON → 重跑本脚本。")
     return rc
 

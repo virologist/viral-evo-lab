@@ -46,8 +46,8 @@ VALID_STATUS = {"success", "partial", "failed", "blocked"}
 _TEXT_GUARD = None
 
 
-def _text_checked(path):
-    """返回 (text, err)，text=None 表示不可解码/控制字符污染（调用方 fail-closed）。"""
+def _load_text_guard():
+    """惰性加载同目录 _text_guard 单一事实源（缓存）。"""
     global _TEXT_GUARD
     if _TEXT_GUARD is None:
         here = Path(__file__).resolve().parent
@@ -55,7 +55,17 @@ def _text_checked(path):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         _TEXT_GUARD = mod
-    return _TEXT_GUARD.read_text_checked(path)
+    return _TEXT_GUARD
+
+
+def _text_checked(path):
+    """返回 (text, err)，text=None 表示不可解码/控制字符污染（调用方 fail-closed）。"""
+    return _load_text_guard().read_text_checked(path)
+
+
+def _visible_content(text) -> bool:
+    """R4.20（盲检 A🔴5）：waiver 署名/理由复用 G6 同一白名单语义判据。"""
+    return _load_text_guard().has_visible_content(text)
 
 
 def _load_guard():
@@ -434,8 +444,10 @@ def _waiver_authorized(w: dict) -> bool:
     """
     by = w.get("authorized_by")
     reason = w.get("reason")
-    return (isinstance(by, str) and by.strip() != ""
-            and isinstance(reason, str) and reason.strip() != "")
+    # R4.20（盲检 A🔴5）：`strip()` 不剥 Cf，reason="\u200b" 可空口放行 G2+G4。
+    # 与 G6 留痕共用「须含字母/数字」的白名单语义判据。
+    return (isinstance(by, str) and _visible_content(by)
+            and isinstance(reason, str) and _visible_content(reason))
 
 
 def _waiver_covers(w: dict, val: str, cands: set) -> bool:
@@ -783,6 +795,19 @@ def main() -> int:
             # 判定一：核验后篡改（mtime 指纹）
             if tampered:
                 problems.append(f"artifact 在核验后被修改（mtime 不符）: {tampered}——须重跑 verify_member_output")
+            # R4.20（盲检 A🔴6）：空 artifact_mtimes 是存量允许的形态（不整体
+            # 判 FAIL，避免误拒），但「核验记录写完后产出又被改」从 mtime 时序
+            # 即可判定，与指纹映射有无无关——空壳映射 + 篡改在此被捕获。
+            try:
+                oc_mtime = oc.stat().st_mtime
+                post_tampered = [a.name for a in artifacts
+                                 if a.stat().st_mtime > oc_mtime]
+            except OSError:
+                post_tampered = []
+            if post_tampered:
+                problems.append(
+                    f"artifact 在核验记录写完后又被修改（时序判据）: {post_tampered}"
+                    "——须重跑 verify_member_output")
 
             # 判定二：阻断态 DEGRADE 未处置
             # A-6 修复：verdict 缺失(None)在 block 态下**不得**豁免——
@@ -830,12 +855,17 @@ def main() -> int:
                         + "：须成员补 [待人工核验] 重传，或主理人核 URL 后写 waivers.json 放行"
                           "（须 value+reason+authorized_by 署名）；禁止仅凭人工裁量跳过" + extra)
 
+            # R4.20（盲检 A🔴6）：原无条件声称「mtime 指纹一致」，空映射时
+            # 实为零比对却谎称通过——按实际比对条数如实披露。
+            compared = sum(1 for a in artifacts if a.name in mtimes)
+            mtime_label = (f"mtime 指纹比对 {compared}/{len(artifacts)} 条"
+                           if mtimes else "无 mtime 指纹（未执行指纹比对）")
             if problems:
                 record("G4 核验留痕", False, "；".join(problems))
             elif resolved:
-                record("G4 核验留痕", True, f"{oc.name}（mtime 指纹一致；" + "；".join(resolved) + "）")
+                record("G4 核验留痕", True, f"{oc.name}（{mtime_label}；" + "；".join(resolved) + "）")
             else:
-                record("G4 核验留痕", True, f"{oc.name}（mtime 指纹一致，无阻断态未处置）")
+                record("G4 核验留痕", True, f"{oc.name}（{mtime_label}，无阻断态未处置）")
         except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError) as e:
             record("G4 核验留痕", False, f"output-check.json 解析失败: {e}")
 
@@ -859,10 +889,22 @@ def main() -> int:
                        + ("——verdict 字段缺失即视为未通过" if cverdict is None else
                           "——须处置幻觉/未过项后重跑 write_checklist"))
             else:
-                extra = ""
-                if cd.get("hallucinated"):
-                    extra = f"（hallucinated={cd.get('hallucinated')}）"
-                record("G5 审判留痕", True, f"{cl.name}（verdict=PASS{extra}）")
+                # R4.20（盲检 A🔴2）：生产侧已拒零项审判，消费侧同样拒绝——
+                # 防手改 checklist.json 为 `items_total=0/sources_checked=0/PASS`
+                # 绕过 G5。正数量检查项 + 正数量权威源核验是 PASS 的必要条件。
+                it = cd.get("items_total")
+                sc = cd.get("sources_checked")
+                zero_shell = (
+                    not isinstance(it, int) or isinstance(it, bool) or it <= 0
+                    or not isinstance(sc, int) or isinstance(sc, bool) or sc <= 0)
+                if zero_shell:
+                    record("G5 审判留痕", False,
+                           f"空壳审判：items_total={it!r}/sources_checked={sc!r} 须为正整数")
+                else:
+                    extra = ""
+                    if cd.get("hallucinated"):
+                        extra = f"（hallucinated={cd.get('hallucinated')}）"
+                    record("G5 审判留痕", True, f"{cl.name}（verdict=PASS{extra}）")
         except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError) as e:
             record("G5 审判留痕", False, f"checklist.json 解析失败: {e}")
 

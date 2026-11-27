@@ -114,6 +114,14 @@ def has_invisible_marker_gap(text: str) -> bool:
     # 在 _is_np_homoglyph 豁免，隔断侧却无对应防线。补 Lo 到 gap_cats：
     # 标记 n/p 后、= 前出现表意文字即视为声明隔断（fail-closed），而
     # 「样本 n = 94」/「p值=0.94」的 CJK 均在标记**之前**或 = 之后，不受影响。
+    # R4.20（盲检 B🔴6）：ASCII 侧隔断是同一失效模式的盲区——`pA=0.94` /
+    # `n_=94` 的 mid 是 ASCII 字母/下划线，类别 L/Pc 此前不在 gap_cats，
+    # 五道守卫全灭 → checked=0 → PASS。合法声明 `p=0.94` / `p = 0.94`
+    # 的 mid 为空（空白已跳过），补 L/N/Pc 不误伤；prime 记法由 D[′'] 的
+    # 专用 markers + 同形豁免处理，不受影响。
+    # 注意：L/N/Pc **不放入本集合**——长 JSON 字段名（"phylo-analyst" /
+    # "task_id"）也含这些类别，一并纳入会误伤合法 envelope。ASCII 侧隔断
+    # 由下方「短 mid + 分隔符 + 数字」专用判据处理。
     gap_cats = {"Sm", "Sk", "So", "Sc", "Cf", "Cs", "Co", "Mn", "Mc", "Me", "Lo"}
     # 在归一化文本上跑类别判据：全角等号 ＝(Sm) 经 NFKC 变 '=' 属合法终止符，
     # 若用原始 text 会把 p＝0.94 误判为隔断（fail-close，既有测试断言 EXIT=5）。
@@ -128,8 +136,20 @@ def has_invisible_marker_gap(text: str) -> bool:
         while k < len(scan) and scan[k] not in "=:[(":
             k += 1
         mid = scan[j:k]
-        if any(_ud.category(ch) in gap_cats for ch in mid):
+        cats = [_ud.category(ch) for ch in mid]
+        if any(cat in gap_cats for cat in cats):
             return True
+        # R4.20（盲检 B🔴6）：ASCII 侧隔断 `pA=0.94` / `n_=94` 此前全灭。
+        # 但合法 JSON 字段名 `"phase": 1` 的独立 p + mid="hase" 也是 L 类，
+        # 不能一律拦。根因判据：伪造声明是「短 ASCII 隔断（1~2 字符）
+        # + =/: 分隔符 + 紧跟数字」；长英文单词是字段名，不是声明标记。
+        if (mid and len(mid) <= 2 and all(ord(c) < 128 for c in mid)
+                and any(cat[0] in ("L", "N") or cat == "Pc" for cat in cats)):
+            v = k + 1
+            while v < len(scan) and scan[v].isspace():
+                v += 1
+            if v < len(scan) and scan[v].isdigit():
+                return True
     return False
 
 
@@ -430,6 +450,16 @@ def pool_has_number(pool: str, cand: str) -> bool:
                 or ch in "%,.")
 
     for m in pat.finditer(pool_norm):
+        # R4.20（盲检 A🟠8）：左边界正则只禁 \d./\w，符号前缀 `€0.94` / `★94`
+        # 仍可洗白 p/n 值；右侧已有语义判据，左侧补对称语义判据：字母/数字/
+        # 符号/连接标点/格式字符紧跟候选即视为数值未完结。放行声明等号 `=`、
+        # CSV 字段逗号 `,` 与空白/行首（合法池形态）。
+        if m.start() > 0:
+            head = pool_norm[m.start() - 1]
+            hcat = unicodedata.category(head)
+            if ((hcat[0] in ("L", "N", "S", "M")
+                 or hcat in ("Pc", "Cf", "Cs", "Co")) and head not in "=:,"):
+                continue
         tail = pool_norm[m.end():]
         if tail and is_value_continuation(tail[0]):
             # CSV 双数字字段 `30,0.9441` / `1,0.94,2`：cand 后随 `,` 是合法

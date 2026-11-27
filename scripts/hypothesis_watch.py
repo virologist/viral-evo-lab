@@ -327,7 +327,15 @@ def main() -> int:
         norm_sev_raw = _row_str(row.get("severity"))
         norm_sev = normalize_for_extraction(norm_sev_raw).lower()
         if norm_status != "closed":
-            continue
+            # R4.20（盲检 B🔴5）：status 侧无判据——`cloաed`（亚美尼亚 а）
+            # 经归一化不收敛 ASCII → 整行被当作未闭环直接丢弃；与已修的
+            # severity 同形组合后两道防线一起失效。语义判据：status 含
+            # 非 ASCII 字母即视为「不可信的 closed 声明」，保守计入复查。
+            suspicious_status = any(
+                ord(c) > 127 and unicodedata.category(c)[0] == "L"
+                for c in _row_str(row.get("status")))
+            if not suspicious_status:
+                continue
         if norm_sev not in ("fatal", "severe"):
             # R4.19（盲检 B🔴7）：码点枚举补不完——希腊 α(U+03B1)/西里尔 л(U+043B)
             # 与 NFKC 都不收敛到 ASCII，`fatαl`/`fataл` → norm≠fatal → 漏报。

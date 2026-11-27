@@ -45,6 +45,7 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 PKG = Path(__file__).resolve().parent.parent
@@ -440,6 +441,27 @@ def test_contract_guard() -> None:
     results = _checks()
     failures = [msg for ok, msg in results if not ok]
     assert not failures, "契约/分发守卫失败:\n  " + "\n  ".join(failures)
+
+
+    # R4.20（盲检 A🔴1/A🔴2/A🟠7）：真源全缺失、零项审判、外部 .learnings
+    # 豁免均须 fail-closed，作为契约守卫的第 12 项。
+    with tempfile.TemporaryDirectory(prefix="contract_r420_") as td:
+        d = Path(td)
+        r = subprocess.run([sys.executable, str(PKG / "scripts" / "render_context_stack.py"),
+                            "--research-ops", str(d), "--which", "all"],
+                           capture_output=True, text=True)
+        assert r.returncode == 3, "R4.20 真源全缺失须 EXIT=3"
+        r = subprocess.run([sys.executable, str(PKG / "scripts" / "write_checklist.py"),
+                            str(d), "T-R420", "--items", "0", "--passed", "0",
+                            "--sources-checked", "0", "--hallucinated", "0"],
+                           capture_output=True, text=True)
+        assert r.returncode == 5, "R4.20 零项审判须 DEGRADE EXIT=5"
+        f = d / ".learnings" / "evil.md"
+        f.parent.mkdir()
+        f.write_text("事故错误值 20.58% 已确认\n", encoding="utf-8")
+        r = subprocess.run([sys.executable, str(PKG / "scripts" / "check_scope.py"), str(f)],
+                           capture_output=True, text=True)
+        assert r.returncode == 3, "R4.20 外部 .learnings 文件不得被豁免"
 
 
 def main() -> int:

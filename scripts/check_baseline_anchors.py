@@ -121,10 +121,24 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
         rep["verdict"] = "ANCHOR_NOT_OBJECT"
         return EXIT_STRUCT, rep
 
+    # schema/files 先校验，保持既有 ANCHOR_SCHEMA_INVALID 契约（缺 files 的
+    # fixture 不得被后续 source 校验抢先改写 verdict）。
+    if obj.get("schema_version") != 1:
+        rep["structural_errors"].append(
+            f"schema_version={obj.get('schema_version')!r} 非 1（未知锚格式，拒绝对账）")
+    files = obj.get("files")
+    if not isinstance(files, dict) or not files:
+        rep["structural_errors"].append("files 缺失 / 非对象 / 为空")
+
     # ADR-003 防「改锚刷绿」：锚的 commit 溯源必须与包内 git HEAD 一致，
-    # 且刷新历史末条的 to_commit 不得与 HEAD 分叉。无 source / 非 git 仓跳过。
+    # 且刷新历史末条的 to_commit 不得与 HEAD 分叉。
     src = obj.get("source")
     head = _git_head(pkg_root)
+    # R4.20（盲检 A🟠11）：原实现 `if isinstance(src, dict) and head:` 使
+    # 「删掉整个 source 字段」直接跳过 commit 溯源校验——改锚刷绿只须删字段。
+    # 锚 schema 明定 source 必填；git HEAD 可用时缺失即结构错误 EXIT=3。
+    if head and not isinstance(src, dict):
+        rep["structural_errors"].append("锚 source 缺失/非对象（不可跳过 commit 溯源校验）")
     if isinstance(src, dict) and head:
         if src.get("commit") and src["commit"] != head:
             # R4.1：归 drift（契约表 :46「commit 与 history 不一致」= 漂移 EXIT=5）
@@ -138,14 +152,16 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
                 rep["drift_errors"].append(
                     "refresh_history 末条 to_commit 与 HEAD 不一致（刷新链断裂）")
 
-    if obj.get("schema_version") != 1:
-        rep["structural_errors"].append(
-            f"schema_version={obj.get('schema_version')!r} 非 1（未知锚格式，拒绝对账）")
-    files = obj.get("files")
-    if not isinstance(files, dict) or not files:
-        rep["structural_errors"].append("files 缺失 / 非对象 / 为空")
     if rep["structural_errors"]:
-        rep["verdict"] = "ANCHOR_SCHEMA_INVALID"
+        # 仅当唯一结构错误是 source 缺失时才用专用 verdict；若同时存在
+        # schema/files/路径错误，保持既有 ANCHOR_SCHEMA_INVALID 契约。
+        files_bad = (not isinstance(files, dict) or not files
+                     or any(not _safe_rel(r) for r in files))
+        only_source = (len(rep["structural_errors"]) == 1
+                       and "source" in rep["structural_errors"][0]
+                       and not files_bad)
+        rep["verdict"] = ("ANCHOR_SOURCE_INVALID" if only_source
+                          else "ANCHOR_SCHEMA_INVALID")
         return EXIT_STRUCT, rep
 
     rep["expected"] = len(files)

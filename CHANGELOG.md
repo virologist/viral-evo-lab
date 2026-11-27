@@ -4,6 +4,37 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.37] - 2026-11-27（R4.20 v1.5.36 双路盲检回补 · 12/12 坐实：空壳审判/waiver/渲染契约 + 检查范围缩水 + 投影空白 + status 同形 + ASCII 隔断）
+
+v1.5.36 两路独立盲检（前台同步，报告均送达）：A 通用 6🔴+5🟠，B 对抗红队 7🔴+3🟠，U+2800 视觉空白项重复，去重后 12 项候选。主代理对 12 项逐条自建 fixture 真实 CLI 独立复现（含正字对照），**12/12 全部坐实、零证伪**；其中 3 项因盲检 fixture 字段口径有误，重建最小用例后复核坐实。另有 4 项🟠低风险根治、3 项🟠披露不修。本轮教训：**「检查范围由被检对象自报」与「空工作量即 PASS」是两类新的语义空壳化**——修复不能只补形态锚，须固定检查范围与工作量下限。
+
+### Fixed（12 项坐实 + 4 项🟠根治）
+- **A1 渲染真源全缺失**（`render_context_stack.py`）：4/4 JSON 全丢、零文件渲染仍 EXIT=0 → docstring 契约「3=真源缺失」落地，missing 非空即 rc=3。
+- **A2 零项审判**（`write_checklist.py` + `check_gates.py` G5）：`items=0/sources=0/hallucinated=0` 签发 PASS 使 G5 放行 → 生产侧 PASS 须正数量检查项与权威源核验（否则 DEGRADE/EXIT=5），消费侧同步拒绝零工作量 checklist（防手改 JSON）。
+- **A3 `set_defaults` 翻转**（`check_decision_records.py`）：`ap.set_defaults(require_tag=True)` 与 `default=True` 语义等价却绕过字面形态锚 → `RE_DEFAULT_TRUE` 补 set_defaults 的关键字/字典两种写法。
+- **A4/B4 U+2800 / 私用区空壳**（`verify_evidence_check.py`）：R4.19 按 Unicode 名称剔 `FILLER` 仍是枚举 → 单一事实源 `has_visible_content()` 改为白名单语义判据（须含 L/N 字符），保留 Hangul filler 具名排除；G6 两条空壳不再 PASS。
+- **A5 ZWSP waiver**（`check_gates.py`）：`reason="\u200b"` 经 `strip()` 非空即空口放行 G2+G4 → waiver 署名/理由复用同一 `has_visible_content()` 判据。
+- **A6 mtime 空映射 + 核验后篡改**（`check_gates.py`）：既往🟠披露「缺条目不判篡改」，本轮坐实新维度「无指纹却谎称一致」→ 不整体拒绝空映射（保住测试基线），改时序语义判据：artifact mtime 晚于核验记录写出时间即 G4 FAIL；报告按实际比对条数如实披露，不再谎称「指纹一致」。
+- **B1/B2 投影空白隔断**（`check_scope.py`）：`20。 58%` / `41, 034,380` / 全角逗号 `41，034` 漏投影使黑名单永假 → 投影按「分隔点 + 两侧空白」语义匹配并纳入 U+FF0C。
+- **B3 cli_sites 白名单内子集**（`check_decision_records.py`）：删掉已翻转站点即跳过检查 → ADR-001 三处 CLI 为不可缩水固定真源，缺失即结构错误 EXIT=3。
+- **B5 status 同形**（`hypothesis_watch.py`）：`cloաed`（亚美尼亚 а）使 fatal 闭环整行隐身，且与已修 severity 同形组合后两道防线一起失效 → status 含非 ASCII 字母即视为不可信 closed 声明，保守计入复查。
+- **B6 ASCII 隔断**（`verify_numbers.py`）：`pA=0.94` / `nA=94` / `p_=0.94` 五道守卫全灭、checked=0 → PASS → 「短 ASCII 隔断（1~2 字符）+ =/: + 紧跟数字」专用判据；不把 L/N/Pc 加入全局 gap_cats，避免误伤合法 JSON 字段名 `"phase": 1`。
+- **B7 非字符串 member**（`poll_run_dir.py`）：`type:"spawn"` + 数组成员被当非 spawn 事件静默跳过 → 仅已知非 spawn 事件白名单可跳过，其余畸形行计入 bad 并 fail-closed EXIT=5。
+- **A🟠7** 外部路径含 `.learnings` 即被豁免 → 豁免仅限包内路径。
+- **A🟠8** 池符号前缀 `€0.94` 洗白 → `pool_has_number` 补左邻语义判据，与右侧对称。
+- **A🟠10** `schema_version: true` 因 `True == 1` 蒙混 → 显式排除 bool。
+- **A🟠11** 删除锚 `source` 字段跳过 commit 溯源 → 缺失即结构错误，且保持既有 schema verdict 契约。
+
+### 披露不修（3 项🟠）
+- `verify_member_output` 无权威源时零核验返回 0（显式设计取舍，下游 G4 兜底）。
+- 繁体撞限标注「輪次耗盡」不被识别（语义等价而非 Unicode 等价，需外部简繁词表，不引入依赖）。
+- severity `fat4l` 等 ASCII 拼写变体（非 Unicode 同形，属输入拼写错误，不在本防线契约内）。
+
+### Verified
+- 12 项 + 正字对照 CLI 实测全部转绿；修复过程中修正 4 次自身误伤（Lu 双字母码、长 JSON mid 误判、U+115F Lo、锚 verdict 抢先）。
+- 回归断言复用既有 `test_require_tag_gate` / `test_poll_hitlimit_and_manifest` / `test_decision_records_guard` / `test_g6_evidence_gate` / `test_disposition_gate` / `test_gate_fuzz` / `test_baseline_anchor_roundtrip` / `test_contract_guard` 八函数，零新增 `def test_*` → 机器锚 `CURRENT_BASELINE = 45 CASES + 16 行为级 = 61/61`。
+- 全链：pytest 19 passed / manifest 80 文件 / fuzz 61/61 / 守卫 11/11 / compileall 全过；四处 version=1.5.37。
+
 ## [1.5.36] - 2026-11-27（R4.19 v1.5.35 双路盲检回补 · 10/10 坐实：句号/千分位投影 + cli_sites 白名单 + member fail-closed + prime/CJK/池边界/severity/filler 语义判据）
 
 v1.5.35 两路独立盲检（A 通用 3🔴 / B 对抗红队 8🔴+1🟠，U+3002 项重复），报告正文均送达；主代理逐条独立复现并设正字对照，**10/10 全部坐实、零证伪**。🟠 BOM 项（`check_baseline_anchors` `bytes:true`）确认为 fail-close 误伤且非契约缺陷，披露不修。本轮教训延续：**合法豁免（CSV 逗号、prime、CJK 白名单）本身成为新攻击面**，故凡「豁免」必须收敛为固定真源白名单或语义判据，不得由被检对象自报检查范围。

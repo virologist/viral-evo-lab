@@ -123,18 +123,24 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
                     return None, (f"spawn_manifest.jsonl 含非法 member {m!r}"
                                   f"（路径穿越/特殊字符），期望清单无法确定: {mf}")
                 members.append(m)
-            elif "event" in obj or "type" in obj:
-                # 非 spawn 事件（evidence_check 等）按设计不带 member——跳过，
-                # 不记为畸形行（否则混有 G6 抽查记录的真实 manifest 被误伤）。
-                continue
             else:
+                # R4.20（盲检 B🔴7）：原 `elif "event" in obj or "type" in obj`
+                # 只按键存在性判定「非 spawn」，于是 `type:"spawn"` +
+                # 非字符串 member 被静默跳过、期望清单缩水仍 READY。
+                # 改白名单：仅已知非 spawn 事件（evidence_check 等）跳过；
+                # 其余畸形记录一律计入 bad 并 fail-closed。
+                event = obj.get("event", obj.get("type"))
+                if isinstance(event, str) and event not in ("spawn", "spawn_agent"):
+                    continue
                 bad += 1
         else:
             bad += 1
     if not members:
         return None, f"spawn_manifest.jsonl 无有效 member 记录（畸形行 {bad}）: {mf}"
     if bad:
-        print(f"⚠️ manifest 含 {bad} 条畸形行（已跳过）", file=sys.stderr)
+        # R4.20（盲检 B🟠2）：畸形行只 warning 会缩水期望清单 → 漏检未产出/
+        # 撞限成员。与非法 member 同口径：清单不确定即 fail-closed EXIT=5。
+        return None, (f"spawn_manifest.jsonl 含 {bad} 条畸形行（期望清单无法确定）: {mf}")
     # 去重保序
     seen: set[str] = set()
     uniq = [m for m in members if not (m in seen or seen.add(m))]

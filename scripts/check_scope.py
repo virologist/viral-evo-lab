@@ -110,11 +110,16 @@ def check_file(p: Path) -> list:
     # 剥掉无法恢复）。不改原文、不影响句尾句号（非数字间）与合法字段边界
     # （逗号后非数字）。此投影局部于 check_scope——不动 normalize_for_matching
     # 本身（verify_numbers 侧 `n = 94。结论` 的合法中文句号须保持）。
-    compact_src = re.sub(r"(?<=\d)[。｡](?=\d)", ".", text)
+    # R4.20（盲检 B🔴1/B🔴2）：原投影要求分隔符两侧**紧邻**目标字符，
+    # `20。 58%` / `41, 034,380` / 全角逗号 `41，034` 均因空白或非 ASCII
+    # 逗号漏投影 → 后续 normalize_for_matching 剥掉句号、保留逗号 →
+    # 黑名单字面量永假。根因修：投影本身按「分隔点 + 两侧空白」语义匹配，
+    # 并纳入全角逗号 U+FF0C；仍只作用于数字/字母之间，不动句尾标点。
+    compact_src = re.sub(r"(?<=\d)\s*[。．｡]\s*(?=\d)", ".", text)
     # `.pre-backup-...` 黑名单前置可为字母（`file。pre-...`），句号同样
-    # 充当分隔点；字母侧同样归一（要求两侧均非空白，避免句尾句号误变点）。
-    compact_src = re.sub(r"(?<=[A-Za-z0-9])[。｡](?=[A-Za-z0-9])", ".", compact_src)
-    compact_src = re.sub(r"(?<=\d),(?=\d)", "", compact_src)
+    # 充当分隔点；字母侧同样归一。
+    compact_src = re.sub(r"(?<=[A-Za-z0-9])\s*[。．｡]\s*(?=[A-Za-z0-9])", ".", compact_src)
+    compact_src = re.sub(r"(?<=\d)\s*[,，]\s*(?=\d)", "", compact_src)
     if compact_src != text:
         compact_norm = normalize_for_matching(compact_src)
         seen_pats = {h[1] for h in hits}
@@ -144,7 +149,10 @@ def main() -> int:
     # 标题叙事二次绕过。改为文件名精确相等 + 路径段精确相等。
     total = 0
     for t in targets:
-        if t.resolve() in _SELF_EXEMPT or ".learnings" in t.parts:
+        # R4.20（盲检 A🟠7）：`.learnings` 豁免只适用于包内路径；显式传入的
+        # 外部文件仅因路径里出现该目录名就被判 clean，是 fail-open 面。
+        if t.resolve() in _SELF_EXEMPT or (
+                ".learnings" in t.parts and t.resolve().is_relative_to(base)):
             continue
         hits = check_file(t)
         if hits:

@@ -61,7 +61,13 @@ def main() -> int:
     hallucinated = args.hallucinated
     note = args.note
 
-    verdict = "PASS" if (items_passed == items_total and hallucinated == 0) else "DEGRADE"
+    # R4.20（盲检 A🔴2）：0 项审判 + 0 源核验此前满足 `items_passed == items_total
+    # and hallucinated == 0` → verdict=PASS，G5 消费侧只认 PASS → 空壳放行。
+    # 根因：PASS 的语义是「审判真实发生过」，须有正数量的检查项与权威源核验，
+    # 不能由生产者自报零工作量即通过。
+    verdict = ("PASS" if (items_total > 0 and sources_checked > 0
+                          and items_passed == items_total and hallucinated == 0)
+               else "DEGRADE")
 
     payload = {
         "ts": datetime.now().isoformat(timespec="seconds"),
