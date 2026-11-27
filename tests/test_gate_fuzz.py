@@ -506,6 +506,20 @@ def test_disposition_gate() -> None:
         rc, out = run()
         assert rc == 3, f"severity ZWJ 污染须 EXIT=3（不得 CLEAN），实为 rc={rc}: {out[-200:]}"
 
+        # R4.19（盲检 B🔴7）：severity 非 ASCII 字母同形（fatαl/fataл）NFKC
+        # 不收敛 → norm≠fatal → 漏报。须保守计入 late_fatal EXIT=5；合法
+        # fatal 同结构对照仍 EXIT=5（不得因扩展检测而漏）。
+        hyp_p.write_text(json.dumps({
+            "last_updated": today,
+            "active_hypotheses": [{"id": "H-1", "status": "active", "claim": "c"}]}),
+            encoding="utf-8")
+        for label, sev in (("Greek", "fat\u03b1l"), ("Cyrillic", "fata\u043b")):
+            led_p.write_text(
+                "finding_id,severity,status,closed_date,finding_summary\n"
+                f"F-R419-{label},{sev},closed,{today},同形证伪\n", encoding="utf-8")
+            rc, out = run()
+            assert rc == 5, f"R4.19 severity {label} 同形须 REVIEW_REQUIRED EXIT=5，实为 {rc}"
+
 
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
@@ -1547,6 +1561,41 @@ def test_require_tag_gate() -> None:
             assert "Traceback" not in (p.stdout + p.stderr) and p.returncode != 1, \
                 f"{bad_field}={bad_val} 不得崩溃 EXIT=1，实为 {p.returncode}: {p.stderr[-200:]}"
 
+        # R4.19（盲检 B🔴1/2/5/6）：verify_numbers 四类 fail-open 回归。
+        import tempfile as _tf
+        with _tf.TemporaryDirectory(prefix="vn_r419_") as td:
+            vn_d = Path(td)
+            pool = vn_d / "pool.csv"
+            pool.write_text("metric,value\nother,0.11\n", encoding="utf-8")
+            vn = PKG / "scripts" / "verify_numbers.py"
+
+            def vn_rc(text: str, source: Path = pool) -> int:
+                f = vn_d / "artifact.md"
+                f.write_text(text, encoding="utf-8")
+                return subprocess.run(
+                    [sys.executable, str(vn), str(f), "--sources", str(source), "--json"],
+                    capture_output=True, text=True, timeout=60).returncode
+
+            # B🔴1：prime 豁免泛化——d+任意非ASCII字母须拦；合法 d′ 仍 EXIT=5。
+            for label, mark in (("IPA", "\u0272"), ("Greek", "\u03b1"), ("Cyrillic", "\u0433")):
+                assert vn_rc(f"样本 d{mark}=0.94（伪造）\n") == 3, \
+                    f"R4.19 d+{label} 非prime mark 须同形守卫 EXIT=3"
+            assert vn_rc("样本 d′=0.94（合法prime）\n") == 5, \
+                "R4.19 合法 d′ 不得被误杀（须未溯源 EXIT=5）"
+            # B🔴2：CJK Lo 隔断 p/n 声明须拦（合法「样本 n = 94」仍 EXIT=5 已验）。
+            for text in ("样本 p量=0.94（伪造）\n", "样本 n量=94（伪造）\n"):
+                assert vn_rc(text) == 3, f"R4.19 CJK 隔断声明须 EXIT=3: {text!r}"
+            # B🔴5：池左边界字母前缀洗白须拒。
+            pool.write_text("metric,raw\ncase,id94\n", encoding="utf-8")
+            assert vn_rc("样本 n = 94\n") == 5, "R4.19 池 id94 不得洗白 n=94"
+            pool.write_text("metric,raw\ncase,x0.94\n", encoding="utf-8")
+            assert vn_rc("结果 p = 0.94\n") == 5, "R4.19 池 x0.94 不得洗白 p=0.94"
+            # B🔴6：Pc（下划线/undertie）数值延续须拒。
+            for sep in ("_", "\u203f"):
+                pool.write_text(f"metric,raw\ncase,0.94{sep}5\n", encoding="utf-8")
+                assert vn_rc("结果 p = 0.94\n") == 5, \
+                    f"R4.19 池 0.94{sep!r}5 不得洗白 p=0.94"
+
 
 def test_poll_hitlimit_and_manifest() -> None:
     """R-13a/c（2026-11-09）：撞限标注消费 + --from-manifest 行为级守卫。
@@ -1651,6 +1700,23 @@ def test_poll_hitlimit_and_manifest() -> None:
         rc, out = run("--expected", "literature-scout")
         assert rc == 5 and "撞限" in out, \
             f"第 9 行撞限标注须 NOT_READY/EXIT=5（不得因位置漏检），实为 rc={rc}"
+
+        # R4.19（盲检 A🔴3）：manifest 含非法 member（路径注入）须 fail-closed
+        # EXIT=5，不得静默跳过缩水期望清单仍判 READY（与 cron_watch 非法 id 同口径）。
+        (d / "T-P__literature-scout.md").write_text("# 正常产出\n", encoding="utf-8")
+        (d / "spawn_manifest.jsonl").write_text(
+            '{"task_id":"T-P","member":"literature-scout"}\n'
+            '{"task_id":"T-P","member":"../evil"}\n', encoding="utf-8")
+        rc, out = run("--from-manifest")
+        assert rc == 5 and "非法 member" in out, \
+            f"R4.19 非法 member 须清单无法确定 EXIT=5，实为 rc={rc}: {out[-200:]}"
+        # 合法 mixture：spawn + evidence_check（无 member 事件）不得被误伤。
+        (d / "spawn_manifest.jsonl").write_text(
+            '{"task_id":"T-P","member":"literature-scout"}\n'
+            '{"event":"evidence_check","actor":"lead","reason":"抽查"}\n', encoding="utf-8")
+        rc, out = run("--from-manifest")
+        assert rc == 0, \
+            f"R4.19 spawn+evidence_check 混合清单须正常 READY，实为 rc={rc}: {out[-200:]}"
 
 
 def test_legacy_package_check_fallback() -> None:
@@ -2180,6 +2246,39 @@ def test_decision_records_guard() -> None:
                             capture_output=True, text=True, timeout=60).returncode
         assert rc == 3, f"非法 task_id 须 fail-closed EXIT=3，实为 {rc}"
 
+        # R4.19（盲检 A🔴2）：cli_sites 指向无锚文件不得跳过形态锚检查——
+        # 须记结构错误 EXIT=3（拒绝借改裁决 JSON 的 cli_sites 缩水检查范围）。
+        drec_root = root / "drec_r419"
+        (drec_root / "scripts").mkdir(parents=True, exist_ok=True)
+        (drec_root / "tests").mkdir(exist_ok=True)
+        (drec_root / "scripts" / "dummy.py").write_text("# no anchors\n", encoding="utf-8")
+        (drec_root / "tests" / "anchors.py").write_text(
+            "# test_require_tag_gate\n", encoding="utf-8")
+        bad_rec = {"schema_version": 1, "records": [{
+            "id": "ADR-X", "title": "t", "status": "accepted",
+            "decided_at": "2026-01-01", "decision": "d",
+            "verification": {"rule": "g6_opt_in_visible",
+                             "cli_sites": ["scripts/dummy.py"],
+                             "tests": ["test_require_tag_gate"]}}]}
+        rec_path = root / "drec_r419.json"
+        rec_path.write_text(json.dumps(bad_rec), encoding="utf-8")
+        rc = subprocess.run(
+            [sys.executable, str(PKG / "scripts" / "check_decision_records.py"),
+             "--pkg-root", str(drec_root), "--records", str(rec_path), "--json"],
+            capture_output=True, text=True, timeout=60).returncode
+        assert rc == 3, f"R4.19 cli_sites 无锚文件须结构错误 EXIT=3，实为 {rc}"
+
+        # R4.19（盲检 A🔴1/B🔴3/B🔴4）：check_scope 数字紧凑投影——中文句号
+        # 小数点、千分位逗号使事故值/PMID/commit 黑名单永假须全部命中 EXIT=3。
+        for text in ("事故错误值 20。58% 已确认\n", "状态：v6。6 草稿 未发布\n",
+                     "备份 file。pre-backup-2026\n", "事故编号 PP 41,034,380，详见\n",
+                     "事故 commit 1,094，详见\n"):
+            sc = root / "scope_compact.md"
+            sc.write_text(text, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(PKG / "scripts" / "check_scope.py"),
+                                 str(sc)], capture_output=True, text=True, timeout=60).returncode
+            assert rc == 3, f"R4.19 数字紧凑投影须命中 EXIT=3: {text!r}"
+
 
 def test_g6_evidence_gate() -> None:
     """ADR-002 / SOP T-D1：G6 从软门变成可触发硬门，且 SKIP 必须留痕。"""
@@ -2275,6 +2374,20 @@ def test_g6_evidence_gate() -> None:
         _, rep = run_g()
         assert any(g["gate"] == "G6 抽查留痕" for g in rep["gates"]), \
             "策略文件 enabled 应触发 G6"
+
+        # R4.19（盲检 B🔴8）：Hangul Jamo filler（U+115F，Lo 视觉空白）凑满
+        # MIN_RECORDS=2 满足 reason/excerpt「非空」→ 空壳 PASS。须剔除 FILLER
+        # 后仍有可见字符，纯 filler 记录判不合格 EXIT=5。
+        filler = "\u115f"
+        def filler_ev(line: int) -> str:
+            return json.dumps({"event": "evidence_check", "actor": "lead",
+                               "task_id": TASK_ID, "reason": filler * 3,
+                               "value": {"file": "src.md", "line": line,
+                                         "excerpt": filler * 5}}, ensure_ascii=False)
+        man.write_text(filler_ev(1) + "\n" + filler_ev(2) + "\n", encoding="utf-8")
+        rc, rep = run_g("--require-evidence-check")
+        assert rc == 5 and rep.get("verdict") == "FAIL", \
+            f"R4.19 纯 filler 空壳须 EXIT=5 FAIL，实为 rc={rc}: {rep.get('verdict')}"
 
 
 def test_reconcile_decisions() -> None:

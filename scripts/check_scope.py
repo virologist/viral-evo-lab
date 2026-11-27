@@ -102,6 +102,27 @@ def check_file(p: Path) -> list:
             continue
         if pat.search(full_norm):
             hits.append((-1, pat.pattern, full_norm.strip()[:80]))
+    # R4.19（盲检 A🔴1/B🔴3/B🔴4）：匹配用途归一化剥离中文句号 U+3002
+    # （`20。58%`→`2058%`）与保留千分位逗号（`PP 41,034,380` 字面量失配）
+    # 使事故值/PMID/commit 黑名单永假。根因修在匹配侧再加**数字紧凑投影**：
+    # 在**原文**上只把「数字与数字之间」的句号型小数点归一为 `.`、千分位
+    # 逗号剥离，再走同一 normalize_for_matching（否则 U+3002 已被上一步
+    # 剥掉无法恢复）。不改原文、不影响句尾句号（非数字间）与合法字段边界
+    # （逗号后非数字）。此投影局部于 check_scope——不动 normalize_for_matching
+    # 本身（verify_numbers 侧 `n = 94。结论` 的合法中文句号须保持）。
+    compact_src = re.sub(r"(?<=\d)[。｡](?=\d)", ".", text)
+    # `.pre-backup-...` 黑名单前置可为字母（`file。pre-...`），句号同样
+    # 充当分隔点；字母侧同样归一（要求两侧均非空白，避免句尾句号误变点）。
+    compact_src = re.sub(r"(?<=[A-Za-z0-9])[。｡](?=[A-Za-z0-9])", ".", compact_src)
+    compact_src = re.sub(r"(?<=\d),(?=\d)", "", compact_src)
+    if compact_src != text:
+        compact_norm = normalize_for_matching(compact_src)
+        seen_pats = {h[1] for h in hits}
+        for pat in PATTERNS:
+            if pat.pattern in seen_pats:
+                continue
+            if pat.search(compact_norm):
+                hits.append((-1, pat.pattern, compact_norm.strip()[:80]))
     return hits
 
 

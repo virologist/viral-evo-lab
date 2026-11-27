@@ -38,6 +38,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 # R4.18（盲检🔴8）：形式要件的「非空」须拒绝 Cf 零宽字符（\u200b/\u00ad 等
@@ -65,7 +66,16 @@ def _is_nonempty(v) -> bool:
         return False
     if has_forbidden(v):
         return False
-    return bool(normalize_for_extraction(v).strip())
+    norm = normalize_for_extraction(v)
+    # R4.19（盲检 B🔴8）：Hangul Jamo filler（U+115F CHOSEONG FILLER /
+    # U+1160 JUNGSEONG FILLER / U+3164 HANGUL FILLER）Unicode 类别是 Lo，
+    # strip() 不剥、has_forbidden 不拒、归一化原样保留 → 纯 filler 的 reason/
+    # excerpt 满足「非空」要件 → 两条空壳凑满 MIN_RECORDS=2 即 PASS。
+    # 语义判据：Unicode 名称含 FILLER 的字符视觉上是空白占位符，不构成
+    # 实质内容——剔除后须仍有可见字符（合法文本不含此类字符，不误伤）。
+    visible = "".join(ch for ch in norm
+                      if "FILLER" not in unicodedata.name(ch, "").upper())
+    return bool(visible.strip())
 
 
 def _validate(ev: dict, task_id: str) -> list[str]:

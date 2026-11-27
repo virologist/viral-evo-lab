@@ -64,6 +64,18 @@ RULE_ANCHORS: dict[str, dict[str, tuple[str, ...]]] = {
     },
 }
 
+# R4.19（盲检 A🔴2）：每个 rule 允许被检查的站点白名单。RULE_ANCHORS 的键
+# 即「声明了形态锚的文件」，require_tag_default_off 例外（通用正则式锚，
+# 三处 CLI 由 ADR-001 裁决固定）。cli_sites 只能指向白名单内文件，防止
+# 借「改裁决 JSON 的 cli_sites 指向无锚 dummy」整体短路形态锚检查。
+_SITE_WHITELIST: dict[str, set[str]] = {
+    rule: set(anchors.keys()) for rule, anchors in RULE_ANCHORS.items()
+}
+_SITE_WHITELIST["require_tag_default_off"] = {
+    "scripts/check_gates.py", "scripts/verify_numbers.py",
+    "scripts/verify_member_output.py",
+}
+
 
 def _read_text(path: Path) -> str:
     """统一读文本：utf-8-sig 剥 BOM；不可解码抛 UnicodeError 由调用方走契约码。
@@ -139,6 +151,20 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
             if not isinstance(rel, str):
                 rep["structural_errors"].append(
                     f"{rid}: cli_sites 元素非字符串（{type(rel).__name__}）")
+                continue
+            # R4.19（盲检 A🔴2）：形态锚检查范围由被检对象自报——cli_sites
+            # 指向无锚 dummy.py 时 `RULE_ANCHORS[rule].get(rel, ())` 返回空元组，
+            # 该文件被完全跳过，真实实现已翻仍判 OK（fail-open）。
+            # 根因：不可信的 cli_sites 决定检查范围。修：对每个 rule 定义
+            # **允许被检查的站点白名单**（来自 RULE_ANCHORS 声明或 ADR-001
+            # 三处固定 CLI），cli_sites 元素须在白名单内，否则结构错误 EXIT=3。
+            # 注意 require_tag_default_off 的 RULE_ANCHORS 为空 dict（形态锚
+            # 是 RE_STORE_TRUE/RE_DEFAULT_TRUE 通用式），须用专用三站点集合。
+            allowed = _SITE_WHITELIST.get(rule, set())
+            if rel not in allowed:
+                rep["structural_errors"].append(
+                    f"{rid}: cli_sites {rel!r} 不在 rule {rule!r} 的站点白名单中"
+                    f"（拒绝对无锚文件跳过检查）")
                 continue
             f = pkg_root / rel
             try:

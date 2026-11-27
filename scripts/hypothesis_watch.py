@@ -39,6 +39,7 @@ import csv
 import json
 import os
 import sys
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -323,10 +324,21 @@ def main() -> int:
         # 不收敛到 ASCII → fatal 证伪发现被跳过 → late_fatal 漏报 EXIT=0。
         # 统一走 normalize_for_extraction（NFKC + 同形映射 + 剥 Mn）后比较。
         norm_status = normalize_for_extraction(_row_str(row.get("status"))).lower()
-        norm_sev = normalize_for_extraction(_row_str(row.get("severity"))).lower()
+        norm_sev_raw = _row_str(row.get("severity"))
+        norm_sev = normalize_for_extraction(norm_sev_raw).lower()
         if norm_status != "closed":
             continue
         if norm_sev not in ("fatal", "severe"):
+            # R4.19（盲检 B🔴7）：码点枚举补不完——希腊 α(U+03B1)/西里尔 л(U+043B)
+            # 与 NFKC 都不收敛到 ASCII，`fatαl`/`fataл` → norm≠fatal → 漏报。
+            # 语义判据：severity 仅 fatal/severe/severity 级词有业务意义，合法
+            # 词表恒为 ASCII 窄集；若归一化后仍含**非 ASCII 字母**，即为同形
+            # 冒充嫌疑，保守按 fatal 计入 late_fatal（fail-closed，宁可多复查）。
+            # 合法中文 severity 值（如「严重」）虽也非 ASCII，但专家包台账契约
+            # 固定英文枚举，此处保守判定不误伤合法英文 fatal/severe。
+            if any(ord(c) > 127 and unicodedata.category(c)[0] == "L"
+                   for c in norm_sev_raw):
+                late_fatal.append(row)
             continue
         closed_raw = row.get("closed_date") or ""
         cd = parse_dt(closed_raw)

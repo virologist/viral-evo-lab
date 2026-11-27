@@ -4,6 +4,27 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.36] - 2026-11-27（R4.19 v1.5.35 双路盲检回补 · 10/10 坐实：句号/千分位投影 + cli_sites 白名单 + member fail-closed + prime/CJK/池边界/severity/filler 语义判据）
+
+v1.5.35 两路独立盲检（A 通用 3🔴 / B 对抗红队 8🔴+1🟠，U+3002 项重复），报告正文均送达；主代理逐条独立复现并设正字对照，**10/10 全部坐实、零证伪**。🟠 BOM 项（`check_baseline_anchors` `bytes:true`）确认为 fail-close 误伤且非契约缺陷，披露不修。本轮教训延续：**合法豁免（CSV 逗号、prime、CJK 白名单）本身成为新攻击面**，故凡「豁免」必须收敛为固定真源白名单或语义判据，不得由被检对象自报检查范围。
+
+### Fixed（10 项，全部主代理独立复现）
+- **A1/B4 事故值句号小数点**（`20。58%` / `v6。6` / `file。pre-backup`）：匹配侧白名单剥 U+3002 使黑名单字面量永假（clean）→ `check_scope` 在**原始文本**上做局部「数字/字母间句号→`.`、千分位逗号剥离」紧凑投影后二次扫描；刻意不动全局 `normalize_for_matching`，保住 `n = 94。结论` 的合法中文句号（避免 fail-close）。
+- **B3 千分位逗号字面量永假**（`PP 41,034,380` / commit 逗号）：与 A1 同一紧凑投影修复，只在数字间剥逗号，CSV 字段边界（逗号后非数字）保持。
+- **A2 检查范围自报**（cli_sites 指向无锚 dummy）：`RULE_ANCHORS[rule]` 有非空锚声明时，cli_sites 元素必须属于声明键集合；`require_tag_default_off` 的锚为空 dict，改用专用「必须覆盖三处 CLI 之一」校验，避免误伤 ADR-001 裁决。
+- **A3 非法 member 静默跳过**（spawn_manifest.jsonl 混入 `bad!/x` → READY）：非 spawn 事件（如 `evidence_check`）仍跳过；spawn 事件的畸形 member 一律 fail-closed EXIT=5，不再静默累积。
+- **B1 prime 豁免泛化**（`dɲ=0.94` / `dα=0.94`）：`has_homoglyph_declaration` 的「mark 前是 d/D 即豁免」改为「归一化后确为撇号变体才豁免」，非撇号 mark 仍判同形。
+- **B2 CJK 隔断伪造声明**（`p量=0.94` / `n量=0.94`）：`=数字` 结构下 Lo 隔断纳入同形声明判据；`p值=0.94` 同构写法按脚本契约（声明标记须直接接数字）判 fail-closed，要求写 `p=0.94`。
+- **B5 池左边界洗白**（池 `id94` 洗白 `n=94`、池 `x0.94` 洗白 `p=0.94`）：`pool_has_number` 左边界补 `\w` 对称约束，与右邻语义判据配对。
+- **B6 池 Pc 连接符洗白**（`0.94_5` / `0.94‿5`）：右邻数值延续语义补 `Pc` 类别。
+- **B7 severity 非 ASCII 字母同形**（`fatαl` / `fataл` → CLEAN）：`hypothesis_watch` 归一化后逐字符判据——ASCII 外任何字母（L*）视为同形，仅接受纯 ASCII `fatal`/`severe`。
+- **B8 G6 Hangul filler 空壳**（U+115F 视觉空白 → PASS）：`verify_evidence_check._is_nonempty` 拒绝 Unicode 名字含 `FILLER` 的视觉空白字符，与既有 Cf/Cc/U+FFFD 拒绝并轨。
+
+### Verified
+- 10 项 + 正字对照 CLI 实测全部转绿（原 PASS/CLEAN/READY/OK → EXIT 3/5，合法对照保持）。
+- 回归断言复用既有 `test_require_tag_gate` / `test_poll_hitlimit_and_manifest` / `test_decision_records_guard` / `test_g6_evidence_gate` / `test_disposition_gate` 五函数，零新增 → 机器锚 `CURRENT_BASELINE = 45 CASES + 16 行为级 = 61/61`。
+- 全链：manifest / pytest / fuzz / 守卫 / compileall / 四处 version / 包外锚 DRIFT→受控刷新→22/22 全过（详见治理同步文档）。
+
 ## [1.5.35] - 2026-11-27（R4.18 v1.5.34 双路盲检回补 · 8 类 fail-open：归一化白名单重构 + 池边界语义判据 + severity/形态锚/留痕）
 
 v1.5.34 两路独立盲检（A 通用 10🔴+1🟠 / B 对抗红队 7 组🔴+1🟠，大量交叉印证），报告正文均送达；主代理逐条独立复现去重后坐实 8 类 fail-open、证伪 2 项（evidence `line=全角１` 归一化后为合法行号 1；泰文 PMID payload 用错元音符 U+0E38 非数字 U+0E58，正确数字本已被 R4.18 Nd 映射覆盖）。根因归纳：**「按类别/码点枚举」永远补不完**——本轮由 Mc/Me 扩展到 Nd/No/Zs/Lm/Co/非 ASCII `!`，且发现 `%`(Po) 被误剥使黑名单字面量 `20\.58%` 永假。

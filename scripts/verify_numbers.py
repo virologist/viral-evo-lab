@@ -108,7 +108,13 @@ def has_invisible_marker_gap(text: str) -> bool:
     if _MARKER_GAP.search(text) is not None or _MARKER_GAP_CI.search(text) is not None:
         return True
     import unicodedata as _ud
-    gap_cats = {"Sm", "Sk", "So", "Sc", "Cf", "Cs", "Co", "Mn", "Mc", "Me"}
+    # R4.19（盲检 B🔴2）：Lo（含 CJK 表意文字）隔断同样让 p/n 声明正则失配
+    # ——`p量=0.94` / `n量=94`（量 U+91CF 属 Lo）checked=0 → PASS fail-open。
+    # 对照：`p§=0.94`（Po）已被同形守卫拦；而 CJK 因「样本量=94」语义合法
+    # 在 _is_np_homoglyph 豁免，隔断侧却无对应防线。补 Lo 到 gap_cats：
+    # 标记 n/p 后、= 前出现表意文字即视为声明隔断（fail-closed），而
+    # 「样本 n = 94」/「p值=0.94」的 CJK 均在标记**之前**或 = 之后，不受影响。
+    gap_cats = {"Sm", "Sk", "So", "Sc", "Cf", "Cs", "Co", "Mn", "Mc", "Me", "Lo"}
     # 在归一化文本上跑类别判据：全角等号 ＝(Sm) 经 NFKC 变 '=' 属合法终止符，
     # 若用原始 text 会把 p＝0.94 误判为隔断（fail-close，既有测试断言 EXIT=5）。
     scan = normalize_for_extraction(text)
@@ -249,7 +255,12 @@ def has_homoglyph_declaration(text: str) -> bool:
         # R4.18：D′/d´ prime 记法中 mark 是撇号变体（´ U+00B4 / ʹ 等），
         # 前一个字符是 d/D——这是合法 dprime 声明，不是 n/p 同形冒充，
         # 放行（避免 fail-close 误伤，d´=0.94 应 EXIT=5 而非 3）。
-        if m.start() > 0 and text[m.start() - 1] in "dD":
+        # R4.19（盲检 B🔴1）：原仅判「前字符∈dD」→ `dɲ=0.94`/`dα=0.94`
+        # 把任意非 ASCII 字母当 prime 变体放行 → checked=0 → PASS fail-open
+        # （合法 d′=0.94 反而是 EXIT=5）。语义判据：mark 归一化后**确为撇号**
+        # 才是 prime 记法。ɲ/α/г 等归一化后非 ' → 不豁免 → 同形守卫拦截。
+        if m.start() > 0 and text[m.start() - 1] in "dD" \
+                and normalize_for_extraction(mark) == "'":
             continue
         # 预组合 ń(U+0144)/ṕ(U+1E55) 等 NFD 剥 Mn 后已转成 ASCII n/p，
         # 声明正则可正常提取（EXIT=5），无需 fail-closed。仅当归一化后
@@ -372,7 +383,13 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # 三列字段时误删 `(?!,[0-9])` → 产出 `n = 94` 被权威池 `94,500` 洗白 PASS。
     # 恢复：整数候选（无 `.`）右边界禁 `,\d`（千分位延续），浮点候选（含 `.`）
     # 不禁逗号（合法 CSV 字段 `1,0.94,2` / `30,0.9441` 正常溯源）。
-    left = r"(?<![\d.])(?<![0-9],)" if "." not in cand else r"(?<![\d.])"
+    # R4.19（盲检 B🔴5）：原左边界只禁数字/点/逗号，池中 `id94` / `x0.94`
+    # 的字母前缀使产出 `n=94` / `p=0.94` 被洗白 → found=1 PASS fail-open。
+    # 与右边界 `\w` 对称：左边界追加禁字母/下划线（\w 除数字外的部分）。
+    # 合法 CSV 字段 `30,0.9441` / `1,0.94,2` 的候选左邻是 `,` 或空白，不含
+    # 字母，不放行受影响；中文正文 `样本 n = 94` 左邻是空格，照常命中。
+    left = (r"(?<![\d.\w])(?<![0-9],)" if "." not in cand
+            else r"(?<![\d.\w])")
     # 整数候选右边界只禁「逗号 + 1~3 位数字 + 非数字/点/逗号结尾」——命中
     # 千分位/字段延续（94,500 / 1,94,2）；CSV 浮点字段 30,0.9441 的 `,0.`
     # 因后随小数点不满足末项，合法放行（v1.5.28 CSV 双字段回归保住）。
@@ -405,7 +422,11 @@ def pool_has_number(pool: str, cand: str) -> bool:
         # 仅 Cf/Cs/Co 等格式/代理/私用字符才是不可见延续，须拒。
         if ch.isspace():
             return False
-        return (cat[0] in ("L", "N", "S", "M") or cat in ("Cf", "Cs", "Co")
+        # R4.19（盲检 B🔴6）：Pc（Connector Punctuation，下划线 _ U+005F /
+        # undertie ‿ U+203F）是「标点连接」类，语义上是数值延续（0.94_5），
+        # 但 cat[0] == 'P' 不在 L/N/S/M → 原漏检 → 池中 0.94_5 洗白 p=0.94。
+        # 补 Pc（不是整个 P*——Po 句读 。；， 是合法终止符，不能拒）。
+        return (cat[0] in ("L", "N", "S", "M") or cat in ("Cf", "Cs", "Co", "Pc")
                 or ch in "%,.")
 
     for m in pat.finditer(pool_norm):

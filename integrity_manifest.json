@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-27T08:30:24",
+ "generated": "2026-11-27T09:23:09",
  "file_count": 80,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "f9783d9bcd497c08",
+   "sha16": "40ff1f02fb3feb2a",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "c01aee596be66a5f",
+   "sha16": "4a7f3da92298ab0d",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "99f7125e33af0287",
+   "sha16": "714600452ef38b5c",
    "bytes": 6722
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "c6b12d960c7c40a4",
-   "bytes": 121009
+   "sha16": "9c2ff9912eda85d1",
+   "bytes": 124597
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
@@ -179,16 +179,16 @@
    "bytes": 15876
   },
   "scripts/check_decision_records.py": {
-   "sha16": "710e88f7976ca5bd",
-   "bytes": 10651
+   "sha16": "2a62595e013cc5a4",
+   "bytes": 12356
   },
   "scripts/check_gates.py": {
    "sha16": "3fee72df0eaf652c",
    "bytes": 48986
   },
   "scripts/check_scope.py": {
-   "sha16": "32c3ac954b5948ef",
-   "bytes": 8728
+   "sha16": "03450043ad84d58c",
+   "bytes": 10249
   },
   "scripts/cron_watch.sh": {
    "sha16": "e916ea3dd6c97794",
@@ -207,8 +207,8 @@
    "bytes": 6361
   },
   "scripts/hypothesis_watch.py": {
-   "sha16": "9c80a198dd235c5b",
-   "bytes": 22441
+   "sha16": "679a6ad46ada07ba",
+   "bytes": 23340
   },
   "scripts/install_cron_watch.sh": {
    "sha16": "2ad7aad9a46c4895",
@@ -219,8 +219,8 @@
    "bytes": 3978
   },
   "scripts/poll_run_dir.py": {
-   "sha16": "475f6b617601421a",
-   "bytes": 13837
+   "sha16": "79a876b231328129",
+   "bytes": 14715
   },
   "scripts/reconcile_decisions.py": {
    "sha16": "a7e3e78e070bdc1e",
@@ -235,16 +235,16 @@
    "bytes": 9915
   },
   "scripts/verify_evidence_check.py": {
-   "sha16": "7873c9a5fb373786",
-   "bytes": 8186
+   "sha16": "bb2be65bf09b9501",
+   "bytes": 8881
   },
   "scripts/verify_member_output.py": {
    "sha16": "8dbeb5a434f46829",
    "bytes": 10843
   },
   "scripts/verify_numbers.py": {
-   "sha16": "7f4050e32db49f26",
-   "bytes": 30732
+   "sha16": "6e6d184d7cc53b5d",
+   "bytes": 32629
   },
   "scripts/write_checklist.py": {
    "sha16": "c78c56df37da400c",
@@ -307,8 +307,8 @@
    "bytes": 25364
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "08e2fea2be3dc096",
-   "bytes": 160885
+   "sha16": "c8e555fdc4203a46",
+   "bytes": 168235
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

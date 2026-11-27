@@ -115,9 +115,18 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
                 # 空格/大写/路径成分/特殊字符全部拦掉，消除跨平台大小写分裂）
                 if (len(m) > 64  # 四轮🟢3：长度上限（防超长标识符进文件名）
                         or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", m)):
-                    bad += 1
-                    continue
+                    # R4.19（盲检 A🔴3）：非法 member（含 `../evil` 路径注入）
+                    # 此前只 warning 后静默跳过 → 期望清单缩减为合法子集 →
+                    # 成员未产出/撞限全漏检仍 READY。契约明示「期望清单无法
+                    # 确定 → EXIT=5」，与 cron_watch 非法 task_id fail-closed
+                    # 同口径：有 member 字段但值非法 = 清单不可信，直接失败。
+                    return None, (f"spawn_manifest.jsonl 含非法 member {m!r}"
+                                  f"（路径穿越/特殊字符），期望清单无法确定: {mf}")
                 members.append(m)
+            elif "event" in obj or "type" in obj:
+                # 非 spawn 事件（evidence_check 等）按设计不带 member——跳过，
+                # 不记为畸形行（否则混有 G6 抽查记录的真实 manifest 被误伤）。
+                continue
             else:
                 bad += 1
         else:
