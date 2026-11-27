@@ -1247,6 +1247,36 @@ def test_require_tag_gate() -> None:
                             capture_output=True, text=True, timeout=60).returncode
         assert rc != 3, f"R4.16 预组合 ń 不得 fail-close EXIT=3，实为 {rc}"
 
+        # R4.17（盲检 3🔴）：① 同形声明泛化——ɣ(LATIN GAMMA→p)/ס(HEBREW
+        # SAMEKH→n) 及 Mn 隔断的 ɲ\u0301 均零提取 PASS，须 fail-closed；
+        # ② 权威池多语小数点——产出 n=94 被池中 94·5 / 94٫5 洗白。
+        for label, payload, pool, want_rc in (
+                ("gamma同形声明", "样本 ɣ = 888 只\n", "other,0.5\n", 3),
+                ("samekh同形声明", "样本 ס = 888 只\n", "other,0.5\n", 3),
+                ("Mn隔断同形", "样本 ɲ\u0301 = 888 只\n", "other,0.5\n", 3),
+                ("池中点洗白", "n = 94\n", "val\n94·5\n", 5),
+                ("池中阿小数点洗白", "n = 94\n", "val\n94٫5\n", 5)):
+            (r14src / "pool.csv").write_text(pool, encoding="utf-8")
+            f_r17 = d / f"r17_{label}.md"
+            f_r17.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_r17),
+                                 "--sources", str(r14src)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == want_rc, \
+                f"R4.17 {label} 须 EXIT={want_rc}（不得 PASS=0），实为 {rc}"
+        # 合法对照：ASCII n / 纯池中整数 / CSV 浮点字段不得误伤
+        for label, payload, pool in (
+                ("ASCII声明", "n = 94\n", "val\n94\n"),
+                ("CSV浮点字段", "p = 0.9441\n", "val\n30,0.9441\n")):
+            (r14src / "pool.csv").write_text(pool, encoding="utf-8")
+            f_r17ok = d / f"r17ok_{label}.md"
+            f_r17ok.write_text(payload, encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(vn), str(f_r17ok),
+                                 "--sources", str(r14src)],
+                                capture_output=True, text=True, timeout=60).returncode
+            assert rc == 0, f"R4.17 合法对照 {label} 不得误伤 EXIT={rc}"
+        # 池归一化后 CSV 浮点字段仍溯源（0.9441 in 30,0.9441）
+
         # R4.7（两路盲检 6🔴，全部主代理独立复现）：
         # A🔴 CJK 紧邻 n= 空白拆段（\b 边界漂移）；B1 诱饵数字短路声明总闸；
         # B3 逗号未作数字边界（n=94 被池中 0,94 洗白）；B4 NFKC 不覆盖的排版/
@@ -1538,6 +1568,14 @@ def test_poll_hitlimit_and_manifest() -> None:
             rc, out = run("--expected", "literature-scout")
             assert rc == 5 and "撞限" in out, \
                 f"R4.16 {label} 隔断撞限须 EXIT=5，实为 rc={rc}: {out[-200:]}"
+        # R4.17（盲检🔴3）：Mc(间距组合符 U+0903)/Me(封闭组合符 U+20DD) 插进
+        # 撞限词——normalize_for_matching 剥全 M* 类 → 仍判撞限 EXIT=5。
+        for label, sep in (("Mc visarga", "\u0903"), ("Me enclosing", "\u20dd")):
+            (d / "T-P__literature-scout.md").write_text(
+                f"轮{sep}次耗尽：产出不完整\n# p\n", encoding="utf-8")
+            rc, out = run("--expected", "literature-scout")
+            assert rc == 5 and "撞限" in out, \
+                f"R4.17 {label} 隔断撞限须 EXIT=5，实为 rc={rc}: {out[-200:]}"
         # 正常文件 → READY
         (d / "T-P__literature-scout.md").write_text("# 正常产出\n", encoding="utf-8")
         rc, _ = run("--expected", "literature-scout")

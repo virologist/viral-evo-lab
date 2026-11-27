@@ -4,6 +4,20 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.34] - 2026-11-27（R4.17 v1.5.33 盲检回补 · 3🔴 fail-open：同形声明泛化 + 池多语小数点洗白 + 撞限 Mc/Me 隔断）
+
+v1.5.33 新一轮盲检报若干🔴，报告正文随会话压缩丢失，主代理按摘要残留的 3 条具体变体逐条独立复现，全部坐实 fail-open 后根因级修复；报告未记全的第 4 项按纪律不凭空编造，留待下一轮盲检重新暴露。
+
+### Fixed（3🔴，全部主代理独立复现）
+- **1 同形声明泛化**：`ɣ`(LATIN GAMMA→p)、`ס`(HEBREW SAMEKH→n)、`ɲ\u0301`(Mn 隔断同形) 等单码点/组合非 ASCII 字母冒充 n/p 声明 → `checked=0/PASS`。v1.5.33 按 Unicode 名称枚举 N/P/ENG/PHI 补不完，`_is_np_homoglyph` 改判据为「任意非 ASCII 字母（L* 类）、排除 CJK/假名/韩文表意文字」，且 `prepare_numbers` 在归一化后追加一次同形守卫（Mn 隔断 → mark 单独成位）双向覆盖。合法 ASCII `n=888` 与预组合 `ń=94`（NFD→ASCII 豁免）不误伤。
+- **2 池多语小数点洗白**：产出 `n = 94` 被权威池 `94·5`(U+00B7) / `94٫5`(U+066B) 洗白 PASS——池是 `load_sources` 原文含多语小数点，cand 是产出侧已归一化 ASCII，整数候选右边界遇 U+00B7 不拒。`pool_has_number` 对池统一走 `normalize_for_extraction`（`94·5`→`94.5` 后右边界遇 `.` 即拒），四处调用方（verify_numbers / check_gates / verify_member_output / assemble）同口径单一事实源。纯池中整数 `94` 与 CSV 浮点字段 `30,0.9441` 仍正常溯源。
+- **3 撞限 Mc/Me 隔断**：`轮\u0903次耗尽`（U+0903 天城文 Visarga，Mc 间距组合符）/ `轮\u20dd次耗尽`（Me 封闭组合符）→ poll READY/EXIT=0——`normalize_for_extraction` 只剥 Mn，Mc/Me 保留致子串失配。`normalize_for_matching` 的 drop_cats 补全全 M*（Mn/Mc/Me）→ EXIT=5。
+
+### Verified
+- 3🔴 修复前后 CLI 三态实测（PASS/EXIT=0 → EXIT 3/5），合法对照（ASCII n / 预组合 ń / 纯池中整数 / CSV 浮点字段 / 中文撞限）全过无误伤。
+- 回归断言复用既有 `test_require_tag_gate()` / `test_poll_hitlimit_and_manifest()`，零新增函数 → `CURRENT_BASELINE` 机器锚保持 45 CASES + 16 行为级 = **61/61**。
+- manifest 80 文件 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / compileall 全过 / 四处 version 一致（1.5.34）。
+
 ## [1.5.33] - 2026-11-25（R4.16 v1.5.32 盲检 A 回补 · 3🔴 fail-open：同形声明 + 池字母后缀洗白 + 撞限字母隔断）
 
 v1.5.32 盲检 A（前台同步，报告送达）报 3🔴+2🟠。主代理逐条独立复现 3🔴 全部坐实后修复；2🟠（G4 artifact_mtimes 缺条目静默免除篡改检测、check_baseline_anchors bool bytes）经评估为「需配合其他门禁全绿才构成放行、且修之会误拒存量产出」——披露为已知限制，不修。

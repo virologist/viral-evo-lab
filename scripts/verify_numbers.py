@@ -217,15 +217,24 @@ _HOMOGLYPH_DECL = re.compile(
 
 
 def _is_np_homoglyph(ch: str) -> bool:
+    """声明 mark 是否为冒充 n/p 的非 ASCII 字母（根因级类别判定）。
+
+    R4.17（盲检🔴1）：原按 Unicode 名称枚举 N/P/ENG/PHI，补不完——
+    ɣ(LATIN GAMMA→冒充 p)、ס(HEBREW SAMEKH→冒充 n) 等任一非 ASCII
+    字母紧跟 `=数字` 都会让 n/p 声明正则零命中 → checked=0 → PASS。
+    改为「任意非 ASCII 字母（L* 类）即视为同形声明 mark」，排除 CJK
+    表意文字（Lo 汉字，避免误伤合法中文正文里的单字声明）。归一化后
+    能还原为 ASCII n/p 的（如预组合 ń/ṕ）由调用方豁免，不在此拦。
+    """
     import unicodedata as _ud
-    name = _ud.name(ch, "").upper()
-    if not name:
+    # 只认字母类；非字母（符号/数字/标点）不是同形声明 mark
+    if not _ud.category(ch).startswith("L"):
         return False
-    return (("LATIN" in name and "LETTER" in name
-             and ("LETTER N" in name or "LETTER P" in name
-                  or "LETTER ENG" in name or "LETTER PHI" in name))
-            or ("ARMENIAN" in name and ("NOW" in name or "PEH" in name))
-            or ("GREEK" in name and "PHI" in name))
+    name = _ud.name(ch, "").upper()
+    # CJK 表意文字（汉字/假名/韩文）是合法正文，单字=数字多为中文叙述，不拦
+    if "CJK" in name or "HIRAGANA" in name or "KATAKANA" in name or "HANGUL" in name:
+        return False
+    return True
 
 
 def has_homoglyph_declaration(text: str) -> bool:
@@ -260,6 +269,11 @@ def prepare_numbers(text: str, min_digits: int = 2):
     if has_homoglyph_declaration(text):
         return False, [], "数字声明标记被同形字冒充"
     norm = normalize_for_extraction(text)
+    # R4.17（盲检🔴1）：Mn 组合符插在同形 mark 上（ɲ\u0301 = 888）会让原始
+    # text 的 _HOMOGLYPH_DECL 正则失配，但归一化后 mark 单独成位 → 须在 norm
+    # 上再判一次同形声明，双向覆盖（同 has_split_number 的两次检查）。
+    if has_homoglyph_declaration(norm):
+        return False, [], "归一化后数字声明标记被同形字冒充"
     # R4.12（盲检 A🔴2）：数字+中文句号+数字（含 NFKC(｡)→。）是小数点变体，
     # 定点检测（不动句尾句号），否则 30。5 被提取为 30 被池中 30 洗白。
     # 必须在 norm 生成后同时查原始 text 与归一化 norm（｡ NFKC→。）。
@@ -361,8 +375,15 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # 追加禁字母/数字/下划线/百分号后缀（\w 含字母数字下划线，% 单列）。
     right = (r"(?![\d.\w%])(?!,\d+(?!\.))" if "." not in cand
              else r"(?![\d.])")
+    # R4.17（盲检🔴2）：权威池是 load_sources 原文，可能含多语小数点/中点
+    # （94·5 / 94٫5 / 94。5），而 cand 来自产出侧已归一化的 ASCII。池中
+    # `94·5` 若按原文匹配，整数候选 `94` 右边界是 U+00B7（非 \d.\w%）→
+    # 误判命中 → 洗白。统一对池走与产出侧同一 normalize_for_extraction，
+    # `94·5`→`94.5` 后右边界遇 `.` 即拒，四处调用方（verify_numbers /
+    # check_gates / verify_member_output / assemble）同口径，单一事实源。
+    pool_norm = normalize_for_extraction(pool)
     pat = re.compile(left + re.escape(cand) + right)
-    return pat.search(pool) is not None
+    return pat.search(pool_norm) is not None
 
 
 def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False,
