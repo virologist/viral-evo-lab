@@ -169,7 +169,15 @@ def normalize_for_extraction(text: str) -> str:
     pre = text.translate(_EQUIV_TRANS)
     decomposed = unicodedata.normalize("NFD", pre)
     no_mn = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
-    return unicodedata.normalize("NFKC", no_mn).translate(_EQUIV_TRANS)
+    nfkc = unicodedata.normalize("NFKC", no_mn).translate(_EQUIV_TRANS)
+    # R4.18（盲检🔴4/6）：NFKC 不把**非 ASCII 的 Nd 十进制数字**（泰文 ๔
+    # U+0E54 / 阿拉伯-印度 ١ U+0661 / 天城文 १ U+0967 等）转 ASCII，
+    # 产出用这些同形数字写 `PP ๔๑...` / `轮١次耗尽` → 正则静默失配 →
+    # clean/READY fail-open。类别判据（Nd + decimal）一次性覆盖所有语种
+    # 十进制数字，不再逐码点枚举。圈号/上标（No）已由 NFKC 消解。
+    return "".join(
+        str(unicodedata.decimal(ch)) if unicodedata.category(ch) == "Nd" and ord(ch) > 127
+        else ch for ch in nfkc)
 
 
 def normalize_for_matching(text: str) -> str:
@@ -183,24 +191,62 @@ def normalize_for_matching(text: str) -> str:
     """
     import unicodedata as _ud
     base = normalize_for_extraction(text)
-    # 全角 ！经 NFKC 已变 ASCII !（Po），故按类别剥离 + 显式保留合法数字
-    # 分隔符（.,:-~′'）——事故值/撞限词匹配用途下安全。
-    # R4.15（盲检 A🔴1/2/6）：Cf（ZWJ U+200D 等）此前保留，插进「轮次耗尽」
-    # /「位置映射错」/ severity="fatal‍" 均让子串或精确比较失配 →
-    # READY/clean/CLEAN fail-open。匹配用途下 emoji ZWJ 序列无语义，全剥 Cf。
-    keep_ascii = frozenset(".,:-~′'")
-    # R4.17（盲检🔴3）：Mc(间距组合符，如 U+0903 天城文 Visarga)/Me(封闭
-    # 组合符，如 U+20DD)/Mn(非间距组合符)插进「轮次耗尽」同样让子串失配 →
-    # READY fail-open。Mn 在 normalize_for_extraction 已剥，但 Mc/Me 会
-    # 保留（NFD 不分解间距符），故匹配用途下按类别全剥 M*。
-    drop_cats = ("Sm", "Sk", "So", "Sc", "Pd", "Po", "Ps", "Pe", "Pi", "Pf", "Cf",
-                 "Mn", "Mc", "Me")
-    # R4.16（盲检 A🔴3）：ɲ(U+0272)/ŋ(U+014B) 等拉丁扩展/亚美尼亚字母（Ll/Lu/
-    # Lt/Lm，非 ASCII）插进「轮次耗尽」让子串失配 → READY。匹配用途下剥除；
-    # Lo（汉字/表意文字）保留，否则撞限词自身被剥光。
+    # R4.18（盲检🔴4/6，根因级重构）：原按类别枚举剥离（S*/P*/Cf/M*/非ASCII
+    # L{l,u,t,m}），但类别永远补不完——Nd(阿拉伯数字插进撞限词)/No(½)/Zs(空格
+    # NBSP)/Co(私用区)/Lm(ʰ) 逐个绕过；更糟的是 `%`(Po) 被误剥导致 check_scope
+    # 黑名单 `20\.58%` **字面量自身**永假（纯 ASCII 输入即 clean fail-open）。
+    # 弃用「剥坏类别」的黑名单，改**白名单**：只保留
+    #   ① ASCII 可见字符（0x21~0x7E，含 % 数字 . , : - ( ) [ ] 等合法 token/分隔符）
+    #   ② CJK 表意文字（汉字本身，撞限词「轮次耗尽」/事故叙事「位置映射错」）
+    # 其余（非 ASCII 字母/各语种符号/组合符/私用区/各类空白）一律剥离——
+    # 匹配用途下这些字符均无语义，剥除后关键子串恢复，白名单不再有遗漏类别。
+    # 注意：ASCII 空白(0x20)/换行也剥（撞限词/事故叙事不含空白；黑名单里的
+    # \s* 本就容忍空白），全角空格经 NFKC 已是 0x20 同样剥除。
+    def is_cjk(ch: str) -> bool:
+        o = ord(ch)
+        return (0x4E00 <= o <= 0x9FFF or 0x3400 <= o <= 0x4DBF
+                or 0x20000 <= o <= 0x2FA1F or 0xF900 <= o <= 0xFAFF)
+
+    def keep(ch: str) -> bool:
+        o = ord(ch)
+        if 0x21 <= o <= 0x7E:  # ASCII 可见（含 %，修复黑名单字面量永假）
+            return True
+        return is_cjk(ch)
+    # R4.18 设计纪律（分离关注点）：此处**不再剥「CJK 之间的 ASCII」**——
+    # check_scope 的合法黑名单 token（PP41034380 PMID / d211094 commit）
+    # 本就嵌在中文正文里（「说明：PP 41034380 是事故编号」），一刀切剥离
+    # 会误放真污染（fail-open）。撞限词「轮次耗尽」的隔断问题改用专用
+    # normalize_for_cjk_keyword（纯 CJK 投影）在 poll 侧解决，互不干扰。
+    kept = [ch for ch in base if keep(ch)]
+    # 数字间 ASCII 标点（10!94 / 10—94 / 10⬰94 中的隔断符）须剥以还原事故值
+    # token（1094 commit），但**不得剥字母/数字本身**（PMID PP41034380），
+    # 也须保留合法数字字面量分隔符 `.` `,` `:` `-` `%`（黑名单 20\.58% /
+    # 0\.2058 / 千分位 1,234 依赖）。仅当 ASCII 可见字符左右均为数字、
+    # 且不是这些合法分隔符时剥离。
+    numeric_seps = frozenset(".,:-%")
+    out = []
+    for i, ch in enumerate(kept):
+        if (0x21 <= ord(ch) <= 0x7E and not ch.isalnum() and ch not in numeric_seps
+                and i > 0 and i + 1 < len(kept)
+                and kept[i - 1].isdigit() and kept[i + 1].isdigit()):
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
+def normalize_for_cjk_keyword(text: str) -> str:
+    """撞限关键词专用归一化：只保留 CJK 表意文字，其余一律剥离。
+
+    R4.18（盲检🔴4，根因级）：撞限词「轮次耗尽」是**纯 CJK**，插入任何
+    非 CJK 字符（Nd 阿拉伯数字 ١ / No ½ / Lm ʰ / Co 私用区 / Zs 空格 /
+    ASCII ! 等）都是隔断攻击。通用的 normalize_for_matching 必须保留
+    ASCII 数字字母（供 PMID/commit 黑名单匹配），无法一刀切剥离；故撞限
+    检测单独走此「纯 CJK 投影」：任意非 CJK 隔断自动消失，类别永不遗漏。
+    """
+    base = normalize_for_extraction(text)
     return "".join(ch for ch in base
-                   if ch in keep_ascii or (_ud.category(ch) not in drop_cats
-                       and not (ord(ch) > 127 and _ud.category(ch) in ("Ll", "Lu", "Lt", "Lm"))))
+                   if (0x4E00 <= ord(ch) <= 0x9FFF or 0x3400 <= ord(ch) <= 0x4DBF
+                       or 0x20000 <= ord(ch) <= 0x2FA1F or 0xF900 <= ord(ch) <= 0xFAFF))
 
 
 def has_forbidden(text: str) -> bool:

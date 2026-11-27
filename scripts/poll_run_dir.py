@@ -49,7 +49,7 @@ from pathlib import Path
 # R4.2（2026-11-19 · 盲检🔴3）：统一严格读守卫——撞限检测原用 errors="replace"
 # 会把 UTF-16 的「轮次耗尽」标注吞成 U+FFFD → 误判 READY 放行不完整产出。
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _text_guard import read_text_checked, normalize_for_matching  # noqa: E402
+from _text_guard import read_text_checked, normalize_for_cjk_keyword  # noqa: E402
 
 # R-13a：撞限标注识别串（与主理人 MD 撞限协议条款逐字对应）
 HIT_LIMIT_MARK = "轮次耗尽"
@@ -159,10 +159,10 @@ def head_hit_limit(f: Path, lines: int = 8) -> bool:
     head, err = read_text_checked(f)
     if head is None:
         return True  # 不可解码/控制字符污染 ≠ 没标注——保守判定，人工复核
-    # R4.13/14：Mn 及非 Mn 符号（⬰ ★ ！ —）插进「轮次耗尽」让子串失配 →
-    # 不完整产出被判 READY。normalize_for_matching 统一剥 Mn + 非 ASCII S*/P*，
-    # 匹配用途归一化后做撞限子串匹配，覆盖全部 Unicode 等价隔断形态。
-    return HIT_LIMIT_MARK in normalize_for_matching(head)
+    # R4.18（盲检🔴4，根因级）：撞限词是纯 CJK，插入任何非 CJK（Nd/No/Lm/
+    # Co/Zs/ASCII 符号）都是隔断。改用纯 CJK 投影 normalize_for_cjk_keyword，
+    # 类别永不遗漏（R4.13~17 逐类别补 S*/P*/Cf/M*/L* 仍被 Nd/空格绕过）。
+    return HIT_LIMIT_MARK in normalize_for_cjk_keyword(head)
 
 
 def main() -> int:

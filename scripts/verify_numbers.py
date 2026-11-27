@@ -39,6 +39,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 # R4.2（2026-11-19 · 盲检🔴1）：统一严格读守卫——无 BOM UTF-16 的 NUL 交错在
@@ -219,20 +220,23 @@ _HOMOGLYPH_DECL = re.compile(
 def _is_np_homoglyph(ch: str) -> bool:
     """声明 mark 是否为冒充 n/p 的非 ASCII 字母（根因级类别判定）。
 
-    R4.17（盲检🔴1）：原按 Unicode 名称枚举 N/P/ENG/PHI，补不完——
-    ɣ(LATIN GAMMA→冒充 p)、ס(HEBREW SAMEKH→冒充 n) 等任一非 ASCII
-    字母紧跟 `=数字` 都会让 n/p 声明正则零命中 → checked=0 → PASS。
-    改为「任意非 ASCII 字母（L* 类）即视为同形声明 mark」，排除 CJK
-    表意文字（Lo 汉字，避免误伤合法中文正文里的单字声明）。归一化后
-    能还原为 ASCII n/p 的（如预组合 ń/ṕ）由调用方豁免，不在此拦。
+    R4.18（盲检🔴3，根因级）：R4.17 的「任意非 ASCII 字母 L*」仍有两漏——
+    ① 假名/韩文（ん U+3093 / ニ U+30CB / ㄴ U+3134，category Lo，是 n 的
+    直接同形字）被名称排除名单放行；② 非字母 mark（★ So / ⬰ Sm / 私用区
+    Co）根本不进 L* 判据。排除名单与类别枚举同构、永远补不完。改**语义判据**：
+    `_HOMOGLYPH_DECL` 已限定「单个非 ASCII 非空白字符 + `=数字`」结构，
+    合法 n/p 声明的 mark 都是 ASCII（由正常提取处理），故此结构下除 CJK
+    表意文字（合法中文正文「样本量=94」的「量」）外，任何非 ASCII mark
+    一律视为同形声明 → fail-closed。归一化后能还原 ASCII n/p 的（预组合
+    ń/ṕ）由调用方豁免。
     """
     import unicodedata as _ud
-    # 只认字母类；非字母（符号/数字/标点）不是同形声明 mark
-    if not _ud.category(ch).startswith("L"):
-        return False
+    if ord(ch) < 128:
+        return False  # ASCII 由正常 n/p 提取处理
     name = _ud.name(ch, "").upper()
-    # CJK 表意文字（汉字/假名/韩文）是合法正文，单字=数字多为中文叙述，不拦
-    if "CJK" in name or "HIRAGANA" in name or "KATAKANA" in name or "HANGUL" in name:
+    # 仅 CJK 表意文字（汉字）是合法正文载体，放行。假名(HIRAGANA/KATAKANA)/
+    # 韩文(HANGUL)是表音文字、n/ni/nieun 的直接同形字，不豁免（本轮🔴）。
+    if "CJK UNIFIED IDEOGRAPH" in name or "CJK COMPATIBILITY IDEOGRAPH" in name:
         return False
     return True
 
@@ -241,6 +245,11 @@ def has_homoglyph_declaration(text: str) -> bool:
     for m in _HOMOGLYPH_DECL.finditer(text):
         mark = m.group("mark")
         if not _is_np_homoglyph(mark):
+            continue
+        # R4.18：D′/d´ prime 记法中 mark 是撇号变体（´ U+00B4 / ʹ 等），
+        # 前一个字符是 d/D——这是合法 dprime 声明，不是 n/p 同形冒充，
+        # 放行（避免 fail-close 误伤，d´=0.94 应 EXIT=5 而非 3）。
+        if m.start() > 0 and text[m.start() - 1] in "dD":
             continue
         # 预组合 ń(U+0144)/ṕ(U+1E55) 等 NFD 剥 Mn 后已转成 ASCII n/p，
         # 声明正则可正常提取（EXIT=5），无需 fail-closed。仅当归一化后
@@ -383,7 +392,34 @@ def pool_has_number(pool: str, cand: str) -> bool:
     # check_gates / verify_member_output / assemble）同口径，单一事实源。
     pool_norm = normalize_for_extraction(pool)
     pat = re.compile(left + re.escape(cand) + right)
-    return pat.search(pool_norm) is not None
+    # R4.18（盲检🔴1/2，根因级）：原右边界靠正则字符类 [\d.\w%] 枚举，补不完——
+    # ① 浮点分支只 `(?![\d.])`，`0.94e5`/`0.94foo`/`0.94%` 全部洗白 p=0.94；
+    # ② 整数分支 `\w%` 不含 Sc($€)/So(°★)/Sk 等符号，`94$`/`94€`/`94°` 洗白 n=94。
+    # 与「码点/类别枚举补不完」同构。改**语义判据**：命中后检查紧邻右字符，
+    # 凡属「数值延续/量纲」类别（字母 L*/数字 N*/标点连接 Pc/符号 S*/格式 Cf/
+    # 百分号%，以及 CSV 合法字段后随的 `.`、`,`+数字）即视为数值未完结，拒命中。
+    # 合法终止：行尾/空白/CSV 逗号字段边界/句读（。；，）等放行。
+    def is_value_continuation(ch: str) -> bool:
+        cat = unicodedata.category(ch)
+        # Cc 中的 \t\n\r\f\v 是合法 token 终止符（行尾/字段边界），不拒；
+        # 仅 Cf/Cs/Co 等格式/代理/私用字符才是不可见延续，须拒。
+        if ch.isspace():
+            return False
+        return (cat[0] in ("L", "N", "S", "M") or cat in ("Cf", "Cs", "Co")
+                or ch in "%,.")
+
+    for m in pat.finditer(pool_norm):
+        tail = pool_norm[m.end():]
+        if tail and is_value_continuation(tail[0]):
+            # CSV 双数字字段 `30,0.9441` / `1,0.94,2`：cand 后随 `,` 是合法
+            # 字段边界。right 正则已对整数 cand 用 (?!,\d+(?!\.)) 区分
+            # 「千分位延续(94,500→拒)」与「下一字段是浮点(30,0.9441→放行)」，
+            # 浮点 cand 用 (?![\d.]) 本就允许。凡正则已放行此处不二次拒。
+            if tail[0] == ",":
+                return True
+            continue
+        return True
+    return False
 
 
 def load_sources(paths: list[str], exclude: list[str] | None = None, allow_md: bool = False,

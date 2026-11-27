@@ -40,6 +40,11 @@ import re
 import sys
 from pathlib import Path
 
+# R4.18（盲检🔴8）：形式要件的「非空」须拒绝 Cf 零宽字符（\u200b/\u00ad 等
+# 凭空满足「有 reason/摘录」），line 值域须为正整数（拒 -1/0/全角数字）。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _text_guard import has_forbidden, normalize_for_extraction  # noqa: E402
+
 EXIT_OK = 0
 EXIT_STRUCT = 3
 EXIT_FAIL = 5
@@ -49,8 +54,18 @@ RE_LOCATOR = re.compile(r"^.+\.([A-Za-z0-9]+):(\d+)$")
 
 
 def _is_nonempty(v) -> bool:
-    """字符串非空且非纯空白。"""
-    return isinstance(v, str) and bool(v.strip())
+    """字符串非空、非纯空白，且不含不可见格式字符（Cf）。
+
+    R4.18（盲检🔴8）：`str.strip()` 不剥 Cf（U+200B 零宽空格 / U+00AD 软连
+    字符），`reason="\u200b"` / `excerpt="\u200b"` 凭空满足「有内容」要件 →
+    G6 抽查留痕被空壳记录 through（fail-open）。复用统一守卫 has_forbidden
+    拒 Cc/Cf/U+FFFD；归一化后还须至少一个可见字符。
+    """
+    if not isinstance(v, str) or not v.strip():
+        return False
+    if has_forbidden(v):
+        return False
+    return bool(normalize_for_extraction(v).strip())
 
 
 def _validate(ev: dict, task_id: str) -> list[str]:
@@ -69,9 +84,16 @@ def _validate(ev: dict, task_id: str) -> list[str]:
         line = val.get("line")
         # R4.14（盲检 A🔴7）：bool 是 int 子类，line=true 曾被当合法行号 →
         # 两条畸形抽查仍判 PASS（fail-open）。显式排除 bool。
-        if not (isinstance(line, int) and not isinstance(line, bool)
-                or (_is_nonempty(line) and not isinstance(line, bool)
-                    and str(line).isdigit())):
+        # R4.18（盲检🔴8）：原判据还漏 -1/0（isinstance int 即通过）与全角/
+        # 阿拉伯数字（str.isdigit() 认非 ASCII）→ 非法行号当合法。改：int 须
+        # >=1；字符串须归一化后为 ASCII 十进制且 >=1。
+        line_ok = False
+        if isinstance(line, int) and not isinstance(line, bool):
+            line_ok = line >= 1
+        elif isinstance(line, str) and not has_forbidden(line):
+            norm_line = normalize_for_extraction(line).strip()
+            line_ok = bool(re.fullmatch(r"[0-9]+", norm_line)) and int(norm_line) >= 1
+        if not line_ok:
             bad.append("value.line 非行号")
         if not _is_nonempty(val.get("excerpt")):
             bad.append("value.excerpt 缺失（无原文摘录）")

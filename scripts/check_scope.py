@@ -66,6 +66,11 @@ def check_file(p: Path) -> list:
     # R4.14（盲检 A🔴5）：非 Mn 的 Sm/Po/Pd 符号插进事故值（10⬰94/10！94）
     # 同样让黑名单正则静默失配 → clean。用匹配用途归一化剥除非 ASCII 符号。
     from _text_guard import normalize_for_matching  # R4.10: 事故值全角归一化
+    # R4.18（盲检🔴6）：原逐行匹配使「位置映射\n错误」跨行拆段后每行都
+    # 不含完整黑名单词 → clean fail-open。黑名单词义完整即可，行边界无
+    # 语义——追加**全文归一化扫描**（换行被 normalize_for_matching 剥除，
+    # 跨行叙事自动接续）。逐行扫描保留用于精确行号报告与治理正本注释豁免。
+    full_norm = normalize_for_matching(text)
     for lineno, raw_line in enumerate(text.splitlines(), 1):
         line = normalize_for_matching(raw_line)
         # R4.6（盲检🔴 B3）：原实现把整行 `#`/`//` 开头的行全部跳过——md 标题
@@ -89,6 +94,14 @@ def check_file(p: Path) -> list:
                 continue
             hits.append((lineno, pat.pattern, line.strip()[:80]))
             break
+    # R4.18（盲检🔴6）：全文扫描补跨行拆段。仅收黑名单命中且尚未被逐行
+    # 捕获的 pattern（用 pattern 去重，避免同一污染重复计数）。
+    seen_pats = {h[1] for h in hits}
+    for pat in PATTERNS:
+        if pat.pattern in seen_pats:
+            continue
+        if pat.search(full_norm):
+            hits.append((-1, pat.pattern, full_norm.strip()[:80]))
     return hits
 
 

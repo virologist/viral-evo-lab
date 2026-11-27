@@ -35,6 +35,11 @@ import re
 import sys
 from pathlib import Path
 
+# R4.18（盲检🔴7）：形态锚正则须在归一化源码上匹配，防全角等号（＝ U+FF1D）
+# 等 Unicode 等价形态把 default=True 翻转玩法绕过。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _text_guard import normalize_for_extraction  # noqa: E402
+
 EXIT_OK = 0
 EXIT_STRUCT = 3
 EXIT_VIOLATION = 5
@@ -141,15 +146,20 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
             except (OSError, UnicodeError) as e:
                 rep["structural_errors"].append(f"{rid}: {rel} 不可读: {type(e).__name__}")
                 continue
+            # R4.18（盲检🔴7）：形态锚正则/子串在**归一化源码**上匹配——
+            # 全角等号 `default＝True`、全角括号等 Unicode 等价形态原先
+            # 让 RE_DEFAULT_TRUE / 形态锚静默失配 → 默认值已被翻转仍判 OK。
+            # 归一化只用于形态校验，不改原文件、不影响 JSON 记录读取。
+            src_norm = normalize_for_extraction(src)
             # ADR-001：三处 CLI 必须保持默认关闭
             if rule == "require_tag_default_off":
-                if not RE_STORE_TRUE.search(src):
+                if not RE_STORE_TRUE.search(src_norm):
                     rep["violations"].append(f"{rid}: {rel} 已非 action=\"store_true\" 形态")
-                if RE_DEFAULT_TRUE.search(src):
+                if RE_DEFAULT_TRUE.search(src_norm):
                     rep["violations"].append(f"{rid}: {rel} 出现 default=True（默认值被翻转）")
             # 其余 rule：文件内形态锚必须齐备
             for needle in RULE_ANCHORS[rule].get(rel, ()):
-                if needle not in src:
+                if needle not in src_norm:
                     rep["violations"].append(f"{rid}: {rel} 缺形态锚 {needle!r}")
 
         # 测试锚：在 tests/ 下任一 .py 中出现即可（防测试被静默删除）

@@ -4,6 +4,28 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.35] - 2026-11-27（R4.18 v1.5.34 双路盲检回补 · 8 类 fail-open：归一化白名单重构 + 池边界语义判据 + severity/形态锚/留痕）
+
+v1.5.34 两路独立盲检（A 通用 10🔴+1🟠 / B 对抗红队 7 组🔴+1🟠，大量交叉印证），报告正文均送达；主代理逐条独立复现去重后坐实 8 类 fail-open、证伪 2 项（evidence `line=全角１` 归一化后为合法行号 1；泰文 PMID payload 用错元音符 U+0E38 非数字 U+0E58，正确数字本已被 R4.18 Nd 映射覆盖）。根因归纳：**「按类别/码点枚举」永远补不完**——本轮由 Mc/Me 扩展到 Nd/No/Zs/Lm/Co/非 ASCII `!`，且发现 `%`(Po) 被误剥使黑名单字面量 `20\.58%` 永假。
+
+### Fixed（8 类，全部主代理独立复现）
+- **1 池右边界语义判据**（A1/A2+B2）：浮点候选 `(?![\d.])` 漏后缀 → `0.94e5`/`0.94foo`/`0.94%` 洗白 `p=0.94`；整数 `[\d.\w%]` 漏 Sc/So → `94$`/`94€`/`94°` 洗白 `n=94`。`pool_has_number` 命中后检查紧邻右字符的 Unicode 语义（L*/N*/S*/M*/Cf/Cs/Co 为数值延续即拒；空白/逗号字段边界放行），不再枚举字符类。四处消费方同口径。
+- **2 同形声明语义判据**（A3+B1）：R4.17 的「非 ASCII 字母 L* 排除 CJK/假名/韩文」仍漏假名 `ん`/`ニ`/韩文 `ㄴ`（Lo 同形字）与非字母 mark `★`(So)/`⬰`(Sm)/私用区(Co)。`_is_np_homoglyph` 改为「`=数字` 结构下除 CJK 表意文字外任何非 ASCII mark 一律 fail-closed」；D′ prime 记法（`´` 前接 d/D）保留豁免。
+- **3 归一化白名单重构**（A4/B3/B4）：`normalize_for_matching` 从「剥坏类别」黑名单改**白名单**（仅 ASCII 可见 0x21-0x7E + CJK 表意文字），根治 Nd/No/Zs/Lm/Co 隔断；`%`(Po) 保留修复黑名单字面量永假。撞限词专用 `normalize_for_cjk_keyword`（纯 CJK 投影）在 poll 侧落地，类别永不遗漏。
+- **4 check_scope 跨行+数字**（A6/A8）：逐行匹配使「位置映射\n错误」拆段漏检 → 追加全文归一化扫描；`normalize_for_extraction` 增 Nd→ASCII 数字映射（泰文 `๔๑...`→`41034380`）修复 PMID 黑名单。
+- **5 severity 归一化**（A5/B5）：台账 severity/status 精确 `.lower()` 漏全角 `ＦＡＴＡＬ`/西里尔 `faтal`/组合音标 → `hypothesis_watch` 比较前走 `normalize_for_extraction`。
+- **6 形态锚归一化**（A9/B7）：`check_decision_records` 形态正则在全角等号 `default＝True` 下失配 → 源码在归一化后匹配。
+- **7 留痕非空/行号值域**（A10/B6）：`verify_evidence_check` 的 `reason`/`excerpt` 可用 Cf 零宽字符凭空满足非空 → `_is_nonempty` 加 `has_forbidden`；`line` 增 `>=1` 值域。
+
+### 证伪（2 项，不成立）
+- evidence `line="１"`（U+FF11）：归一化后为合法行号 1，正确放行非 fail-open。
+- 泰文 PMID 原 payload 混入元音符 U+0E38（Mn，非数字）——正确数字 U+0E58 组合已被 Nd 映射覆盖。
+
+### Verified
+- 8 类 25 变体 CLI 三态实测（PASS/READY/CLEAN → EXIT 3/5）全过；合法对照（CSV 双字段 / prime 变体 / 中文正文 n / 治理正本精确豁免 / 合法 PMID 嵌入正文）全过无误伤。
+- 回归断言复用既有 `test_require_tag_gate` / `test_poll_hitlimit_and_manifest` / `test_decision_records_guard` / `test_g6_evidence_gate` 四函数，零新增 → 机器锚 `CURRENT_BASELINE = 45 CASES + 16 行为级 = 61/61`。
+- manifest 80 文件 / pytest 19 passed / fuzz 61/61 / 守卫 11/11 / compileall 全过 / 四处 version 一致（1.5.35）。
+
 ## [1.5.34] - 2026-11-27（R4.17 v1.5.33 盲检回补 · 3🔴 fail-open：同形声明泛化 + 池多语小数点洗白 + 撞限 Mc/Me 隔断）
 
 v1.5.33 新一轮盲检报若干🔴，报告正文随会话压缩丢失，主代理按摘要残留的 3 条具体变体逐条独立复现，全部坐实 fail-open 后根因级修复；报告未记全的第 4 项按纪律不凭空编造，留待下一轮盲检重新暴露。

@@ -42,6 +42,11 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+# R4.18（盲检🔴5）：severity/status 精确比较须走统一归一化，防全角/西里尔
+# 同形字（ＦＡＴＡＬ / faтal）致 fatal 证伪发现漏报。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _text_guard import normalize_for_extraction  # noqa: E402
+
 
 def autodetect_research_ops() -> str:
     env_v = os.environ.get("RESEARCH_OPS_DIR", "").strip()
@@ -313,9 +318,15 @@ def main() -> int:
         fid = _row_str(row.get("finding_id"))
         if fid in handled:
             continue
-        if _row_str(row.get("status")).lower() != "closed":
+        # R4.18（盲检🔴5）：台账 severity/status 是权威证据源，全角字母
+        # （ＦＡＴＡЛ）、西里尔同形（faтal）、组合音标（fataĺ）等经 .lower()
+        # 不收敛到 ASCII → fatal 证伪发现被跳过 → late_fatal 漏报 EXIT=0。
+        # 统一走 normalize_for_extraction（NFKC + 同形映射 + 剥 Mn）后比较。
+        norm_status = normalize_for_extraction(_row_str(row.get("status"))).lower()
+        norm_sev = normalize_for_extraction(_row_str(row.get("severity"))).lower()
+        if norm_status != "closed":
             continue
-        if _row_str(row.get("severity")).lower() not in ("fatal", "severe"):
+        if norm_sev not in ("fatal", "severe"):
             continue
         closed_raw = row.get("closed_date") or ""
         cd = parse_dt(closed_raw)
