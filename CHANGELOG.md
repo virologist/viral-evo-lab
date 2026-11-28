@@ -4,6 +4,22 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.40] - 2026-11-28（R4.23 v1.5.39 双路盲检回补 · 5 组坐实 fail-open 根因级修复）
+
+v1.5.39 两路独立盲检（A 通用 4🔴+3🟠 / B 对抗红队 3🔴+4🟠，去重 5 组）报告正文均送达。主代理逐条自建 fixture + 真实 CLI 独立复现，**5/5 全部坐实零证伪**。本轮系统性根因：R4.22 修复的**邻界遗漏**——时间证据链只修基准字段未修复核字段、守卫正则与提取正则词边界口径漂移、真值别名值解析仍是字面枚举、双实现各取一次 JSON、兼容区剥离放在 NFKC 之后成死代码。
+
+### Fixed（5 组）
+- **A-1 reviewed_at 未来**（`hypothesis_watch.py`）：R4.22 只修了 last_updated 未来上界，同链 reviewed_at 未来值使 `(now-rev).days` 负 age → 超期复核验收恒真，`--check-disposition` 静默 OK/0 → 复核是已发生事实，时刻不可能在未来，与 future_pool 同口径 fail-closed → INCOMPLETE/6。
+- **A-2 词边界漂移**（`verify_numbers.py`）：复合 token 守卫用 `\b[nNpP]`，而提取侧用 `(?<![A-Za-z])`（允许 CJK 紧邻）→ `样本n = 30′5` 的「本」与 n 同为 \w 使 \b 失配，提取侧照样取 30 洗白 → 统一为 `(?<![A-Za-z])` 单一口径。
+- **A-3/B-1 default 真值别名**（`check_decision_records.py`）：R4.22 的 `[A-Za-z_]\w*|\d+` 值解析仍枚举，`default=0.5`/`-1`/`"1"`/`[1]` 绕过，超长 help 把 default 挤出 240 字符窗口 → ① 参数块定位改**括号配平**（无长度上限）② 值判定改 `ast.literal_eval` 求语义后 `bool()`，求不出（变量/表达式）保守判真。
+- **A-4/B-3 V5 双实现解析漂移**（`scripts/assemble_spawn_prompt.py`）：`_v5_type_precheck` 用贪婪 `\{.*\}` 另取 JSON，与 vendor 三形态解析口径漂移（围栏 + 前置散文使两处取到不同对象），解析失败静默返回 [] → 类型混淆放行 → 加载器返回 vendor 整个模块，预检复用 `_extract_task_json` 单一事实源，解析失败 fail-closed。
+- **B-2 CJK 兼容字隔断 check_scope**（`_text_guard.py`）：R4.22 在 `normalize_for_matching.is_cjk` 里的兼容区排除是死代码（base 已先 NFKC 把 U+F900 折成「豈」统一汉字）→ 抽 `strip_cjk_compatibility()` 在 NFKC **之前**剥除，matching 与 cjk_keyword 两通道共用单一事实源。
+
+### Verified
+- 13 项既有向量 + 5 组新回归断言复用既有 `test_gate_fuzz` / `test_decision_records_guard` 函数（零新增 `def test_*`），机器锚 `CURRENT_BASELINE = 45 CASES + 16 行为级 = 61/61` 不变。
+- 全链：pytest 19/19 / manifest 80 文件 / compileall OK；四处 version=1.5.40。
+- 正字对照全过：近期 reviewed_at→OK、行首 n=30′5→3、纯污染 PP41034380→3、default=False→OK、裸 JSON 类型混淆→4。
+
 ## [1.5.39] - 2026-11-28（R4.22 v1.5.38 双路盲检回补 · 13 项坐实 fail-open 根因级修复）
 
 v1.5.38 两路独立盲检（A 通用 10🔴+3🟠 / B 对抗红队 5🔴+4🟠，去重 13 项）报告正文均送达。主代理对 13 项逐条自建 fixture + 真实 CLI 独立复现，**13/13 坐实零证伪**（A2=B4、A6=B2 重复项合并计）。本轮系统性根因：**时间基准无未来上界**（A1/A2/A3/B3）、**形态锚枚举真值字面/名称子串**（A5/A6/B5）、**同一文件语义只判路径不判 inode**（A8）、**肯定式类型判据跳过非字符串**（A10）、**合法豁免边界过宽**（B1/A9）。

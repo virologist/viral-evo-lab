@@ -424,6 +424,56 @@ def test_gate_fuzz() -> None:
                               capture_output=True, text=True, timeout=60).returncode == 4, \
             "R4.22 A10 非字符串 judge_mode/threshold 须 EXIT=4"
 
+        # ── R4.23（v1.5.39 双路盲检 5 组坐实 fail-open 回归）────────────
+        # A-1 reviewed_at 未来使复核验收恒真 → INCOMPLETE 6
+        state = ro / "00_governance" / "hypothesis_watch_state.json"
+        state.write_text(json.dumps({"handled_finding_ids": [],
+                                     "reviewed_at": "2099-01-01T00:00:00+08:00"}), encoding="utf-8")
+        # 需池超期且无未处置 fatal，才走到 reviewed_at 判据
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text(json.dumps({
+            "last_updated": "2026-01-01T00:00:00+08:00", "active_hypotheses": []}), encoding="utf-8")
+        (ro / "00_governance" / "redteam_ledger.csv").write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n"
+            "F-OK,low,closed,2026-01-02,非致命\n", encoding="utf-8")
+        assert _rc("hypothesis_watch.py", "--research-ops", str(ro),
+                   "--check-disposition") == 6, "R4.23 A-1 未来 reviewed_at 须 INCOMPLETE/6"
+        # A-2 \b 与提取口径漂移：样本n（CJK 紧邻）复合 token 须 3
+        a2 = d / "r423_a2.md"; a2.write_text("样本n = 30\u20325\n", encoding="utf-8")
+        assert _rc("verify_numbers.py", str(a2), "--sources", str(src9)) == 3, \
+            "R4.23 A-2 CJK 紧邻 prime 复合 token 须 EXIT=3"
+        # B-2 CJK 兼容字隔断 check_scope 黑名单 → 3
+        b2 = d / "r423_b2.md"; b2.write_text("事故编号见 PP 41\uf900034380\n", encoding="utf-8")
+        assert _rc("check_scope.py", str(b2)) == 3, \
+            "R4.23 B-2 CJK 兼容字隔断黑名单须 EXIT=3"
+        # A-3 default 浮点真值别名 → 5（复用 A6 的脚本，构造浮点注入）
+        cli2 = d / "r423_cli"; (cli2 / "scripts").mkdir(parents=True)
+        (cli2 / "docs").mkdir(); (cli2 / "tests").mkdir()
+        # 6 个 rule 锚文件齐备（同 test_decision_records_guard），否则结构错误 3
+        for n2 in ("check_gates.py", "verify_numbers.py", "verify_member_output.py",
+                   "verify_evidence_check.py", "reconcile_decisions.py", "check_baseline_anchors.py"):
+            src2 = (PKG / "scripts" / n2).read_text(encoding="utf-8")
+            if n2 == "check_gates.py":
+                src2 = src2.replace('action="store_true",\n                    help="严审模式',
+                                    'action="store_true", default=0.5,\n                    help="严审模式', 1)
+            (cli2 / "scripts" / n2).write_text(src2, encoding="utf-8")
+        (cli2 / "docs" / "decision_records.json").write_bytes(
+            (PKG / "docs" / "decision_records.json").read_bytes())
+        (cli2 / "tests" / "anchors.py").write_text(
+            "# " + "\n# ".join(("test_require_tag_gate", "require_tag 闸三点接线存活",
+                               "test_g6_evidence_gate", "test_anchor_refresh_guard",
+                               "test_reconcile_decisions")),
+            encoding="utf-8")
+        assert _rc("check_decision_records.py", "--pkg-root", str(cli2), "--json") == 5, \
+            "R4.23 A-3 default=0.5 浮点真值别名须 EXIT=5"
+        # A-4/B-3 V5 围栏 + 前置散文使双实现解析漂移 → 4
+        fence = d / "r423_v5.md"
+        fence.write_text('```json\n' + json.dumps(bad_v5, ensure_ascii=False) +
+                         '\n```\n说明：阈值取自 config/foo.yaml}\n', encoding="utf-8")
+        assert _rc("assemble_spawn_prompt.py", "--member", "literature-scout",
+                   "--task-file", str(fence), "--check-task-package",
+                   "--out", str(d / "spawn2.md")) == 4, \
+            "R4.23 A-4 围栏 JSON 类型预检漂移须 EXIT=4"
+
 
 def test_g4_waiver_release() -> None:
     """L3（2026-11-09）：G4 阻断态的 waiver 放行五路径行为回归。

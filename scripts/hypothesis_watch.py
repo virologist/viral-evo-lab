@@ -222,8 +222,14 @@ def check_disposition(state_p: Path, late_fatal: list, hyp_updated: datetime,
     notes.append("全部 fatal/severe 闭环发现已处置")
     if age_days > max_age:
         rev = parse_dt(obj.get("reviewed_at", ""))
-        if rev is None or rev < hyp_updated or (now_canonical() - rev).days > max_age:
-            return False, [f"假说池 {age_days} 天未更新，reviewed_at 缺失/过期/早于池更新"] + notes
+        # R4.23（盲检 A🔴1，根因级）：R4.22 只修了 last_updated 的未来上界，
+        # 同一证据链的 reviewed_at 未来值仍使 `(now-rev).days` 负 age →
+        # 超期判据恒假、`rev < hyp_updated` 亦假 → 未来「复核」被判有效，
+        # 陈旧池在 --check-disposition 下静默 OK。复核是已发生的事实，
+        # 时刻不可能在未来：与 future_pool 同口径 fail-closed。
+        if (rev is None or rev < hyp_updated or rev > now_canonical()
+                or (now_canonical() - rev).days > max_age):
+            return False, [f"假说池 {age_days} 天未更新，reviewed_at 缺失/未来/过期/早于池更新"] + notes
         notes.append(f"例行复核有效（reviewed_at={obj.get('reviewed_at')}）")
     return True, notes
 

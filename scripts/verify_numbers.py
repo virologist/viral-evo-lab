@@ -336,8 +336,12 @@ def prepare_numbers(text: str, min_digits: int = 2):
     # vmo / G2 三处同源）。这与 \d。\d 句号小数点同类：声明值内部的数字被
     # 合法分隔符劈开。仅在**声明 marker 后**检测，避免误伤 1,234 千分位、
     # 10:30 时间、1-2 范围等无声明前缀的合法写法。
-    if re.search(r"\b[nNpP]\s*[=:]\s*\d+[′'~:\-]\d", text) \
-            or re.search(r"\b[nNpP]\s*[=:]\s*\d+[′'~:\-]\d", norm):
+    # R4.23（盲检 A🔴2，根因级）：`\b` 要求词边界，而提取侧 n_eq/p_val 用
+    # `(?<![A-Za-z])` 特意允许 CJK/数字紧邻（R4.5）——`样本n = 30′5` 的
+    # 「本」与 n 同为 \w，\b 不成立使本守卫失配，但提取侧照样取 30 洗白。
+    # 统一为与提取侧同一口径：仅禁 ASCII 字母紧邻，CJK 紧邻一律拦。
+    _COMPOUND = r"(?<![A-Za-z])[nNpP]\s*[=:]\s*\d+[′'~:\-]\d"
+    if re.search(_COMPOUND, text) or re.search(_COMPOUND, norm):
         return False, [], "数字声明值被合法分隔符劈开为复合 token"
     # 归一化后再查一次劈开（全角→ASCII 后可能出现新的相邻数字-符号结构）
     if has_split_number(norm) or has_broken_key_pattern(norm):

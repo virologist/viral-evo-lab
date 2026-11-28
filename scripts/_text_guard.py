@@ -186,6 +186,19 @@ def normalize_for_extraction(text: str) -> str:
         else ch for ch in nfkc)
 
 
+def strip_cjk_compatibility(text: str) -> str:
+    """R4.23（盲检 B🔴2）：在 NFKC **之前**剥除 CJK 兼容表意文字区。
+
+    兼容字（U+F900–FAFF / U+2F800–2FA1F）经 NFKC 折叠成**另一个**统一
+    汉字（U+F900→豈、U+2F800→丽），事后投影无法区分合法汉字与折叠后的
+    兼容字，故兼容字插进黑名单（PP 41豈034380 / 位置映豈射错）或撞限词
+    均隔断子串匹配。所有「匹配用途」归一化必须共用本前置剥离（单一事实源）。
+    """
+    return "".join(ch for ch in text
+                   if not (0xF900 <= ord(ch) <= 0xFAFF
+                           or 0x2F800 <= ord(ch) <= 0x2FA1F))
+
+
 def normalize_for_matching(text: str) -> str:
     """匹配用途归一化：在 normalize_for_extraction 基础上再剥非 ASCII 的
     符号/标点类字符（S*/P*），供关键子串匹配（撞限标注/事故叙事）使用。
@@ -196,7 +209,10 @@ def normalize_for_matching(text: str) -> str:
     维持合法数字格式。仅用于匹配，不改原文其它用途。
     """
     import unicodedata as _ud
-    base = normalize_for_extraction(text)
+    # R4.23（盲检 B🔴2）：NFKC 前先剥 CJK 兼容区（否则折成统一汉字后隔断
+    # 黑名单子串，R4.22 在 is_cjk 里的后置排除是死代码）。与撞限通道共用
+    # strip_cjk_compatibility 单一事实源。
+    base = normalize_for_extraction(strip_cjk_compatibility(text))
     # R4.18（盲检🔴4/6，根因级重构）：原按类别枚举剥离（S*/P*/Cf/M*/非ASCII
     # L{l,u,t,m}），但类别永远补不完——Nd(阿拉伯数字插进撞限词)/No(½)/Zs(空格
     # NBSP)/Co(私用区)/Lm(ʰ) 逐个绕过；更糟的是 `%`(Po) 被误剥导致 check_scope
@@ -259,10 +275,7 @@ def normalize_for_cjk_keyword(text: str) -> str:
     # 必须在 NFKC **之前**剥除——NFKC 把 U+F900 折成「豈」(U+8C48，统一区)，
     # 事后投影无法区分，兼容字便作为隔断字符混进「轮次耗尽」使子串失配 →
     # READY/0 fail-open。撞限词用字均为常用统一汉字，兼容区无合法用途。
-    raw = "".join(ch for ch in text
-                  if not (0xF900 <= ord(ch) <= 0xFAFF
-                          or 0x2F800 <= ord(ch) <= 0x2FA1F))
-    base = normalize_for_extraction(raw)
+    base = normalize_for_extraction(strip_cjk_compatibility(text))
     return "".join(ch for ch in base
                    if (0x4E00 <= ord(ch) <= 0x9FFF or 0x3400 <= ord(ch) <= 0x4DBF
                        or 0x20000 <= ord(ch) <= 0x2FA1F))

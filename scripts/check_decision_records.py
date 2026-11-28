@@ -61,34 +61,117 @@ RE_DEFAULT_TRUE = re.compile(
     r"set_defaults\s*\(\s*[^)]*require_tag\s*=\s*" + _TRUE + r"|"
     r"set_defaults\s*\(\s*[^)]*[\"']require_tag[\"']\s*:\s*" + _TRUE)
 
-# R4.22（盲检 A🔴6/B🔴2，根因级）：字面枚举 True 是补丁——`default=1`、
-# `default=_TAG_ON`（变量）、`set_defaults(require_tag=1)` 等真值别名语义上
-# 同样把默认值翻成 ON，却都不含 True 字面 → 形态锚零命中 → OK/0 fail-open。
+# R4.22（盲检 A🔴6/B🔴2）+ R4.23（盲检 A🔴3/B🔴1，根因级）：字面枚举 True、
+# 标识符/整数字面都是补丁——`default=0.5` / `-1` / `"1"` / `[1]` / 超长 help
+# 把 default 挤出 240 字符窗口，均绕过形态锚 → OK/0 fail-open。
 # 根因判据：`--require-tag` 用 `action="store_true"` 时正确形态**根本不需要**
-# default 参数（默认即 False）。任何在 require-tag 参数块内出现的 default=
-# 只要值不是显式的假（False/0/None/False 变量），即视为默认值被翻转。
-# 限定在 `--require-tag` 后、下一个 add_argument 前的窗口，避免误伤其它
-# 参数的 default=0/[] 等合法写法。
-_REQUIRE_TAG_BLOCK = re.compile(
-    r"add_argument\(\s*[\"']--require-tag[\"'][\s\S]{0,240}?(?=add_argument\(|\Z)", re.S)
-_DEFAULT_ASSIGN = re.compile(
-    r"default\s*=\s*\(?\s*([A-Za-z_][\w]*|\d+)\)?", re.I)
-_FALSE_LITERALS = {"false", "0", "none", "False", "0", "None"}
+# default 参数（默认即 False）。任何 require-tag 参数块内的 default=（或
+# set_defaults(require_tag=...)）只要语义为真值即违规。两层根治：
+#   ① 参数块定位用**括号配平**（无长度上限，防超长 help 挤出）；
+#   ② 值判定用 `ast.literal_eval` 求 Python 字面量语义后 `bool()`——覆盖
+#      浮点/负数/字符串/容器；求值失败（变量/表达式）保守判真（fail-closed）。
+import ast as _ast
+
+
+def _balanced_call_args(src: str, call_start: int) -> str:
+    """从 `(` 位置起括号配平取到匹配的 `)`，返回内部文本；不配平返回到末尾。"""
+    depth, in_str, quote, esc = 0, False, "", False
+    for i in range(call_start, len(src)):
+        ch = src[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == quote:
+                in_str = False
+            continue
+        if ch in "\"'":
+            in_str, quote = True, ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return src[call_start + 1:i]
+    return src[call_start + 1:]
+
+
+def _expr_is_truthy(expr: str) -> bool:
+    """对 default 的表达式求语义真值：字面量用 literal_eval，其余保守判真。"""
+    expr = expr.strip().rstrip(",").strip()
+    try:
+        val = _ast.literal_eval(expr)
+        return bool(val)  # False/0/0.0/None/""/[]/{}/() 假，其余真
+    except (ValueError, SyntaxError, TypeError, MemoryError, RecursionError):
+        # 变量/函数调用/表达式无法静态求值——保守判真（fail-closed）
+        return True
+
+
+_REQUIRE_TAG_HEAD = re.compile(
+    r"add_argument\(\s*[\"']--require-tag[\"']", re.S)
+_DEFAULT_ASSIGN = re.compile(r"\bdefault\s*=\s*", re.I)
+_SET_DEFAULT_RT = re.compile(r"\bset_defaults\s*\(", re.I)
+
+
+def _default_in_args(args_text: str) -> bool:
+    """参数列表文本内是否有 default=（或 require_tag=）语义真值。"""
+    for m in _DEFAULT_ASSIGN.finditer(args_text):
+        # 从 '=' 后取到顶层逗号/右括号（括号内嵌套由扫描处理）
+        start = m.end()
+        depth, in_str, quote, esc = 0, False, "", False
+        end = len(args_text)
+        for j in range(start, len(args_text)):
+            ch = args_text[j]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == quote:
+                    in_str = False
+                continue
+            if ch in "\"'":
+                in_str, quote = True, ch
+            elif ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                if depth == 0:
+                    end = j
+                    break
+                depth -= 1
+            elif ch == "," and depth == 0:
+                end = j
+                break
+        if _expr_is_truthy(args_text[start:end]):
+            return True
+    return False
 
 
 def has_require_tag_default_true(src: str) -> bool:
-    """require-tag 参数块内是否存在真值 default=（含别名/整数），False/0/None 豁免。"""
-    for block in _REQUIRE_TAG_BLOCK.finditer(src):
-        for m in _DEFAULT_ASSIGN.finditer(block.group(0)):
-            val = m.group(1)
-            if val.lower() not in ("false", "0", "none"):
-                return True
-    # set_defaults(require_tag=1) / set_defaults({"require_tag": 1})
-    for m in re.finditer(
-            r"set_defaults\s*\([^)]*?require_tag\s*=\s*\(?\s*([A-Za-z_]\w*|\d+)\)?",
-            src, re.I):
-        if m.group(1).lower() not in ("false", "0", "none"):
+    """require-tag 参数块/ set_defaults 内是否存在语义真值 default=。"""
+    for head in _REQUIRE_TAG_HEAD.finditer(src):
+        open_paren = src.find("(", head.start())
+        if open_paren < 0:
+            continue
+        if _default_in_args(_balanced_call_args(src, open_paren)):
             return True
+    # set_defaults(require_tag=...) / set_defaults({"require_tag": ...})
+    for call in _SET_DEFAULT_RT.finditer(src):
+        open_paren = src.find("(", call.start())
+        if open_paren < 0:
+            continue
+        args = _balanced_call_args(src, open_paren)
+        for m in re.finditer(r"require_tag\s*=", args, re.I):
+            start = m.end()
+            seg = args[start:].split(",", 1)[0].rstrip(")")
+            if _expr_is_truthy(seg):
+                return True
+        for m in re.finditer(r"[\"']require_tag[\"']\s*:\s*", args, re.I):
+            start = m.end()
+            seg = args[start:].split(",", 1)[0].rstrip("}")
+            if _expr_is_truthy(seg):
+                return True
     return False
 
 # 各 rule 的额外形态锚：(文件, 必须出现的子串元组)
