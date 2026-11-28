@@ -275,6 +275,13 @@ def main() -> int:
     if hyp_updated is None:
         print("❌ 假说池 last_updated 无法解析", file=sys.stderr)
         return 3
+    # R4.22（盲检 A🔴2/B🔴4，根因级）：last_updated 是假说池「更新时间」，
+    # 落到未来即不可信（时钟错误或蓄意改基准洗白证伪）。未来基准下 `cd >
+    # hyp_updated` 与 `age_days > max_age` 恒假，任何已闭环 fatal/severe 都
+    # 被当作「早于池更新」静默吞掉 → CLEAN/0。语义判据：基准在未来时，
+    # 现实中的闭环发现不可能证明「在基准之前已被处置」，一律保守计入
+    # late_fatal（fail-closed）；同时 age_days 上界失效触发例行复核告警。
+    future_pool = hyp_updated > now_canonical()
 
     # H1 修复（审计 C1 2026-10-15）：已处置清单按 finding_id 记账，防"bump 时间戳洗白"
     # L3（2026-11-09）：顶层 list/str/null 与非字符串元素此前抛 AttributeError/TypeError
@@ -371,7 +378,10 @@ def main() -> int:
         # 且两者均为未来时间）此前走 `cd > hyp_updated` 严格比较→相等判「不晚于」
         # → fatal 静默 CLEAN/EXIT=0。统一同日判据：带时间输入也按同日即算晚于，
         # 与纯日期口径一致（保守 fail-closed，宁可多复查不可漏证伪）。
-        if len(_row_str(closed_raw).strip()) <= 10:
+        if future_pool:
+            # 未来基准不可信：无法证明该闭环发现已在基准前处置，保守计入
+            late_fatal.append(row)
+        elif len(_row_str(closed_raw).strip()) <= 10:
             if cd.date() >= hyp_updated.date():
                 late_fatal.append(row)
         elif cd > hyp_updated or cd.date() >= hyp_updated.date():
@@ -395,12 +405,20 @@ def main() -> int:
         alerts.append(f"{len(late_fatal)} 条 fatal/severe 发现闭环于假说池更新之后——活跃假说可能已被其中某些证伪，须逐条复查（语义判断归主理人）")
     if age_days > args.max_age:
         alerts.append(f"假说池 {age_days} 天未更新（> {args.max_age}）——即使无新证伪，也须例行复核")
+    if future_pool:
+        # 未来基准使超期告警（age_days > max_age）恒假；即使台账无 fatal
+        # 发现也不得在不可信基准下静默 CLEAN（fail-closed）。
+        alerts.append("假说池 last_updated 在未来（不可信时间基准）——须校正时钟或核实假说池更新时间")
 
     # C2（2026-11-08）：处置闭环只读验收。默认模式行为完全不变；只有显式传
     # --check-disposition 才启用，供 T0/T2 与 WF1/WF3/WF5 入口作前置门禁。
     if args.check_disposition:
         ok, notes = check_disposition(state_p, late_fatal, hyp_updated, age_days,
                                       args.max_age, state_obj=state_obj, state_err=state_err)
+        if future_pool:
+            # 不可信基准下处置验收不得判 OK（B🔴4：--check-disposition 静默放行）
+            ok = False
+            notes = ["假说池 last_updated 在未来（不可信基准）——处置验收不可判 OK"] + list(notes)
         print(f"\n处置闭环验收: {'OK' if ok else 'INCOMPLETE'}")
         for n in notes:
             print(f"  {'✅' if ok else '🔴'} {n}")

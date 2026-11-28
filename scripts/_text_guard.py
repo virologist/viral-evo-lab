@@ -210,8 +210,14 @@ def normalize_for_matching(text: str) -> str:
     # \s* 本就容忍空白），全角空格经 NFKC 已是 0x20 同样剥除。
     def is_cjk(ch: str) -> bool:
         o = ord(ch)
+        # R4.22（盲检 A🔴4，根因级）：CJK 兼容表意文字区（F900–FAFF）
+        # 不保留——兼容字 NFKC 后折叠成**另一个**统一汉字（如 U+F900→
+        # 「豈」U+8C48），插进「轮次耗尽」仍隔断关键词子串匹配 → READY
+        # fail-open。撞限词/事故叙事用字均为常用统一汉字，兼容区无合法
+        # 用途、纯属隔断攻击面，白名单中排除。扩展区 A/B（3400–4DBF、
+        # 20000–2FA1F）是真正的造字扩展，保留。
         return (0x4E00 <= o <= 0x9FFF or 0x3400 <= o <= 0x4DBF
-                or 0x20000 <= o <= 0x2FA1F or 0xF900 <= o <= 0xFAFF)
+                or 0x20000 <= o <= 0x2FA1F)
 
     def keep(ch: str) -> bool:
         o = ord(ch)
@@ -249,10 +255,17 @@ def normalize_for_cjk_keyword(text: str) -> str:
     ASCII 数字字母（供 PMID/commit 黑名单匹配），无法一刀切剥离；故撞限
     检测单独走此「纯 CJK 投影」：任意非 CJK 隔断自动消失，类别永不遗漏。
     """
-    base = normalize_for_extraction(text)
+    # R4.22（盲检 A🔴4，根因级）：CJK 兼容表意文字（F900–FAFF、2F800–2FA1F）
+    # 必须在 NFKC **之前**剥除——NFKC 把 U+F900 折成「豈」(U+8C48，统一区)，
+    # 事后投影无法区分，兼容字便作为隔断字符混进「轮次耗尽」使子串失配 →
+    # READY/0 fail-open。撞限词用字均为常用统一汉字，兼容区无合法用途。
+    raw = "".join(ch for ch in text
+                  if not (0xF900 <= ord(ch) <= 0xFAFF
+                          or 0x2F800 <= ord(ch) <= 0x2FA1F))
+    base = normalize_for_extraction(raw)
     return "".join(ch for ch in base
                    if (0x4E00 <= ord(ch) <= 0x9FFF or 0x3400 <= ord(ch) <= 0x4DBF
-                       or 0x20000 <= ord(ch) <= 0x2FA1F or 0xF900 <= ord(ch) <= 0xFAFF))
+                       or 0x20000 <= ord(ch) <= 0x2FA1F))
 
 
 def has_forbidden(text: str) -> bool:
@@ -325,9 +338,14 @@ def has_visible_content(text: str) -> bool:
     for ch in normalize_for_extraction(text):
         if unicodedata.category(ch)[0] not in ("L", "N"):
             continue
-        # Hangul Jamo filler 属 Lo 但视觉上是空白占位符（R4.19 已修向量），
-        # 白名单保留这一处具名排除——它是「字母类别却非可见内容」的已知例外。
-        if "FILLER" in unicodedata.name(ch, "").upper():
+        # R4.22（盲检 B🔴5，根因级）：R4.20 按名称子串 FILLER 具名排除仍是枚举——
+        # U+13441 EGYPTIAN HIEROGLYPH FULL BLANK / U+13442 HALF BLANK 是 Lo
+        # （字母类别）但视觉完全空白，名称含 BLANK 不含 FILLER → 被误判为可见
+        # 正文，击穿 G2/G4 waiver 署名与 G6 抽查留痕。语义判据：可见内容必须是
+        # 人类可读文字；Unicode 名称含 FILLER 或 BLANK 的 Lo 字符是占位空白，
+        # 一律排除（埃及象形文字 BLANK、Hangul filler 等同类一并覆盖）。
+        name = unicodedata.name(ch, "").upper()
+        if "FILLER" in name or "BLANK" in name:
             continue
         return True
     return False

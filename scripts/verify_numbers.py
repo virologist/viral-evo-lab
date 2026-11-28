@@ -145,9 +145,17 @@ def has_invisible_marker_gap(text: str) -> bool:
         # 只要 marker 前不邻引号（JSON key 场景），且 mid 后是 =/: + 数字，
         # 即声明隔断。`"phase": 1` / `"confidence": 90` 的 marker 前邻 `"`，
         # 属合法 JSON 字段名，豁免；伪造声明无需引号，故不被豁免。
+        # R4.22（盲检 B🔴1，根因级）：原引号豁免只看 marker 前邻 `"'`，攻击者
+        # 在伪造声明前加任意引号（"pABC=0.94"）即可让整段隔断检测失效 →
+        # checked=0 → PASS。合法 JSON key (`"phase": 1`) 的形态是「前邻引号
+        # **且** marker 后是冒号」；伪造声明 (`pABC=0.94`) 后是等号，不满足。
+        # 收窄豁免为完整 JSON-key 形态，而非单看前邻字符。
+        after_marker = scan[k] if k < len(scan) else ""
+        is_json_key = (m.start() > 0 and scan[m.start() - 1] in "\"'"
+                       and after_marker == ":")
         if (mid and all(ord(c) < 128 for c in mid)
                 and all(cat[0] in ("L", "N") or cat == "Pc" for cat in cats)
-                and not (m.start() > 0 and scan[m.start() - 1] in "\"'")):
+                and not is_json_key):
             v = k + 1
             while v < len(scan) and scan[v].isspace():
                 v += 1
@@ -322,6 +330,15 @@ def prepare_numbers(text: str, min_digits: int = 2):
     # 必须在 norm 生成后同时查原始 text 与归一化 norm（｡ NFKC→。）。
     if re.search(r"\d[。]\d", text) or re.search(r"\d[。]\d", norm):
         return False, [], "数字被句号型小数点隔断"
+    # R4.22（盲检 A🔴9，根因级）：`n = 30′5` / `n = 30'5`（prime/撇号/波浪/
+    # 冒号/连字符）是复合 token，权威源无该值，但 n_eq 尾界允许「数字+分隔符
+    # +数字」后缀 → 提取前缀 30 → 被池中 30 洗白 → PASS（verify_numbers /
+    # vmo / G2 三处同源）。这与 \d。\d 句号小数点同类：声明值内部的数字被
+    # 合法分隔符劈开。仅在**声明 marker 后**检测，避免误伤 1,234 千分位、
+    # 10:30 时间、1-2 范围等无声明前缀的合法写法。
+    if re.search(r"\b[nNpP]\s*[=:]\s*\d+[′'~:\-]\d", text) \
+            or re.search(r"\b[nNpP]\s*[=:]\s*\d+[′'~:\-]\d", norm):
+        return False, [], "数字声明值被合法分隔符劈开为复合 token"
     # 归一化后再查一次劈开（全角→ASCII 后可能出现新的相邻数字-符号结构）
     if has_split_number(norm) or has_broken_key_pattern(norm):
         return False, [], "归一化后数字被隔断"

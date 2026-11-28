@@ -148,6 +148,42 @@ def _legacy_check_task_package(task_text: str) -> tuple[bool, list[str]]:
     return (not missing), missing
 
 
+def _v5_type_precheck(task_text: str) -> list[str]:
+    """R4.22：V5 任务包核心字段类型预检——补 vendor 校验器的类型混淆盲区。
+
+    只做 vendor 未覆盖的「类型必须正确」判据：五要素须字符串或字符串数组，
+    三件套（check/judge_mode/threshold）须字符串。JSON 解析失败交 vendor 处理
+    （本函数不重复报结构错误）。不解析 JSON 的 legacy 文本返回空列表。
+    """
+    m = re.search(r"\{.*\}", task_text, re.S)
+    if not m:
+        return []
+    try:
+        obj = json.loads(m.group(0))
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(obj, dict):
+        return []
+    problems: list[str] = []
+    core = ("objective", "output_format", "task_boundary")
+    for f in core:
+        if f in obj and not isinstance(obj[f], str):
+            problems.append(f"要素 {f} 类型非法（{type(obj[f]).__name__}，须字符串）")
+    if "constraints" in obj:
+        c = obj["constraints"]
+        if not isinstance(c, list) or any(not isinstance(x, str) for x in c):
+            problems.append(f"要素 constraints 类型非法（须字符串数组）")
+    ac = obj.get("acceptance_criteria")
+    if isinstance(ac, list):
+        for idx, item in enumerate(ac, 1):
+            if not isinstance(item, dict):
+                continue  # vendor 已报「验收项不是对象」
+            for k in ("check", "judge_mode", "threshold"):
+                if k in item and not isinstance(item[k], str):
+                    problems.append(f"验收项 #{idx} {k} 类型非法（{type(item[k]).__name__}，须字符串）")
+    return problems
+
+
 def check_task_package_auto(task_text: str, expert_dir: Path,
                             force_legacy: bool = False) -> tuple[bool, list[str], str]:
     """任务包校验统一入口。返回 (ok, problems, mode)；mode ∈ {v5, legacy, legacy-forced}。"""
@@ -157,6 +193,17 @@ def check_task_package_auto(task_text: str, expert_dir: Path,
     fn = _load_v5_checker(expert_dir)
     if fn is not None:
         ok, problems = fn(task_text)
+        # R4.22（盲检 A🔴10，根因级·本包自治加固）：联邦 vendor V5 校验器的
+        # 枚举/引用校验用 `isinstance(x,str) and x not in ENUM` 肯定式判据——
+        # 非字符串（judge_mode=0 / threshold=0 / 五要素={}）直接跳过 → 结构
+        # 门禁被类型混淆糊弄。联邦件归 shared-core 真源所有，不在本包改动
+        # （避免污染 6 个 vendor 副本的 sha 一致性）；改在本调用层做类型预检：
+        # vendor 判 ok 后，对任务包 JSON 的核心字段复核类型，非字符串/非
+        # 字符串数组即 fail-closed。与 vendor 校验是叠加关系，不替代。
+        type_problems = _v5_type_precheck(task_text)
+        if type_problems:
+            ok = False
+            problems = list(problems) + type_problems
         return ok, problems, "v5"
     log("⚠ vendor V5 校验器缺失（vendor/shared-core/assemble_spawn_prompt.py 不在位），"
         "回退旧子串校验——该模式可被散文糊弄，建议恢复 vendor 文件")

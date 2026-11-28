@@ -256,7 +256,12 @@ def main() -> int:
             hitlimit.append(member)
             continue
         age_min = (now - f.stat().st_mtime) / 60
-        if age_min >= args.red_min:
+        if age_min < -1:
+            # R4.22（盲检 A🔴3，根因级）：mtime 落到未来不可信——age_min 为负
+            # 使红/黄超时判据恒假，未来 mtime 的陈旧产出被误判 READY/0。
+            # 留 60 秒时钟漂移容差，超出即按「mtime 异常」保守计入红超时。
+            red.append(f"{member}(mtime 在未来 {(-age_min):.0f}min)")
+        elif age_min >= args.red_min:
             red.append(f"{member}({age_min:.0f}min)")
         elif age_min >= args.yellow_min:
             yellow.append(f"{member}({age_min:.0f}min)")

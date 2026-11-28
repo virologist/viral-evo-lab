@@ -4,6 +4,32 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.39] - 2026-11-28（R4.22 v1.5.38 双路盲检回补 · 13 项坐实 fail-open 根因级修复）
+
+v1.5.38 两路独立盲检（A 通用 10🔴+3🟠 / B 对抗红队 5🔴+4🟠，去重 13 项）报告正文均送达。主代理对 13 项逐条自建 fixture + 真实 CLI 独立复现，**13/13 坐实零证伪**（A2=B4、A6=B2 重复项合并计）。本轮系统性根因：**时间基准无未来上界**（A1/A2/A3/B3）、**形态锚枚举真值字面/名称子串**（A5/A6/B5）、**同一文件语义只判路径不判 inode**（A8）、**肯定式类型判据跳过非字符串**（A10）、**合法豁免边界过宽**（B1/A9）。
+
+### Fixed（13 项，全部主代理独立复现 + 正字对照）
+- **A1 台账未来 ts**（`audit_decision_log.py`）：`(now-max).days` 负 age 使陈旧告警永久失效 → 任何条目 ts > now(+08 canonical) 即内容违规 EXIT=5。
+- **A2/B4 假说池未来 last_updated**（`hypothesis_watch.py`）：未来基准使 `cd>hyp_updated` 与超期告警恒假、fatal 被静默吞 → 未来基准下所有 closed fatal/severe 保守计入 late_fatal，`--check-disposition` 同步不得判 OK，即使无 fatal 也不静默 CLEAN。R4.13「future 同日 fatal」合法用例保持 EXIT=5。
+- **A3 poll 未来 mtime**（`poll_run_dir.py`）：负 age_min 使红/黄超时恒假 → mtime 超 60s 容差落未来即按 mtime 异常计入红超时。
+- **A4 CJK 兼容字隔断撞限词**（`_text_guard.py`）：U+F900 NFKC 折成另一统一汉字（豈）后仍隔断关键词 → 在 NFKC **之前**剥除兼容表意文字区（F900–FAFF、2F800–2FA1F），白名单同步排除。
+- **A5 G4 gate_mode 大小写**（`check_gates.py`）：`== "block"` 精确匹配使 BLOCK/Block 让阻断态消失 → 归一化比较，合法枚举 {block,warn,pass}，未知/非字符串 fail-closed 按阻断。
+- **A6/B2 require-tag default 真值别名**（`check_decision_records.py`）：形态锚只认 True 字面，`default=1`/变量别名绕过 → 窄窗口判据：`--require-tag` 参数块内任何非假（False/0/None）的 default= 即翻转，set_defaults 同口径。
+- **A7 锚 commit=""+tag**（`check_baseline_anchors.py`）：`if src.get("commit")` 假值跳过 HEAD 比对 → source 一旦声明 commit 字段，值必须非空字符串且与 HEAD 相符；无该键的 tag-only fixture 仍合法。
+- **A8 硬链接代写台账**（`reconcile_decisions.py`）：只判 resolve 相等/文件名 → 加 `os.path.samefile` inode 判据，stat 失败保守拒绝。
+- **A9 数字声明 prime 复合 token**（`verify_numbers.py`）：`n = 30′5` 提取 30 被池洗白 → 声明 marker 后「数字+合法分隔符+数字」复合 token fail-closed（与已修 \d。\d 同类），不误伤 1,234/10:30。
+- **A10 V5 类型混淆**（`scripts/assemble_spawn_prompt.py` 本包调用层）：vendor V5 用 `isinstance(x,str) and x not in ENUM` 肯定式判据跳过非字符串 → 本包 `_v5_type_precheck` 在 vendor 判 ok 后复核五要素/三件套类型（联邦件归 shared-core 真源，不在本包改动以免污染 6 个 vendor 副本 sha）。
+- **B1 引号豁免**（`verify_numbers.py`）：仅看 marker 前邻引号，`"pABC=0.94"` 即可绕过 → 收窄为完整 JSON-key 形态（前邻引号 **且** marker 后是冒号）。
+- **B3 G4 ts 未来/非字符串**（`check_gates.py`）：ts 字段存在时必须合法 ISO 字符串且不晚于当前（+60s 容差），非字符串/空/不可解析/未来即内容锚不可信 fail-closed。
+- **B5 可见内容 BLANK Lo**（`_text_guard.py`）：按名称子串 FILLER 枚举，U+13441/13442 EGYPTIAN BLANK（Lo 视觉空白）击穿 G2/G4 waiver 与 G6 → 语义判据：名称含 FILLER 或 BLANK 的 Lo 一律视为占位空白。
+
+### 披露不修（1 项🟠）
+- **B3 远期过去 ts**：ts=2026-01-01（drift>2天）仍在互证窗口外。与合法存量 fixture（ts=固定旧值 2026-11-09）结构同类，强行按时间窗口一刀切必误伤存量 G4 用例；只能靠枚举具体日期（脆弱补丁，违反根因纪律）。已修同族最危险的「未来/非字符串/空」三态，剩余远端过去态列为残留。
+
+### Verified
+- 13 项回归断言复用既有 `test_gate_fuzz` / `test_decision_records_guard` 函数（零新增 `def test_*`），机器锚 `CURRENT_BASELINE = 45 CASES + 16 行为级 = 61/61` 不变。
+- 全链：pytest 19/19 / fuzz 17/17 / manifest 80 文件 / compileall OK；四处 version=1.5.39；包外锚与治理仓同步见 commit。
+
 ## [1.5.38] - 2026-11-28（R4.21 v1.5.37 双路盲检回补 · 11/11 坐实：数字劈开 Cn/无界 + severity 非字母 + 目录零检查 + 短 mid 上限 + default 括号 + poll 事件黑名单 + 锚 source 空 + 多语分隔符 + G5 自洽 + G4 ts 锚）
 
 主代理对盲检 A(4🔴)+B(9🔴) 去重后 11 项逐条自建 fixture 真实 CLI 独立复现，**11/11 坐实零证伪**，每条带正字对照。根因级修复（拒绝「补上限/加白名单」式补丁）：

@@ -149,11 +149,20 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
         # fixture 可只给 tag（如 {"tag":"v1.5.8"}），不得误拒。
         rep["structural_errors"].append("锚 source 无 commit/tag 溯源字段（不可跳过校验）")
     if isinstance(src, dict) and head:
-        if src.get("commit") and src["commit"] != head:
-            # R4.1：归 drift（契约表 :46「commit 与 history 不一致」= 漂移 EXIT=5）
-            rep["drift_errors"].append(
-                f"锚 source.commit={str(src['commit'])[:7]}… 与 git HEAD={head[:7]}… 不符"
-                "（疑改锚刷绿或忘记 --refresh）")
+        # R4.22（盲检 A🔴7，根因级）：`if src.get("commit")` 在空串/假值时跳过
+        # HEAD 比对，`tag + commit=""` 即可重写锚内容刷绿。根因：source 一旦
+        # 声明 commit 字段，其值就是溯源断言，必须非空且与 HEAD 相符；
+        # 「只给 tag 不给 commit」的 fixture 形态（无该键）仍合法。
+        if "commit" in src:
+            cv = src["commit"]
+            if not isinstance(cv, str) or not cv.strip():
+                rep["structural_errors"].append(
+                    "锚 source.commit 字段存在但为空/非字符串（不可跳过 HEAD 溯源校验）")
+            elif cv != head:
+                # R4.1：归 drift（契约表 :46「commit 与 history 不一致」= 漂移 EXIT=5）
+                rep["drift_errors"].append(
+                    f"锚 source.commit={str(cv)[:7]}… 与 git HEAD={head[:7]}… 不符"
+                    "（疑改锚刷绿或忘记 --refresh）")
         hist = obj.get("refresh_history")
         if isinstance(hist, list) and hist:
             last = hist[-1] if isinstance(hist[-1], dict) else {}

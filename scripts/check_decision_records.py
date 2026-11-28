@@ -61,6 +61,36 @@ RE_DEFAULT_TRUE = re.compile(
     r"set_defaults\s*\(\s*[^)]*require_tag\s*=\s*" + _TRUE + r"|"
     r"set_defaults\s*\(\s*[^)]*[\"']require_tag[\"']\s*:\s*" + _TRUE)
 
+# R4.22（盲检 A🔴6/B🔴2，根因级）：字面枚举 True 是补丁——`default=1`、
+# `default=_TAG_ON`（变量）、`set_defaults(require_tag=1)` 等真值别名语义上
+# 同样把默认值翻成 ON，却都不含 True 字面 → 形态锚零命中 → OK/0 fail-open。
+# 根因判据：`--require-tag` 用 `action="store_true"` 时正确形态**根本不需要**
+# default 参数（默认即 False）。任何在 require-tag 参数块内出现的 default=
+# 只要值不是显式的假（False/0/None/False 变量），即视为默认值被翻转。
+# 限定在 `--require-tag` 后、下一个 add_argument 前的窗口，避免误伤其它
+# 参数的 default=0/[] 等合法写法。
+_REQUIRE_TAG_BLOCK = re.compile(
+    r"add_argument\(\s*[\"']--require-tag[\"'][\s\S]{0,240}?(?=add_argument\(|\Z)", re.S)
+_DEFAULT_ASSIGN = re.compile(
+    r"default\s*=\s*\(?\s*([A-Za-z_][\w]*|\d+)\)?", re.I)
+_FALSE_LITERALS = {"false", "0", "none", "False", "0", "None"}
+
+
+def has_require_tag_default_true(src: str) -> bool:
+    """require-tag 参数块内是否存在真值 default=（含别名/整数），False/0/None 豁免。"""
+    for block in _REQUIRE_TAG_BLOCK.finditer(src):
+        for m in _DEFAULT_ASSIGN.finditer(block.group(0)):
+            val = m.group(1)
+            if val.lower() not in ("false", "0", "none"):
+                return True
+    # set_defaults(require_tag=1) / set_defaults({"require_tag": 1})
+    for m in re.finditer(
+            r"set_defaults\s*\([^)]*?require_tag\s*=\s*\(?\s*([A-Za-z_]\w*|\d+)\)?",
+            src, re.I):
+        if m.group(1).lower() not in ("false", "0", "none"):
+            return True
+    return False
+
 # 各 rule 的额外形态锚：(文件, 必须出现的子串元组)
 RULE_ANCHORS: dict[str, dict[str, tuple[str, ...]]] = {
     "require_tag_default_off": {},
@@ -206,8 +236,8 @@ def check(pkg_root: Path, records_path: Path) -> tuple[int, dict]:
             if rule == "require_tag_default_off":
                 if not RE_STORE_TRUE.search(src_norm):
                     rep["violations"].append(f"{rid}: {rel} 已非 action=\"store_true\" 形态")
-                if RE_DEFAULT_TRUE.search(src_norm):
-                    rep["violations"].append(f"{rid}: {rel} 出现 default=True（默认值被翻转）")
+                if RE_DEFAULT_TRUE.search(src_norm) or has_require_tag_default_true(src_norm):
+                    rep["violations"].append(f"{rid}: {rel} 出现 default=True/真值别名（默认值被翻转）")
             # 其余 rule：文件内形态锚必须齐备
             for needle in RULE_ANCHORS[rule].get(rel, ()):
                 if needle not in src_norm:

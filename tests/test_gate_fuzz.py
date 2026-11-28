@@ -307,6 +307,123 @@ def test_gate_fuzz() -> None:
             failures.append(msg)
     assert not failures, "门禁 fuzz 失败:\n  " + "\n  ".join(failures)
 
+    # R4.22（盲检双路 13 项坐实 fail-open 回归）——刻意复用本函数：零新增
+    # `def test_*`，不动脚本 main() 的 CASES+16 行为级机器锚。每项自建最小
+    # fixture + 真实 CLI 实跑，断言 fail-closed，正字对照保持合法。
+    def _rc(script: str, *args: str) -> int:
+        return subprocess.run([sys.executable, str(PKG / "scripts" / script), *args],
+                              capture_output=True, text=True, timeout=60).returncode
+
+    with tempfile.TemporaryDirectory(prefix="r422_") as td:
+        d = Path(td)
+        # A1 audit_decision_log 未来 ts → 内容违规 5
+        led = d / "decision_log.csv"
+        led.write_text("ts,actor,decision_type,decision,rationale,tier\n"
+                       "2099-01-01T00:00:00+08:00,lead,x,y,z,通知档\n", encoding="utf-8")
+        assert _rc("audit_decision_log.py", str(led), "--max-age-days", "30") == 5, \
+            "R4.22 A1 未来台账 ts 须 EXIT=5"
+        # A2 hypothesis_watch 未来 last_updated 吞 fatal → REVIEW 5
+        ro = d / "ro"
+        (ro / "context_stack").mkdir(parents=True)
+        (ro / "00_governance").mkdir(parents=True)
+        (ro / "context_stack" / "confirmed_hypotheses.json").write_text(json.dumps({
+            "last_updated": "2099-01-01T00:00:00+08:00", "active_hypotheses": []}), encoding="utf-8")
+        (ro / "00_governance" / "redteam_ledger.csv").write_text(
+            "finding_id,severity,status,closed_date,finding_summary\n"
+            "F-R422,fatal,closed,2026-11-28,证伪\n", encoding="utf-8")
+        assert _rc("hypothesis_watch.py", "--research-ops", str(ro)) == 5, \
+            "R4.22 A2 未来池基准吞 fatal 须 EXIT=5"
+        # A3 poll 未来 mtime → NOT_READY 5
+        run3 = d / "run3"; run3.mkdir()
+        art3 = run3 / "T-X__phylo-analyst.md"
+        art3.write_text("# deliverable\n", encoding="utf-8")
+        os.utime(art3, (2 ** 31, 2 ** 31))  # 2038 未来
+        assert _rc("poll_run_dir.py", str(run3), "T-X", "--expected", "phylo-analyst") == 5, \
+            "R4.22 A3 未来 mtime 须 EXIT=5"
+        # A4 poll CJK 兼容字插撞限词 → 撞限 5
+        for f in run3.glob("*.md"):
+            f.unlink()
+        art4 = run3 / "T-X__phylo-analyst.md"
+        art4.write_text("<!-- 轮\uf900次耗尽：产出不完整 -->\n", encoding="utf-8")
+        assert _rc("poll_run_dir.py", str(run3), "T-X", "--expected", "phylo-analyst") == 5, \
+            "R4.22 A4 CJK 兼容字隔断撞限词须 EXIT=5"
+        # A9 数字声明 prime 复合 token → 3；B1 引号豁免 pABC → 3
+        src9 = d / "src9"; src9.mkdir()
+        (src9 / "truth.csv").write_text("n,30\np,0.9441\n", encoding="utf-8")
+        a9 = d / "a9.md"; a9.write_text("样本 n = 30\u20325\n", encoding="utf-8")
+        assert _rc("verify_numbers.py", str(a9), "--sources", str(src9)) == 3, \
+            "R4.22 A9 prime 复合 token 须 EXIT=3"
+        b1 = d / "b1.md"; b1.write_text('"pABC=0.94"\n', encoding="utf-8")
+        assert _rc("verify_numbers.py", str(b1), "--sources", str(src9)) == 3, \
+            "R4.22 B1 引号豁免伪造声明须 EXIT=3"
+        # B5 可见内容 BLANK Lo 视觉空白 → G6 不合格 5
+        g6 = d / "g6"; g6.mkdir()
+        (g6 / "spawn_manifest.jsonl").write_text(
+            json.dumps({"event": "spawn", "task_id": "T-X", "member": "phylo-analyst"}) + "\n",
+            encoding="utf-8")
+        (g6 / "T-X__phylo-analyst.md").write_text(json.dumps(BASE_ENV) + "\n", encoding="utf-8")
+        (g6 / "T-X__checklist.json").write_text(json.dumps({
+            "verdict": "PASS", "items_total": 1, "items_passed": 1,
+            "sources_checked": 1, "hallucinated": 0}) + "\n", encoding="utf-8")
+        blank = "\U00013441" * 4
+        (g6 / "T-X__evidence_check.json").write_text(json.dumps({
+            "checks": [{"kind": "抽查", "actor": blank, "reason": blank, "excerpt": blank,
+                        "line": 1, "file": "x.md"}]}) + "\n", encoding="utf-8")
+        ev_rc = _rc("verify_evidence_check.py", str(g6))
+        assert ev_rc in (3, 5), f"R4.22 B5 BLANK 视觉空白须不合格，实为 EXIT={ev_rc}"
+        # A5 G4 gate_mode 大小写变体 → 阻断态信号不得消失 5
+        gm = d / "gm"; gm.mkdir(); (gm / "src").mkdir()
+        (gm / "src" / "t.csv").write_text("90\n", encoding="utf-8")
+        (gm / "T-X__phylo-analyst.md").write_text(json.dumps(BASE_ENV) + "\n", encoding="utf-8")
+        (gm / "T-X__checklist.json").write_text(json.dumps({
+            "verdict": "PASS", "items_total": 1, "items_passed": 1,
+            "sources_checked": 1, "hallucinated": 0}) + "\n", encoding="utf-8")
+        oc5 = {"artifact_mtimes": {}, "verdict": "DEGRADE", "gate_mode": "BLOCK",
+               "unverified": [{"member": "phylo-analyst", "kind": "n_eq", "value": "777"}]}
+        (gm / "T-X__output-check.json").write_text(json.dumps(oc5) + "\n", encoding="utf-8")
+        assert _rc("check_gates.py", str(gm), "T-X", "--sources", str(gm / "src")) == 5, \
+            "R4.22 A5 gate_mode=BLOCK 不得静默放行"
+        # A6 require-tag default 真值别名 → 在 test_decision_records_guard 中
+        # 复用其完整最小包 fixture 加断言（见该函数末尾 R4.22 段），此处不重复。
+        # A7 锚 source commit=""+tag → 结构错 3；A8 硬链接代写台账 → 拒绝 3
+        anch = json.loads((PKG / "integrity_manifest.json").read_text(encoding="utf-8"))
+        anch["source"] = {"tag": "v1.5.8", "commit": ""}
+        af = d / "anchor.json"; af.write_text(json.dumps(anch), encoding="utf-8")
+        assert _rc("check_baseline_anchors.py", "--anchors", str(af),
+                   "--pkg-root", str(PKG)) == 3, "R4.22 A7 commit 空串须 EXIT=3"
+        recon = d / "recon"; (recon / "run").mkdir(parents=True)
+        (recon / "decision_log.csv").write_text(
+            "ts,actor,decision_type,decision,rationale,tier\n"
+            "2026-11-27T10:00:00+08:00,lead,initial,基线,初始,通知档\n",
+            encoding="utf-8", newline="")
+        (recon / "run" / "T-X__waivers.json").write_text(
+            json.dumps({"waivers": [{"gate": "G2", "value": "79", "reason": "x"}]}), encoding="utf-8")
+        os.link(recon / "decision_log.csv", recon / "DRAFT.csv")
+        assert _rc("reconcile_decisions.py", "--run-dirs", str(recon / "run"),
+                   "--ledger", str(recon / "decision_log.csv"),
+                   "--draft-out", str(recon / "DRAFT.csv")) == 3, \
+            "R4.22 A8 硬链接别名代写台账须 EXIT=3"
+        # B3 G4 ts 未来/非字符串 → 内容锚不可信（配合阻断态时 FAIL）。
+        # 无阻断信号的纯 PASS 态 G4 不拦截属设计（见 CHANGELOG 残留披露），
+        # 此处断言「未来 ts + DEGRADE 未处置」仍 FAIL，锁定修复语义。
+        (gm / "T-X__output-check.json").write_text(json.dumps({
+            "artifact_mtimes": {}, "ts": "2099-01-01T00:00:00", "verdict": "DEGRADE",
+            "gate_mode": "block",
+            "unverified": [{"member": "phylo-analyst", "kind": "n_eq", "value": "777"}]}),
+            encoding="utf-8")
+        assert _rc("check_gates.py", str(gm), "T-X", "--sources", str(gm / "src")) == 5, \
+            "R4.22 B3 未来 ts 阻断态仍须 EXIT=5"
+        # A10 V5 任务包非字符串类型混淆 → 本包调用层类型预检拒绝 4
+        bad_v5 = {"objective": "d", "output_format": "md", "constraints": [],
+                  "task_boundary": "仅本任务",
+                  "acceptance_criteria": [{"check": "存在", "judge_mode": 0, "threshold": 0}]}
+        v5f = d / "v5.json"; v5f.write_text(json.dumps(bad_v5, ensure_ascii=False), encoding="utf-8")
+        assert subprocess.run([sys.executable, str(PKG / "scripts" / "assemble_spawn_prompt.py"),
+                               "--member", "literature-scout", "--task-file", str(v5f),
+                               "--check-task-package", "--out", str(d / "spawn.md")],
+                              capture_output=True, text=True, timeout=60).returncode == 4, \
+            "R4.22 A10 非字符串 judge_mode/threshold 须 EXIT=4"
+
 
 def test_g4_waiver_release() -> None:
     """L3（2026-11-09）：G4 阻断态的 waiver 放行五路径行为回归。
@@ -2220,6 +2337,21 @@ def test_decision_records_guard() -> None:
                                capture_output=True, text=True, timeout=60)
             assert p.returncode == 3 and "Traceback" not in p.stderr, \
                 f"rule 容器 {bad_rule!r} 应结构错误 EXIT=3，实为 {p.returncode}: {p.stderr[-200:]}"
+
+        # R4.22（盲检 A🔴6/B🔴2）：default 真值别名（1 / 变量）与 default=True
+        # 语义等价地把 ADR-001 默认值翻成 ON，字面形态锚零命中。复用本 fixture
+        # 的完整裁决记录：恢复 records → 三处 CLI 恢复 → 仅把 check_gates.py
+        # 的 store_true 改 default=1 → 须 EXIT=5/VIOLATION。
+        dr.write_bytes((PKG / "docs" / "decision_records.json").read_bytes())
+        cg = root / "scripts" / "check_gates.py"
+        cg.write_bytes((PKG / "scripts" / "check_gates.py").read_bytes())
+        src = cg.read_text(encoding="utf-8")
+        cg.write_text(src.replace('action="store_true",\n                    help="严审模式',
+                                  'action="store_true", default=1,\n                    help="严审模式', 1),
+                      encoding="utf-8")
+        rc, rep = run()
+        assert rc == 5 and rep["verdict"] == "VIOLATION", \
+            f"R4.22 A6 default=1 真值别名须 EXIT=5: rc={rc} rep={rep}"
 
         # R4.3（盲检🟠A）：契约正本/SKILL 文件缺失不得被静默跳过却输出
         # 「全员契约完整」虚假 PASS（删文件反而 PASS、留空文件反而 FAIL）。

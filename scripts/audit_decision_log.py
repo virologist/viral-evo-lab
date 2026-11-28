@@ -172,6 +172,21 @@ def audit(path: Path, min_entries: int, max_age_days: int | None,
         rep["verdict"] = "TOO_FEW"
         return EXIT_STRUCT, rep
 
+    # R4.22（盲检 A🔴1，根因级）：时间戳必须有未来上界。原实现仅算
+    # age=(now-max).days，未来 ts 得负 age → `age > max_age` 恒假 → 陈旧
+    # 告警永久失效（HEALTHY/0 代替 STALE/6）。台账 ts 是决策发生时点，
+    # 落到未来即数据不可信（时钟错误或蓄意改 ts 洗白陈旧），fail-closed。
+    # 语义判据而非窗口补丁：任何条目 ts > now（+08 canonical 同基准）即违规。
+    now_ref = now_canonical()
+    future_ts = [t.isoformat(timespec="seconds") for t in parsed_times
+                 if t > now_ref]
+    if future_ts:
+        rep["violations"].append(
+            f"台账含未来时间戳（{len(future_ts)} 条，最新 {future_ts[-1]}）——"
+            "ts 须为决策实际发生时点，未来值使陈旧检测永久失效")
+        rep["verdict"] = "CONTENT_VIOLATION"
+        return EXIT_CONTENT, rep
+
     # 内容层：任一违规即 5（优先于陈旧）
     if rep["violations"]:
         rep["verdict"] = "CONTENT_VIOLATION"

@@ -812,18 +812,30 @@ def main() -> int:
             # 这把单一可变锚（mtime）升级为「内容锚 ts + 文件锚 mtime 互证」。
             ts_touched = False
             ts_val = oc_data.get("ts")
-            if isinstance(ts_val, str) and ts_val:
-                try:
-                    from datetime import datetime as _dt
-                    ts_epoch = _dt.fromisoformat(ts_val).timestamp()
-                    drift = oc_mtime - ts_epoch
-                    # 仅在 ts 与 oc mtime 同属「近期产物」（差 < 2 天）时互证：
-                    # 存量测试 fixture 用固定旧 ts（如 2026-11-09），差十几天，
-                    # 属合成数据，不参与 touch 判定（否则误伤 G4 存量用例）。
-                    if 0 <= drift < 172800:
-                        ts_touched = drift > 2.0
-                except (ValueError, TypeError):
-                    ts_touched = True   # ts 不可解析即不可信
+            # R4.22（盲检 B🔴3，根因级）：原判据只在 `0 <= drift < 2天` 窄窗口
+            # 生效，窗口外（未来 ts → drift<0；远期过去 → drift≥2天）及非字符串
+            # /空 ts 一律「无罪推定」，配合 touch oc 抹时序证据即 G4 PASS。
+            # 根因：ts 是核验时刻内容锚，一旦落盘必为合法 ISO 字符串且不晚于
+            # 当前时刻。分两层：① ts 字段存在但非字符串/空/不可解析/未来 →
+            # 锚本身不可信，fail-closed；② 合法过去 ts 才进入 mtime 互证窗口。
+            if "ts" in oc_data:
+                if not isinstance(ts_val, str) or not ts_val.strip():
+                    ts_touched = True  # 非字符串/空 ts 不可信
+                else:
+                    try:
+                        from datetime import datetime as _dt
+                        ts_epoch = _dt.fromisoformat(ts_val.replace("Z", "+00:00")).timestamp()
+                        now_epoch = _dt.now().timestamp()
+                        if ts_epoch > now_epoch + 60:
+                            ts_touched = True  # 未来核验时刻不可信（留 60s 容差）
+                        else:
+                            drift = oc_mtime - ts_epoch
+                            # 存量 fixture 用固定旧 ts（2026-11-09），差十几天，
+                            # 属合成数据，不参与 touch 判定（否则误伤 G4 存量用例）。
+                            if 0 <= drift < 172800:
+                                ts_touched = drift > 2.0
+                    except (ValueError, TypeError, OverflowError):
+                        ts_touched = True   # ts 不可解析即不可信
             if ts_touched:
                 problems.append(
                     "核验记录文件 mtime 晚于其 ts 核验时刻（疑 touch 抹时序证据）"
@@ -836,7 +848,20 @@ def main() -> int:
             # 判定二：阻断态 DEGRADE 未处置
             # A-6 修复：verdict 缺失(None)在 block 态下**不得**豁免——
             # 「没有 verdict」不等于「核验通过」，否则 output-check.json 被截断即可绕过阻断。
-            block_mode = gate_mode == "block"
+            # R4.22（盲检 A🔴5，根因级）：gate_mode 是消费侧可读写的留痕字段，
+            # `== "block"` 精确匹配使 BLOCK/Block/带空格等大小写变体让阻断态
+            # 信号整体消失（DEGRADE 未处置被静默放行）。合法枚举恒为纯 ASCII
+            # 窄集（block/warn/pass），归一化后比较；未知/非字符串形态本身
+            # 不可信，保守按阻断态处理（fail-closed），不给绕过留口。
+            _VALID_GATE_MODES = {"block", "warn", "pass"}
+            if gate_mode is None:
+                block_mode = False  # 存量 fixture 普遍缺省（无阻断态语义）
+            elif isinstance(gate_mode, str):
+                gm_norm = gate_mode.strip().lower()
+                # warn/pass 是已知非阻断态；block 及任何未知字符串一律阻断
+                block_mode = gm_norm not in ("warn", "pass")
+            else:
+                block_mode = True  # 非字符串形态异常 → 保守阻断
             verdict_val = oc_data.get("verdict")
             verdict_missing = verdict_val is None
             blocked = block_mode and (verdict_val != "PASS" or verdict_missing)

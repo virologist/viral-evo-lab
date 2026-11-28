@@ -159,9 +159,20 @@ def reconcile(run_dirs: list[Path], ledger: Path, task_id: str = "") -> tuple[in
 
 def write_draft(rep: dict, out: Path, ledger: Path) -> tuple[int, str]:
     """生成待人工终裁草稿；**拒绝写入任何名为 decision_log.csv 的路径**。"""
-    if out.expanduser().resolve() == ledger.expanduser().resolve() \
-            or out.name.lower() == "decision_log.csv":
-        return EXIT_STRUCT, "拒绝：draft-out 指向台账或同名文件（ADR-004 脚本不代写台账）"
+    import os as _os
+    out_x, ledger_x = out.expanduser(), ledger.expanduser()
+    # R4.22（盲检 A🔴8，根因级）：原只判 resolve() 路径相等与文件名——硬链接
+    # 是独立路径名，绕过两条判据后 open("w") 沿同一 inode 改写真台账。根因：
+    # 「指向台账」的语义是 inode 同一，不是路径字符串相等。加 samefile 判据。
+    same_inode = False
+    try:
+        if out_x.exists() and ledger_x.exists():
+            same_inode = _os.path.samefile(out_x, ledger_x)
+    except OSError:
+        same_inode = True  # stat 失败无法排除同一文件，保守拒绝
+    if out_x.resolve() == ledger_x.resolve() or same_inode \
+            or out_x.name.lower() == "decision_log.csv":
+        return EXIT_STRUCT, "拒绝：draft-out 指向台账（含硬链接别名）或同名文件（ADR-004 脚本不代写台账）"
     ts = datetime.now().astimezone().isoformat(timespec="seconds")
     try:
         with out.open("w", encoding="utf-8", newline="") as fh:
