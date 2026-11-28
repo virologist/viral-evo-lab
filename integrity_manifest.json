@@ -1,17 +1,17 @@
 {
- "generated": "2026-11-27T10:01:00",
+ "generated": "2026-11-28T09:20:15",
  "file_count": 80,
  "files": {
   ".claude-plugin/marketplace.json": {
-   "sha16": "9bedcd339b33de92",
+   "sha16": "5da720fe45da178f",
    "bytes": 706
   },
   ".claude-plugin/plugin.json": {
-   "sha16": "14c3959fb82763e8",
+   "sha16": "b8b3da94393eb371",
    "bytes": 6693
   },
   ".codebuddy-plugin/plugin.json": {
-   "sha16": "5b8b2003cdb3d468",
+   "sha16": "04dc16bf1a9bf582",
    "bytes": 6722
   },
   ".gitignore": {
@@ -31,8 +31,8 @@
    "bytes": 39918
   },
   "CHANGELOG.md": {
-   "sha16": "b662c6cf449aa6ea",
-   "bytes": 129645
+   "sha16": "5406b448de679f4d",
+   "bytes": 132714
   },
   "CLAUDE.md": {
    "sha16": "8412c2c388a01f7f",
@@ -163,8 +163,8 @@
    "bytes": 6211
   },
   "scripts/_text_guard.py": {
-   "sha16": "88c84e4212e6f38b",
-   "bytes": 20601
+   "sha16": "577e069ace99a693",
+   "bytes": 21119
   },
   "scripts/assemble_spawn_prompt.py": {
    "sha16": "5a393bffb87ce07d",
@@ -175,20 +175,20 @@
    "bytes": 10185
   },
   "scripts/check_baseline_anchors.py": {
-   "sha16": "a6c2373a8d7105a2",
-   "bytes": 16976
+   "sha16": "ea34f0009601992e",
+   "bytes": 17733
   },
   "scripts/check_decision_records.py": {
-   "sha16": "b38d5652f2083378",
-   "bytes": 13806
+   "sha16": "461ffad6f8fb6a94",
+   "bytes": 14108
   },
   "scripts/check_gates.py": {
-   "sha16": "99c1028bfa6a9240",
-   "bytes": 51490
+   "sha16": "5905531ca225eb3d",
+   "bytes": 54024
   },
   "scripts/check_scope.py": {
-   "sha16": "c52eb1139092351e",
-   "bytes": 10938
+   "sha16": "ea9a5d8c8547fd1a",
+   "bytes": 13675
   },
   "scripts/cron_watch.sh": {
    "sha16": "e916ea3dd6c97794",
@@ -207,8 +207,8 @@
    "bytes": 6361
   },
   "scripts/hypothesis_watch.py": {
-   "sha16": "f69bb682825cfd78",
-   "bytes": 23922
+   "sha16": "f4b5a4c3ffa1bc34",
+   "bytes": 24452
   },
   "scripts/install_cron_watch.sh": {
    "sha16": "2ad7aad9a46c4895",
@@ -219,8 +219,8 @@
    "bytes": 3978
   },
   "scripts/poll_run_dir.py": {
-   "sha16": "e068c93dae23ea60",
-   "bytes": 15250
+   "sha16": "43c9f0da36ba126b",
+   "bytes": 16183
   },
   "scripts/reconcile_decisions.py": {
    "sha16": "a7e3e78e070bdc1e",
@@ -243,8 +243,8 @@
    "bytes": 10843
   },
   "scripts/verify_numbers.py": {
-   "sha16": "98d3a48d4d0273dd",
-   "bytes": 34695
+   "sha16": "5f8d9c8bd13583d7",
+   "bytes": 34939
   },
   "scripts/write_checklist.py": {
    "sha16": "b13758f90e2c617b",
@@ -307,8 +307,8 @@
    "bytes": 26688
   },
   "tests/test_gate_fuzz.py": {
-   "sha16": "a8665fd73f8fcdf9",
-   "bytes": 178530
+   "sha16": "ddc75f74e2b8e070",
+   "bytes": 187741
   },
   "tests/test_vendor_core.py": {
    "sha16": "f8d84c878e702178",

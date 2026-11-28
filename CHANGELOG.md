@@ -4,6 +4,23 @@ All notable changes to **viral-evo-lab** are documented here. Format follows [Ke
 
 > **2026-11-07 补记说明**：v1.1.1~v1.5.0 区间曾长期缺条目（版本记录断层，已按治理约束⑤索引同步修复）。以下补记条目均从 git tag 链与提交信息反推，逐条附 commit hash 溯源；措辞可能较当时实况简略，以 git 历史为准。
 
+## [1.5.38] - 2026-11-28（R4.21 v1.5.37 双路盲检回补 · 11/11 坐实：数字劈开 Cn/无界 + severity 非字母 + 目录零检查 + 短 mid 上限 + default 括号 + poll 事件黑名单 + 锚 source 空 + 多语分隔符 + G5 自洽 + G4 ts 锚）
+
+主代理对盲检 A(4🔴)+B(9🔴) 去重后 11 项逐条自建 fixture 真实 CLI 独立复现，**11/11 坐实零证伪**，每条带正字对照。根因级修复（拒绝「补上限/加白名单」式补丁）：
+
+- **R1/R2 数字劈开**（`_text_guard.py`）：`_SPLIT_BAD_CATS` 补 `Cn`（未分配码点）；`_SPLIT_NUM` 去掉 `{1,64}` 上限改无界（`\d` 起点 + 贪婪 + 前瞻无灾难性回溯）。Cn 隔断与 65×Sm 隔断由 PASS(0) → EXIT=3。
+- **R3 severity/status 非字母隔断**（`hypothesis_watch.py`）：判据从「非 ASCII 字母(L)」改为「任意非 ASCII 字符」——合法枚举恒为纯 ASCII 窄集，类别枚举补不完。Cn/Nd/Po/Zs 隔断由 CLEAN(0) → EXIT=5。
+- **R4 目录零检查**（`check_scope.py`）：显式目录参数递归展开 .md/.py，展开为空即结构错误 EXIT=3。
+- **R5 短 mid 上限**（`verify_numbers.py`）：去掉 `len(mid)<=2` 上限，改语义判据——任意长 ASCII 字母/数字/下划线 mid，marker 前不邻引号（JSON key 豁免）且后接 `=`/`:` + 数字即隔断。pABC/pXYZ → EXIT=3。
+- **R6 default 括号**（`check_decision_records.py`）：`RE_DEFAULT_TRUE` 容忍 `True` 前的包裹括号（`\(*\s*`）。`default=(True)` → EXIT=5。
+- **R7 poll 事件黑名单**（`poll_run_dir.py`）：改显式已知非 spawn 事件白名单；event/type 任一键含 spawn 语义（strip 后）即 fail-closed，只有存在的键全在白名单内才跳过。伪装 type=spawn+event=evidence_check / event=spawn\\t → EXIT=5。
+- **R8 锚 source 空**（`check_baseline_anchors.py`）：source 须含 commit 或 tag 非空字符串溯源字段。`{}`/`commit:null`/`commit:""` → EXIT=3。
+- **R9 多语分隔符**（`check_scope.py`）：从 `_EQUIV_TRANS` 单一事实源反向提取所有映射为 `.`/`,` 的字符纳入紧凑投影；再叠加「数字间任何分隔符一律剥离」投影覆盖千分位语义。U+066C/066B/30FB → EXIT=3。
+- **R10 G5 自洽**（`check_gates.py`）：消费侧补 `items_passed==items_total` 且 `hallucinated==0`（与生产者单一事实源一致）。1 总/0 通过/99 幻觉 → EXIT=5。
+- **R11 G4 ts 锚**（`check_gates.py`）：oc 内容 `ts`（核验时刻）与文件 mtime 互证，差 >2s（且 ts 在近 2 天内）即判 touch 抹时序 → G4 FAIL。真实 `verify_member_output` 产物（带指纹+ts）篡改+touch 实测 EXIT=5。**空指纹手写 oc（无 ts/无 checked_artifacts）属调用方可完全伪造元数据的信任边界，披露为残留（🟠），不伪造根治补丁**。
+
+回归断言复用既有 6 个测试函数，零新增 `def test_*`，机器锚 `CURRENT_BASELINE = 45 CASES + 16 行为级 = 61/61` 不变。全链：pytest 19/19 / fuzz 61/61 / manifest 80 文件 --check EXIT=0 / compileall OK。
+
 ## [1.5.37] - 2026-11-27（R4.20 v1.5.36 双路盲检回补 · 12/12 坐实：空壳审判/waiver/渲染契约 + 检查范围缩水 + 投影空白 + status 同形 + ASCII 隔断）
 
 v1.5.36 两路独立盲检（前台同步，报告均送达）：A 通用 6🔴+5🟠，B 对抗红队 7🔴+3🟠，U+2800 视觉空白项重复，去重后 12 项候选。主代理对 12 项逐条自建 fixture 真实 CLI 独立复现（含正字对照），**12/12 全部坐实、零证伪**；其中 3 项因盲检 fixture 字段口径有误，重建最小用例后复核坐实。另有 4 项🟠低风险根治、3 项🟠披露不修。本轮教训：**「检查范围由被检对象自报」与「空工作量即 PASS」是两类新的语义空壳化**——修复不能只补形态锚，须固定检查范围与工作量下限。

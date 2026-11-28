@@ -52,10 +52,14 @@ RE_STORE_TRUE = re.compile(
 # 语义等价，却绕过了只认字面 `default=True` 的形态锚。补 set_defaults 的
 # 关键字与字典两种写法；固定真源仍是 ADR-001「三处 CLI 默认关闭」，不枚举
 # 具体调用形态之外的业务字段。
+# R4.21（盲检 B🔴2）：`default=(True)` 用括号包裹 True 即失配——原正则
+# 要求 `=`/`:` 后紧跟 True。根因修：`True` 前允许任意层左括号与空白
+# （`\(*\s*`），且 `set_defaults` 分支的 `require_tag=` 后同样容忍。
+_TRUE = r"\(*\s*True\b"
 RE_DEFAULT_TRUE = re.compile(
-    r"""default\s*=\s*True"""
-    r"""|set_defaults\s*\(\s*[^)]*require_tag\s*=\s*True"""
-    r"""|set_defaults\s*\(\s*[^)]*["']require_tag["']\s*:\s*True""")
+    r"default\s*=\s*" + _TRUE + r"|"
+    r"set_defaults\s*\(\s*[^)]*require_tag\s*=\s*" + _TRUE + r"|"
+    r"set_defaults\s*\(\s*[^)]*[\"']require_tag[\"']\s*:\s*" + _TRUE)
 
 # 各 rule 的额外形态锚：(文件, 必须出现的子串元组)
 RULE_ANCHORS: dict[str, dict[str, tuple[str, ...]]] = {

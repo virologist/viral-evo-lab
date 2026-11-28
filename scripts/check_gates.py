@@ -804,6 +804,30 @@ def main() -> int:
                                  if a.stat().st_mtime > oc_mtime]
             except OSError:
                 post_tampered = []
+            # R4.21（盲检 B🔴8）：篡改 artifact 后 touch oc 使 mtime 反转，
+            # 上面的 `artifact > oc` 判据即失效。根因：oc 文件 mtime 可被
+            # touch 伪造。缓解：oc 内容里的 `ts`（verify_member_output 落盘的
+            # 核验时刻，内容字段）与 oc 文件 mtime 应一致；若 mtime 明显晚于
+            # ts（>2s），说明核验记录文件本身被 touch 过，判 G4 FAIL。
+            # 这把单一可变锚（mtime）升级为「内容锚 ts + 文件锚 mtime 互证」。
+            ts_touched = False
+            ts_val = oc_data.get("ts")
+            if isinstance(ts_val, str) and ts_val:
+                try:
+                    from datetime import datetime as _dt
+                    ts_epoch = _dt.fromisoformat(ts_val).timestamp()
+                    drift = oc_mtime - ts_epoch
+                    # 仅在 ts 与 oc mtime 同属「近期产物」（差 < 2 天）时互证：
+                    # 存量测试 fixture 用固定旧 ts（如 2026-11-09），差十几天，
+                    # 属合成数据，不参与 touch 判定（否则误伤 G4 存量用例）。
+                    if 0 <= drift < 172800:
+                        ts_touched = drift > 2.0
+                except (ValueError, TypeError):
+                    ts_touched = True   # ts 不可解析即不可信
+            if ts_touched:
+                problems.append(
+                    "核验记录文件 mtime 晚于其 ts 核验时刻（疑 touch 抹时序证据）"
+                    "——须重跑 verify_member_output")
             if post_tampered:
                 problems.append(
                     f"artifact 在核验记录写完后又被修改（时序判据）: {post_tampered}"
@@ -901,10 +925,22 @@ def main() -> int:
                     record("G5 审判留痕", False,
                            f"空壳审判：items_total={it!r}/sources_checked={sc!r} 须为正整数")
                 else:
-                    extra = ""
-                    if cd.get("hallucinated"):
-                        extra = f"（hallucinated={cd.get('hallucinated')}）"
-                    record("G5 审判留痕", True, f"{cl.name}（verdict=PASS{extra}）")
+                    # R4.21（盲检 B🔴7）：消费侧只验正数量，不验自洽——
+                    # `items_total=1/items_passed=0/hallucinated=99/verdict=PASS`
+                    # 手改 JSON 即过。生产者 write_checklist 的 PASS 定义是
+                    # items_passed==items_total 且 hallucinated==0；消费侧必须
+                    # 复核同一不变量（单一事实源口径），否则手改可绕过。
+                    ip = cd.get("items_passed")
+                    hal = cd.get("hallucinated")
+                    self_consistent = (
+                        isinstance(ip, int) and not isinstance(ip, bool) and ip == it
+                        and isinstance(hal, int) and not isinstance(hal, bool) and hal == 0)
+                    if not self_consistent:
+                        record("G5 审判留痕", False,
+                               f"审判不自洽：items_passed={ip!r}≠items_total={it!r} "
+                               f"或 hallucinated={hal!r}≠0（PASS 须全通过且零幻觉）")
+                    else:
+                        record("G5 审判留痕", True, f"{cl.name}（verdict=PASS）")
         except (json.JSONDecodeError, OSError, ValueError, TypeError, AttributeError) as e:
             record("G5 审判留痕", False, f"checklist.json 解析失败: {e}")
 

@@ -140,11 +140,14 @@ def has_invisible_marker_gap(text: str) -> bool:
         if any(cat in gap_cats for cat in cats):
             return True
         # R4.20（盲检 B🔴6）：ASCII 侧隔断 `pA=0.94` / `n_=94` 此前全灭。
-        # 但合法 JSON 字段名 `"phase": 1` 的独立 p + mid="hase" 也是 L 类，
-        # 不能一律拦。根因判据：伪造声明是「短 ASCII 隔断（1~2 字符）
-        # + =/: 分隔符 + 紧跟数字」；长英文单词是字段名，不是声明标记。
-        if (mid and len(mid) <= 2 and all(ord(c) < 128 for c in mid)
-                and any(cat[0] in ("L", "N") or cat == "Pc" for cat in cats)):
+        # R4.21（盲检 B🔴1）：len(mid)<=2 是「上限补丁」——pABC/pXYZ 三字符
+        # 即绕过。根因判据：**任何长度**的 ASCII 字母/数字/下划线 mid 拼接，
+        # 只要 marker 前不邻引号（JSON key 场景），且 mid 后是 =/: + 数字，
+        # 即声明隔断。`"phase": 1` / `"confidence": 90` 的 marker 前邻 `"`，
+        # 属合法 JSON 字段名，豁免；伪造声明无需引号，故不被豁免。
+        if (mid and all(ord(c) < 128 for c in mid)
+                and all(cat[0] in ("L", "N") or cat == "Pc" for cat in cats)
+                and not (m.start() > 0 and scan[m.start() - 1] in "\"'")):
             v = k + 1
             while v < len(scan) and scan[v].isspace():
                 v += 1

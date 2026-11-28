@@ -139,6 +139,15 @@ def check(anchors: Path, pkg_root: Path) -> tuple[int, dict]:
     # 锚 schema 明定 source 必填；git HEAD 可用时缺失即结构错误 EXIT=3。
     if head and not isinstance(src, dict):
         rep["structural_errors"].append("锚 source 缺失/非对象（不可跳过 commit 溯源校验）")
+    # R4.21（盲检 B🔴5）：source={} / commit=null / commit="" 都通过
+    # isinstance(dict)，而 `if src.get("commit")` 假值使整段溯源校验跳过。
+    # 根因修：source.commit 必须是非空字符串——锚 schema 明定 commit 必填，
+    # 空值即无法溯源，与「删掉 source 字段」同口径 EXIT=3。
+    elif head and not any(isinstance(src.get(k), str) and src.get(k).strip()
+                          for k in ("commit", "tag")):
+        # 溯源锚至少要有 commit 或 tag 之一——真实锚两者都有；自包含测试
+        # fixture 可只给 tag（如 {"tag":"v1.5.8"}），不得误拒。
+        rep["structural_errors"].append("锚 source 无 commit/tag 溯源字段（不可跳过校验）")
     if isinstance(src, dict) and head:
         if src.get("commit") and src["commit"] != head:
             # R4.1：归 drift（契约表 :46「commit 与 history 不一致」= 漂移 EXIT=5）

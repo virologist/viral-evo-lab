@@ -18,7 +18,20 @@ from pathlib import Path
 
 # R4.2/R4.3：复用单一事实源的不可见字符检测（Cc/Cf/U+FFFD），避免内联判定与守卫漂移
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _text_guard import has_forbidden  # noqa: E402
+from _text_guard import has_forbidden, _EQUIV_TRANS  # noqa: E402
+
+# R4.21（盲检 B🔴6）：紧凑投影的分隔符字符集此前硬编码 `。．｡` / `,，`，
+# 漏掉 _text_guard._EQUIV_TRANS 中的多语小数点（U+066B/00B7/30FB/FF61/
+# 2022/06D4/0387/2027/FF0E）与阿拉伯千分位（U+066C）。根因修：从单一事实源
+# _EQUIV_TRANS **反向提取**所有映射为 '.' 或 ',' 的源字符，投影集自动随
+# 单一事实源扩展，不再枚举（枚举补不完）。
+_DOT_SEPS = "".join(sorted(
+    chr(k) for k, v in _EQUIV_TRANS.items() if v == ".")) + "。．｡."
+# ASCII 逗号是千分位投影的目标字符本身（_EQUIV_TRANS 的值而非键），须显式纳入。
+_COMMA_SEPS = "".join(sorted(
+    chr(k) for k, v in _EQUIV_TRANS.items() if v == ",")) + "，,"
+_DOT_CLASS = "[" + re.escape(_DOT_SEPS) + "]"
+_COMMA_CLASS = "[" + re.escape(_COMMA_SEPS) + "]"
 
 # 项目特定叙事黑名单（关键词式；命中即疑似污染）
 # 原则：禁"具体事件"（错案位点+具体数字+具体PMID+具体事故日）
@@ -115,19 +128,36 @@ def check_file(p: Path) -> list:
     # 逗号漏投影 → 后续 normalize_for_matching 剥掉句号、保留逗号 →
     # 黑名单字面量永假。根因修：投影本身按「分隔点 + 两侧空白」语义匹配，
     # 并纳入全角逗号 U+FF0C；仍只作用于数字/字母之间，不动句尾标点。
-    compact_src = re.sub(r"(?<=\d)\s*[。．｡]\s*(?=\d)", ".", text)
+    compact_src = re.sub(r"(?<=\d)\s*" + _DOT_CLASS + r"\s*(?=\d)", ".", text)
     # `.pre-backup-...` 黑名单前置可为字母（`file。pre-...`），句号同样
     # 充当分隔点；字母侧同样归一。
-    compact_src = re.sub(r"(?<=[A-Za-z0-9])\s*[。．｡]\s*(?=[A-Za-z0-9])", ".", compact_src)
-    compact_src = re.sub(r"(?<=\d)\s*[,，]\s*(?=\d)", "", compact_src)
+    compact_src = re.sub(r"(?<=[A-Za-z0-9])\s*" + _DOT_CLASS + r"\s*(?=[A-Za-z0-9])",
+                         ".", compact_src)
+    compact_src = re.sub(r"(?<=\d)\s*" + _COMMA_CLASS + r"\s*(?=\d)", "", compact_src)
+    seen_pats = {h[1] for h in hits}
     if compact_src != text:
         compact_norm = normalize_for_matching(compact_src)
-        seen_pats = {h[1] for h in hits}
         for pat in PATTERNS:
             if pat.pattern in seen_pats:
                 continue
             if pat.search(compact_norm):
                 hits.append((-1, pat.pattern, compact_norm.strip()[:80]))
+                seen_pats.add(pat.pattern)
+    # R4.21（盲检 B🔴6）：多语小数点（U+066B/30FB/00B7…）可能是千分位语义
+    # （`41٫034380` 即 41034380），上一步投影成 `41.034380` 后点被保留，
+    # 黑名单字面量仍失配。根因修：再做一次「数字间任何分隔符一律剥离」的
+    # 紧凑投影（千分位语义），两种投影都扫——点型保小数点、剥离型保分组，
+    # 覆盖同一字符的两种语境，不误伤合法文本（只匹配数字间的分隔符）。
+    all_seps = "[" + re.escape(_DOT_SEPS + _COMMA_SEPS) + "]"
+    stripped = re.sub(r"(?<=\d)\s*" + all_seps + r"\s*(?=\d)", "", text)
+    if stripped != text:
+        strip_norm = normalize_for_matching(stripped)
+        for pat in PATTERNS:
+            if pat.pattern in seen_pats:
+                continue
+            if pat.search(strip_norm):
+                hits.append((-1, pat.pattern, strip_norm.strip()[:80]))
+                seen_pats.add(pat.pattern)
     return hits
 
 
@@ -140,7 +170,22 @@ def main() -> int:
     args = ap.parse_args()
     base = Path(__file__).resolve().parent.parent
     if args.paths:
-        targets = [Path(a) for a in args.paths]
+        # R4.21（盲检 A🔴4）：原实现把显式参数逐字当文件路径，传目录时
+        # check_file 对无 .md/.py 后缀的目录直接返回 []，检查 0 个文件却
+        # 输出「全部干净」 EXIT=0——空工作量被当成功。根因修：显式路径
+        # 同样展开为文件集（目录 rglob 收 .md/.py），展开后为空即结构错误。
+        targets = []
+        for raw in args.paths:
+            p = Path(raw)
+            if p.is_dir():
+                targets.extend(f for f in p.rglob("*")
+                               if f.is_file() and f.suffix.lower() in (".md", ".py"))
+            else:
+                targets.append(p)
+        if not targets:
+            print("❌ 待检路径展开后无 .md/.py 文件（拒绝以零检查量报 clean）",
+                  file=sys.stderr)
+            return 3
     else:
         targets = [p for p in base.rglob("*") if p.is_file() and p.suffix.lower() in (".md", ".py")]
     # 自检豁免：本脚本自身 + 纪律契约 + .learnings/（本身记录具体事件）

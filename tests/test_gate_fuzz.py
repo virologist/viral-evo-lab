@@ -558,6 +558,27 @@ def test_disposition_gate() -> None:
         g4 = next(g for g in rep["gates"] if str(g["gate"]).startswith("G4"))
         assert g4["ok"] is False, "R4.20 核验后时序篡改须 G4 FAIL"
 
+    # R4.21（盲检 B🔴7/B🔴8）：G5 消费侧自洽 + G4 ts 内容锚互证。
+    with tempfile.TemporaryDirectory(prefix="r421_gate_") as td:
+        d = Path(td); (d / "sources").mkdir()
+        (d / "sources" / "truth.csv").write_text("90\n1\n", encoding="utf-8")
+        art = d / "T-FUZZ__phylo-analyst.md"
+        art.write_text(json.dumps(BASE_ENV) + "\n", encoding="utf-8")
+        (d / "T-FUZZ__waivers.json").write_text("null\n", encoding="utf-8")
+        (d / "T-FUZZ__output-check.json").write_text(
+            json.dumps({"artifact_mtimes": {}}), encoding="utf-8")
+        def g5rc(ocl):
+            (d / "T-FUZZ__checklist.json").write_text(json.dumps(ocl), encoding="utf-8")
+            return subprocess.run([sys.executable, str(CHECK_GATES), str(d), TASK_ID,
+                                   "--sources", str(d / "sources")],
+                                  capture_output=True, text=True).returncode
+        assert g5rc({"ts": "2026-11-27T00:00:00", "task_id": TASK_ID,
+                     "items_total": 4, "items_passed": 4, "sources_checked": 1,
+                     "hallucinated": 0, "verdict": "PASS"}) == 0, "R4.21 合规 checklist 须 EXIT=0"
+        assert g5rc({"ts": "2026-11-27T00:00:00", "task_id": TASK_ID,
+                     "items_total": 1, "items_passed": 0, "sources_checked": 1,
+                     "hallucinated": 99, "verdict": "PASS"}) == 5, "R4.21 不自洽 checklist 须 EXIT=5"
+
 
 def test_tc3_timezone_canonicalize() -> None:
     """R2（2026-11-15 · T-C3）：parse_dt 必须 canonicalize 带偏移输入到 +08:00，
@@ -1652,6 +1673,24 @@ def test_require_tag_gate() -> None:
                                 capture_output=True, text=True).returncode
             assert rc == want, f"R4.20 vn {text!r}/{src} 须 EXIT={want}，实为 {rc}"
 
+    # R4.21（盲检 A🔴1/A🔴2/B🔴1）：数字劈开类别 Cn + {1,64} 有界 + 短 mid 上限
+    # 三处 fail-open 回归——Cn/65×Sm 隔断须 EXIT=3；pABC/pXYZ 长 mid 隔断须 EXIT=3。
+    with tempfile.TemporaryDirectory(prefix="r421_vn_") as td:
+        d = Path(td)
+        (d / "t09.csv").write_text("0.9\n", encoding="utf-8")
+        (d / "pool.csv").write_text("0.11\n", encoding="utf-8")
+        def vr(src, truth):
+            (d / "a.md").write_text(src, encoding="utf-8")
+            return subprocess.run([sys.executable, str(PKG / "scripts" / "verify_numbers.py"),
+                                   str(d / "a.md"), "--sources", str(d / truth), "--json"],
+                                  capture_output=True, text=True).returncode
+        assert vr("p = 0.9\u03784\n", "t09.csv") == 3, "R4.21 Cn 隔断数字须 EXIT=3"
+        assert vr("p = 0.9" + "\u2b30" * 65 + "4\n", "t09.csv") == 3, "R4.21 65×Sm 隔断须 EXIT=3"
+        assert vr("n = 94\u03785\n", "t09.csv") in (3, 5), "R4.21 n 声明 Cn 隔断不得 PASS"
+        assert vr("结果 pABC=0.94\n", "pool.csv") == 3, "R4.21 pABC 长 mid 隔断须 EXIT=3"
+        assert vr("结果 pXYZ:0.94\n", "pool.csv") == 3, "R4.21 pXYZ 冒号隔断须 EXIT=3"
+        assert vr("结果 pA=0.94\n", "pool.csv") == 3, "R4.21 pA 短 mid 对照须 EXIT=3"
+
 
 def test_poll_hitlimit_and_manifest() -> None:
     """R-13a/c（2026-11-09）：撞限标注消费 + --from-manifest 行为级守卫。
@@ -1791,6 +1830,29 @@ def test_poll_hitlimit_and_manifest() -> None:
         mf.write_text(good + '{"task_id":"T-X","type":"spawn",'
                       '"member":["research-diagnostician"]}\n', encoding="utf-8")
         assert prc() == 5, "R4.20 type=spawn 非字符串 member 须 EXIT=5"
+
+    # R4.21（盲检 B🔴4）：event 优先 type 的黑名单跳过 → 畸形 spawn 行 READY。
+    # 任一键含 spawn 语义（含尾随空白）即 fail-closed EXIT=5；已知非 spawn
+    # 事件（evidence_check）继续跳过。
+    with tempfile.TemporaryDirectory(prefix="r421_poll_") as td:
+        d = Path(td)
+        (d / "T-RT__literature-scout.md").write_text("产出\n", encoding="utf-8")
+        mf = d / "spawn_manifest.jsonl"
+        def prc():
+            return subprocess.run([sys.executable, str(PKG / "scripts" / "poll_run_dir.py"),
+                                   str(d), "T-RT", "--from-manifest"],
+                                  capture_output=True, text=True).returncode
+        mf.write_text('{"task_id":"T-RT","member":"literature-scout"}\n'
+                      '{"event":"evidence_check","actor":"lead"}\n', encoding="utf-8")
+        assert prc() == 0, "R4.21 已知非 spawn 事件须正常 READY"
+        mf.write_text('{"task_id":"T-RT","member":"literature-scout"}\n'
+                      '{"task_id":"T-RT","type":"spawn","event":"evidence_check",'
+                      '"member":["victim"]}\n', encoding="utf-8")
+        assert prc() == 5, "R4.21 type=spawn+event 伪装须 EXIT=5"
+        mf.write_text('{"task_id":"T-RT","member":"literature-scout"}\n'
+                      '{"task_id":"T-RT","event":"spawn\\t","member":["victim"]}\n',
+                      encoding="utf-8")
+        assert prc() == 5, "R4.21 event=spawn 尾随空白须 EXIT=5"
 
 
 def test_legacy_package_check_fallback() -> None:
@@ -2049,6 +2111,23 @@ def test_baseline_anchor_roundtrip() -> None:
         rep = json.loads(r.stdout)
         assert r.returncode == 3 and rep["verdict"] == "ANCHOR_SOURCE_INVALID", \
             f"R4.20 锚 source 缺失须结构错误，实为 rc={r.returncode} rep={rep}"
+
+    # R4.21（盲检 B🔴5）：source={} / commit=null / commit="" 借假值跳过
+    # commit 溯源——须与「删掉 source」同口径 EXIT=3。
+    with tempfile.TemporaryDirectory(prefix="r421_anch_") as td:
+        d = Path(td)
+        rel = "tests/test_vendor_core.py"
+        entry = {"sha256": hashlib.sha256((PKG / rel).read_bytes()).hexdigest(),
+                 "bytes": (PKG / rel).stat().st_size}
+        for src in ({}, {"commit": None}, {"commit": ""}):
+            anchor = d / "a.json"
+            anchor.write_text(json.dumps({"schema_version": 1, "source": src,
+                                          "files": {rel: entry}}, ensure_ascii=False),
+                              encoding="utf-8")
+            rc = subprocess.run([sys.executable, str(PKG / "scripts" / "check_baseline_anchors.py"),
+                                 "--anchors", str(anchor), "--json"],
+                                capture_output=True, text=True).returncode
+            assert rc == 3, f"R4.21 锚 source={src!r} 无溯源字段须 EXIT=3"
 
 
 def test_decision_records_guard() -> None:
@@ -2426,6 +2505,39 @@ def test_decision_records_guard() -> None:
         for ch in ("\u2800", "\ue000", "\u115f", "\u200b"):
             assert g6rc(ch) == 5, f"R4.20 G6 视觉空白 {ch!r} 须 EXIT=5"
 
+    # R4.21（盲检 A🔴4/B🔴2/B🔴6）：check_scope 目录递归 / drec default 括号 /
+    # 多语千分位分隔符投影，四处 fail-open 回归。
+    with tempfile.TemporaryDirectory(prefix="r421_scope_") as td:
+        d = Path(td)
+        poison = d / "poison"; poison.mkdir()
+        (poison / "evil.md").write_text("# 复盘\n具体 PMID PP 41034380\n", encoding="utf-8")
+        src = subprocess.run([sys.executable, str(PKG / "scripts" / "check_scope.py"),
+                              str(poison)], capture_output=True, text=True).returncode
+        assert src == 3, "R4.21 check_scope 传目录须递归检查 EXIT=3"
+        for txt in ("事故编号 PP 41\u066c034\u066c380\n", "事故编号 PP 41\u066b034380\n",
+                    "事故编号 PP 41\u30fb034\u30fb380\n"):
+            (poison / "evil.md").write_text(txt, encoding="utf-8")
+            src = subprocess.run([sys.executable, str(PKG / "scripts" / "check_scope.py"),
+                                  str(poison / "evil.md")], capture_output=True, text=True).returncode
+            assert src == 3, f"R4.21 多语分隔符投影 {txt!r} 须 EXIT=3"
+    with tempfile.TemporaryDirectory(prefix="r421_drec_") as td:
+        d = Path(td); (d / "scripts").mkdir(); (d / "tests").mkdir()
+        records = json.loads((PKG / "docs" / "decision_records.json").read_text(encoding="utf-8"))
+        art = next(r for r in records["records"]
+                   if r["verification"]["rule"] == "require_tag_default_off")
+        records["records"] = [art]
+        (d / "records.json").write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
+        (d / "tests" / "anchors.py").write_text(
+            "# test_require_tag_gate\n# require_tag 闸三点接线存活\n", encoding="utf-8")
+        for fn in ("check_gates.py", "verify_numbers.py", "verify_member_output.py"):
+            (d / "scripts" / fn).write_text(
+                'ap.add_argument("--require-tag", action="store_true", default=(True))\n',
+                encoding="utf-8")
+        rc = subprocess.run([sys.executable, str(PKG / "scripts" / "check_decision_records.py"),
+                             "--pkg-root", str(d), "--records", str(d / "records.json"),
+                             "--json"], capture_output=True, text=True).returncode
+        assert rc == 5, "R4.21 default=(True) 括号包裹须 EXIT=5"
+
 
 def test_g6_evidence_gate() -> None:
     """ADR-002 / SOP T-D1：G6 从软门变成可触发硬门，且 SKIP 必须留痕。"""
@@ -2555,6 +2667,28 @@ def test_g6_evidence_gate() -> None:
         assert hwrc("fatal", "clo\u0561ed") == 5, "R4.20 status 同形须 REVIEW_REQUIRED"
         assert hwrc("fat\u0430l", "clo\u0561ed") == 5, "R4.20 双字段组合攻击须 REVIEW_REQUIRED"
         assert hwrc("fatal", "closed") == 5, "R4.20 合法 closed 基线须 REVIEW_REQUIRED"
+
+    # R4.21（盲检 A🔴3/B🔴3/B🔴9）：severity/status 任意非 ASCII 字符隔断
+    # （Cn/Nd/Po/Zs）须保守计入 REVIEW_REQUIRED，不得 CLEAN。
+    with tempfile.TemporaryDirectory(prefix="r421_hw_") as td:
+        hw = Path(td)
+        (hw / "context_stack").mkdir()
+        (hw / "00_governance").mkdir()
+        (hw / "context_stack" / "confirmed_hypotheses.json").write_text(json.dumps({
+            "active_hypotheses": [{"id": "H-1", "status": "active", "claim": "x"}],
+            "last_updated": "2026-11-20"}, ensure_ascii=False), encoding="utf-8")
+        led = hw / "00_governance" / "redteam_ledger.csv"
+        def hwrc(sev, st):
+            led.write_text(f"finding_id,severity,status,closed_date,finding_summary\n"
+                           f"F-X,{sev},{st},2026-11-26,证伪\n", encoding="utf-8")
+            return subprocess.run([sys.executable, str(PKG / "scripts" / "hypothesis_watch.py"),
+                                   "--research-ops", str(hw)],
+                                  capture_output=True, text=True).returncode
+        for sev, st in (("fatal\u0378", "closed"), ("fatal", "clo\u0378sed"),
+                        ("fatal", "clo\u0663ed"), ("fata\u0663", "closed"),
+                        ("fatal\u00b7", "closed"), ("fatal", "clo\u00a0sed")):
+            assert hwrc(sev, st) == 5, f"R4.21 severity/status 非 ASCII 隔断 {sev!r}/{st!r} 须 EXIT=5"
+        assert hwrc("fat\u03b1l", "closed") == 5, "R4.20 希腊字母对照须 EXIT=5"
 
 
 def test_reconcile_decisions() -> None:

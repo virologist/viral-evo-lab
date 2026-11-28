@@ -331,9 +331,11 @@ def main() -> int:
             # 经归一化不收敛 ASCII → 整行被当作未闭环直接丢弃；与已修的
             # severity 同形组合后两道防线一起失效。语义判据：status 含
             # 非 ASCII 字母即视为「不可信的 closed 声明」，保守计入复查。
-            suspicious_status = any(
-                ord(c) > 127 and unicodedata.category(c)[0] == "L"
-                for c in _row_str(row.get("status")))
+            # R4.21（盲检 A🔴3/B🔴3/B🔴9）：任何非 ASCII 字符插入（Cn/Nd/Po/Zs
+            # 等，非仅字母）都让归一化后收敛不到 closed → 整行隐身。根因：
+            # 合法枚举恒为纯 ASCII 窄集（closed/fatal/severe），故任何非 ASCII
+            # 字符出现在该字段即不可信，无需枚举 Unicode 类别（枚举补不完）。
+            suspicious_status = any(ord(c) > 127 for c in _row_str(row.get("status")))
             if not suspicious_status:
                 continue
         if norm_sev not in ("fatal", "severe"):
@@ -344,8 +346,10 @@ def main() -> int:
             # 冒充嫌疑，保守按 fatal 计入 late_fatal（fail-closed，宁可多复查）。
             # 合法中文 severity 值（如「严重」）虽也非 ASCII，但专家包台账契约
             # 固定英文枚举，此处保守判定不误伤合法英文 fatal/severe。
-            if any(ord(c) > 127 and unicodedata.category(c)[0] == "L"
-                   for c in norm_sev_raw):
+            # R4.21（盲检 A🔴3/B🔴9）：同上——非字母类非 ASCII（Cn/Nd/Po/Zs）
+            # 同样让精确匹配失效。合法 severity 恒为纯 ASCII 窄集，故只要
+            # 含任何非 ASCII 字符即保守计入复查。
+            if any(ord(c) > 127 for c in norm_sev_raw):
                 late_fatal.append(row)
             continue
         closed_raw = row.get("closed_date") or ""

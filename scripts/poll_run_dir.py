@@ -127,10 +127,22 @@ def load_expected_from_manifest(run_dir: Path) -> tuple[list[str] | None, str]:
                 # R4.20（盲检 B🔴7）：原 `elif "event" in obj or "type" in obj`
                 # 只按键存在性判定「非 spawn」，于是 `type:"spawn"` +
                 # 非字符串 member 被静默跳过、期望清单缩水仍 READY。
-                # 改白名单：仅已知非 spawn 事件（evidence_check 等）跳过；
-                # 其余畸形记录一律计入 bad 并 fail-closed。
-                event = obj.get("event", obj.get("type"))
-                if isinstance(event, str) and event not in ("spawn", "spawn_agent"):
+                # R4.21（盲检 B🔴4）：`obj.get("event", obj.get("type"))` 让
+                # event 键优先——`type:"spawn"` + `event:"evidence_check"` 仍被
+                # 当非 spawn 跳过；且「除 spawn 外任意字符串」是黑名单不是
+                # 白名单。根因修：只有**显式列出的已知非 spawn 事件**且
+                # event/type 两键都不含 spawn 语义才可跳过；任一键是 spawn
+                # 语义（含尾随空白变体，strip 后判定）即畸形 fail-closed。
+                ev = obj.get("event")
+                ty = obj.get("type")
+                vals = [v.strip() for v in (ev, ty) if isinstance(v, str)]
+                is_spawn = any(v in ("spawn", "spawn_agent") for v in vals)
+                known_nonspawn = {"evidence_check", "gate_check", "verification",
+                                  "check", "review", "heartbeat"}
+                # 非 spawn 事件记录可只有 event 键（evidence_check 等无 type），
+                # 故只要求「存在的键值都在已知非 spawn 白名单内」，不要求两键齐全。
+                if (not is_spawn and vals
+                        and all(v in known_nonspawn for v in vals)):
                     continue
                 bad += 1
         else:
